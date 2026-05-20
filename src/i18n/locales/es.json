@@ -1,0 +1,39 @@
+{
+  "common": {
+    "appName": "benserca_Mobile",
+    "continue": "Continuar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "back": "Atrás",
+    "loading": "Cargando..."
+  },
+  "auth": {
+    "loginTitle": "Bienvenido",
+    "loginSubtitle": "Inicia sesión para continuar",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "signIn": "Iniciar sesión",
+    "signUp": "Crear cuenta",
+    "noAccount": "¿No tienes cuenta?",
+    "alreadyAccount": "¿Ya tienes cuenta?"
+  },
+  "tabs": {
+    "home": "Inicio",
+    "search": "Buscar",
+    "profile": "Perfil",
+    "settings": "Ajustes"
+  },
+  "home": {
+    "title": "Inicio",
+    "welcome": "Hola, {{name}}"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "appearance": "Apariencia",
+    "language": "Idioma",
+    "system": "Sistema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "signOut": "Cerrar sesión"
+  }
+}
