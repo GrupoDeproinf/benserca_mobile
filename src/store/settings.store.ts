@@ -9,8 +9,10 @@ export type Language = 'es' | 'en';
 interface SettingsState {
   colorScheme: ThemePreference;
   language: Language;
+  hasCompletedOnboarding: boolean;
   setColorScheme: (value: ThemePreference) => void;
   setLanguage: (value: Language) => void;
+  completeOnboarding: () => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -18,8 +20,10 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       colorScheme: 'system',
       language: 'es',
+      hasCompletedOnboarding: false,
       setColorScheme: (value) => set({ colorScheme: value }),
       setLanguage: (value) => set({ language: value }),
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
     }),
     {
       name: 'settings',

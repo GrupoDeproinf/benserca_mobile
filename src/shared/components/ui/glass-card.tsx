@@ -1,6 +1,6 @@
-import { Platform, View, type ViewProps } from 'react-native';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { Platform, View, type ViewProps } from 'react-native';
 import { useResolvedColorScheme } from '@/theme';
 
 interface GlassCardProps extends ViewProps {

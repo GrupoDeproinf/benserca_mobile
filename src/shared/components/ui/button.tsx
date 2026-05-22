@@ -1,5 +1,5 @@
-import { Pressable, type PressableProps } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Pressable, type PressableProps } from 'react-native';
 import { Text } from './text';
 
 interface ButtonProps extends Omit<PressableProps, 'children'> {

@@ -140,23 +140,34 @@ npm run start
 ├── app/                          # Expo Router: rutas y layouts (file-based)
 │   ├── _layout.tsx               # Root layout. Providers globales + lógica de protección de rutas
 │   ├── +not-found.tsx            # 404
-│   ├── (auth)/                   # Grupo de rutas no autenticadas
+│   ├── (auth)/                   # Rutas públicas (solo re-exportan screens de src/features/auth)
 │   │   ├── _layout.tsx
-│   │   └── login.tsx
-│   ├── (tabs)/                   # Grupo de rutas autenticadas (con NativeTabs + Liquid Glass)
-│   │   ├── _layout.tsx           # NativeTabs config
-│   │   ├── index.tsx             # Tab Home
-│   │   ├── search.tsx            # Tab Buscar
-│   │   └── profile.tsx           # Tab Perfil
-│   └── (modals)/
-│       └── settings.tsx          # Modal de ajustes (tema + idioma)
+│   │   ├── index.tsx             # Bienvenida
+│   │   ├── login.tsx
+│   │   └── forgot-password.tsx
+│   └── (tabs)/                   # Rutas autenticadas (re-exportan home/settings)
+│       ├── _layout.tsx
+│       ├── index.tsx
+│       └── settings.tsx
 │
 ├── src/                          # Lógica y UI reutilizable
 │   ├── features/                 # Feature-first: una carpeta por dominio
-│   │   └── auth/
-│   │       ├── schemas/          # Zod schemas (loginSchema, etc.)
-│   │       ├── services/         # Llamadas a API (auth.service.ts)
-│   │       └── store/            # Zustand stores del feature (auth.store.ts)
+│   │   ├── auth/
+│   │   │   ├── components/       # UI solo de auth (BrandMark, AuthScreenLayout…)
+│   │   │   ├── constants/      # Rutas tipadas (AUTH_ROUTES)
+│   │   │   ├── hooks/          # useProtectedRoute
+│   │   │   ├── navigation/     # Layout del stack auth (re-export en app/)
+│   │   │   ├── screens/        # Welcome, Login, ForgotPassword
+│   │   │   ├── schemas/
+│   │   │   ├── services/
+│   │   │   └── store/
+│   │   ├── home/
+│   │   │   └── screens/
+│   │   ├── settings/
+│   │   │   ├── components/
+│   │   │   └── screens/
+│   │   └── tabs/
+│   │       └── navigation/     # NativeTabs layout
 │   │
 │   ├── shared/                   # Reutilizable entre features
 │   │   ├── components/
@@ -417,6 +428,22 @@ Internamente:
 | `npm run lint` | `biome check .` | Lint + format check. |
 | `npm run lint:fix` | `biome check --write .` | Aplica fixes automáticos. |
 | `npm run format` | `biome format --write .` | Solo formatear. |
+
+---
+
+## Metro se cierra al guardar (NativeWind + Expo 55)
+
+Si al editar archivos Metro falla con `Cannot read properties of undefined (reading 'addedFiles')`, es un bug conocido de `react-native-css-interop@0.2.4` con Metro 0.83+.
+
+El proyecto aplica un parche automático en `npm install` (`scripts/patch-nativewind-metro.js`).
+
+```bash
+# Tras clonar o si el error vuelve:
+npm install --legacy-peer-deps
+npm run start:clear
+```
+
+No es un fallo de tu código de pantallas; ocurre cuando Tailwind regenera estilos en caliente.
 
 ---
 

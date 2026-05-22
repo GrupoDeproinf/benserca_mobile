@@ -1,31 +1,74 @@
 {
+  "brand": {
+    "tagline": "Gestión inteligente para tu negocio",
+    "copyright": "© Benserca",
+    "version": "Versión {{version}}"
+  },
   "common": {
-    "appName": "benserca_Mobile",
+    "appName": "Benserca",
     "continue": "Continuar",
     "cancel": "Cancelar",
     "save": "Guardar",
     "back": "Atrás",
     "loading": "Cargando..."
   },
+  "welcome": {
+    "subtitle": "Plataforma corporativa para gestionar operaciones, equipos y reportes de forma segura.",
+    "getStarted": "Comenzar",
+    "signIn": "Iniciar sesión",
+    "features": {
+      "security": {
+        "title": "Acceso seguro",
+        "description": "Autenticación empresarial y datos protegidos."
+      },
+      "analytics": {
+        "title": "Reportes en tiempo real",
+        "description": "Indicadores y métricas al instante."
+      },
+      "teams": {
+        "title": "Gestión de equipos",
+        "description": "Coordina tareas y flujos de trabajo."
+      }
+    }
+  },
   "auth": {
-    "loginTitle": "Bienvenido",
-    "loginSubtitle": "Inicia sesión para continuar",
+    "loginTitle": "Iniciar sesión",
+    "loginSubtitle": "Ingresa tus credenciales para continuar",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
     "email": "Correo electrónico",
     "password": "Contraseña",
     "signIn": "Iniciar sesión",
     "signUp": "Crear cuenta",
     "noAccount": "¿No tienes cuenta?",
-    "alreadyAccount": "¿Ya tienes cuenta?"
+    "alreadyAccount": "¿Ya tienes cuenta?",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "forgotTitle": "Recuperar contraseña",
+    "forgotSubtitle": "Introduce tu correo y te enviaremos un enlace para restablecerla.",
+    "forgotSuccess": "Si el correo está registrado, recibirás las instrucciones en breve.",
+    "forgotCheckInbox": "Revisa tu bandeja de entrada y la carpeta de spam.",
+    "sendResetLink": "Enviar enlace",
+    "backToLogin": "Volver al inicio de sesión"
   },
   "tabs": {
     "home": "Inicio",
+    "picking": "Picking",
     "search": "Buscar",
     "profile": "Perfil",
     "settings": "Ajustes"
   },
   "home": {
     "title": "Inicio",
-    "welcome": "Hola, {{name}}"
+    "greeting": "Panel principal",
+    "welcome": "Hola, {{name}}",
+    "dashboardTitle": "Resumen del día",
+    "dashboardSubtitle": "Consulta tareas pendientes, reportes y alertas desde un solo lugar.",
+    "quickActions": "Accesos rápidos",
+    "actions": {
+      "tasks": "Tareas",
+      "reports": "Reportes",
+      "alerts": "Alertas"
+    }
   },
   "settings": {
     "title": "Ajustes",

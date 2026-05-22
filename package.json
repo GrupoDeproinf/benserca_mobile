@@ -8,6 +8,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:clear": "expo start --clear",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
@@ -15,7 +16,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/patch-nativewind-metro.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",

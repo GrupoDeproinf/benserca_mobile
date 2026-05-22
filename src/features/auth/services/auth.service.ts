@@ -1,5 +1,6 @@
-import type { User } from '../store/auth.store';
+import type { ForgotPasswordFormValues } from '../schemas/forgot-password.schema';
 import type { LoginFormValues } from '../schemas/login.schema';
+import type { User } from '../store/auth.store';
 
 /**
  * Dummy auth service. Replace with real API calls when backend is ready.
@@ -16,4 +17,8 @@ export async function login(values: LoginFormValues): Promise<User> {
 
 export async function logout(): Promise<void> {
   await new Promise((r) => setTimeout(r, 200));
+}
+
+export async function requestPasswordReset(_values: ForgotPasswordFormValues): Promise<void> {
+  await new Promise((r) => setTimeout(r, 600));
 }
