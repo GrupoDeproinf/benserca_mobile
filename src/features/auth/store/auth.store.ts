@@ -1,12 +1,10 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { SessionUser } from '@/shared/types';
 import { zustandMMKVStorage } from '@/services/storage/mmkv';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+export type { UserRole, SessionUser } from '@/shared/types';
+export type User = SessionUser;
 
 interface AuthState {
   user: User | null;
@@ -37,3 +35,7 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+export function useCurrentUser(): User | null {
+  return useAuthStore((s) => s.user);
+}

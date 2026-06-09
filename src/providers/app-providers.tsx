@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ConfirmSheetHost } from '@/shared/components/ui/confirm-sheet';
 import { QueryProvider } from './query-provider';
 import '@/i18n';
 
@@ -8,7 +9,10 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          {children}
+          <ConfirmSheetHost />
+        </QueryProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -9,7 +9,7 @@ interface AuthBrandHeaderProps {
 export function AuthBrandHeader({ compact = false }: AuthBrandHeaderProps) {
   return (
     <View
-      className={`items-center justify-center px-6 ${compact ? 'pb-1 pt-1' : 'pb-4'}`}
+      className={`items-center justify-center px-4 ${compact ? 'py-0' : 'pb-2 pt-0'}`}
     >
       <Animated.View entering={FadeInDown.duration(600).delay(80)}>
         <BrandMark

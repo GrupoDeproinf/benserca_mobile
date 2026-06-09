@@ -2,10 +2,9 @@ import { Image } from 'expo-image';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/ui/text';
-import { useResolvedColorScheme } from '@/theme';
+import { BENSERCA_ICON } from '@/shared/constants/brand-assets';
+import { useResolvedColorScheme } from '@/theme/hooks';
 import { colors } from '@/theme/tokens';
-
-const appIcon = require('@assets/images/icon.png');
 
 interface BrandMarkProps {
   size?: 'sm' | 'lg';
@@ -23,46 +22,44 @@ export function BrandMark({
   const scheme = useResolvedColorScheme();
   const palette = colors[scheme];
   const isLarge = size === 'lg';
-  const iconSize = isLarge ? 72 : 52;
+  const iconSize = isLarge ? 120 : 80;
   const onDark = tone === 'onDark';
+  const logoColor = onDark ? '#FFFFFF' : palette.primary;
 
   return (
-    <View className="items-center gap-2.5">
+    <View className="items-center gap-1.5">
       <View
-        className="overflow-hidden rounded-2xl bg-white"
-        style={{
-          shadowColor: onDark ? '#000' : palette.primary,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: onDark ? 0.2 : 0.15,
-          shadowRadius: 16,
-          elevation: 8,
-        }}
+        style={
+          onDark
+            ? { width: iconSize, height: iconSize, alignItems: 'center', justifyContent: 'center' }
+            : {
+                overflow: 'hidden',
+                borderRadius: 16,
+                backgroundColor: '#FFFFFF',
+                shadowColor: palette.primary,
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.15,
+                shadowRadius: 16,
+                elevation: 8,
+              }
+        }
       >
         <Image
-          source={appIcon}
-          style={{ width: iconSize, height: iconSize }}
-          contentFit="cover"
+          source={BENSERCA_ICON}
+          style={{ width: iconSize, height: iconSize, tintColor: logoColor }}
+          contentFit="contain"
           accessibilityLabel={t('common.appName')}
         />
       </View>
-      <View className="items-center gap-1">
+      {showTagline ? (
         <Text
-          className={`font-bold tracking-tight ${isLarge ? 'text-2xl' : 'text-xl'} ${
-            onDark ? 'text-white' : 'text-foreground dark:text-foreground-dark'
+          className={`text-sm text-center max-w-[280px] leading-5 ${
+            onDark ? 'text-white/80' : 'text-foreground/55 dark:text-foreground-dark/55'
           }`}
         >
-          {t('common.appName')}
+          {t('brand.tagline')}
         </Text>
-        {showTagline && (
-          <Text
-            className={`text-sm text-center max-w-[280px] leading-5 ${
-              onDark ? 'text-white/80' : 'text-foreground/55 dark:text-foreground-dark/55'
-            }`}
-          >
-            {t('brand.tagline')}
-          </Text>
-        )}
-      </View>
+      ) : null}
     </View>
   );
 }

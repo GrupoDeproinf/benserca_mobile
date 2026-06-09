@@ -1,16 +1,141 @@
 {
   "brand": {
     "tagline": "Smart management for your business",
+    "headerTitle": "BENSERCA 18",
     "copyright": "© Benserca",
     "version": "Version {{version}}"
   },
   "common": {
     "appName": "Benserca",
     "continue": "Continue",
+    "all": "All",
     "cancel": "Cancel",
     "save": "Save",
     "back": "Back",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "empty": "No results",
+    "retry": "Retry",
+    "understood": "Got it"
+  },
+  "roles": {
+    "picker": "Picker",
+    "warehouse_lead": "Warehouse lead",
+    "auditor": "Auditor",
+    "supervisor": "Supervisor"
+  },
+  "orderStatus": {
+    "new": "New",
+    "assigned": "Assigned",
+    "inProgress": "In progress",
+    "toPack": "To pack",
+    "packed": "Packed",
+    "rejectedReview": "Rejected - Review",
+    "audited": "Audited",
+    "dispatched": "Dispatched"
+  },
+  "pickerStatus": {
+    "disponible": "Available",
+    "enProceso": "In progress",
+    "reservado": "Reserved",
+    "porEmbalar": "To pack"
+  },
+  "picking": {
+    "screen": {
+      "title": "Orders",
+      "subtitle": "Check and track the status of your orders",
+      "subtitlePicker": "Manage and process your orders",
+      "searchPlaceholder": "Search order, client or document…",
+      "scan": "Scan code",
+      "ordersCount": "orders",
+      "sortRecent": "Most recent",
+      "emptyTitle": "No assigned orders",
+      "emptySubtitle": "No orders match this filter."
+    },
+    "stats": {
+      "total": "Total orders",
+      "pending": "Pending",
+      "inPicking": "In picking",
+      "prepared": "Prepared",
+      "assigned": "Assigned",
+      "inProgress": "In progress",
+      "toPack": "To pack"
+    },
+    "filter": {
+      "title": "Filter orders",
+      "btn": "Filters",
+      "showing": "{{count}} order(s)",
+      "clear": "Clear"
+    },
+    "card": {
+      "bultos": "Packages",
+      "skus": "SKUs",
+      "assigned": "Assigned",
+      "assignedTo": "Taken by",
+      "assignedToYou": "Assigned to you",
+      "unassigned": "Unassigned",
+      "client": "Client",
+      "critical": "CRITICAL",
+      "progress": "Picking progress",
+      "process": "Picking process",
+      "notStarted": "Not started",
+      "needsReview": "Needs review",
+      "pickingDone": "Picking done",
+      "statusPending": "Pending",
+      "statusPicking": "In picking",
+      "statusPrepared": "Prepared",
+      "timeInQueue": "Time in queue",
+      "extraBultos": "Extra packages"
+    },
+    "detail": {
+      "notFound": "Order not found.",
+      "startPicking": "Start picking",
+      "reopenPicking": "Reopen picking",
+      "openBulto": "Open new package",
+      "finishPicking": "Finish picking",
+      "markPacked": "Mark as packed",
+      "linesTitle": "Required SKUs (Profit)",
+      "bultosTitle": "Built packages",
+      "definedBultos": "Defined",
+      "bultosDone": "Created",
+      "skus": "SKUs",
+      "extraBultosFlag": "Extra packages"
+    },
+    "bulto": {
+      "title": "Package {{number}}",
+      "open": "Open",
+      "closed": "Closed",
+      "itemCount": "{{count}} item(s)",
+      "empty": "No items added",
+      "addItem": "Add item",
+      "close": "Close package",
+      "reopen": "Reopen"
+    },
+    "addItem": {
+      "title": "Add item to package",
+      "searchPlaceholder": "Search SKU or name…",
+      "noResults": "No results",
+      "qty": "Quantity",
+      "add": "Add to package"
+    },
+    "extraBultos": {
+      "title": "Extra packages",
+      "body": "You are creating more packages than defined ({{defined}}). The order will be flagged with extra packages."
+    },
+    "finish": {
+      "openBultosTitle": "Open packages",
+      "openBultosBody": "Close all packages before finishing picking.",
+      "confirmTitle": "Finish picking",
+      "confirmBody": "Final state will be calculated. The order will move to 'To pack'.",
+      "confirm": "Finish"
+    },
+    "pack": {
+      "confirmTitle": "Mark as packed",
+      "confirmBody": "The order will enter the audit queue.",
+      "confirm": "Pack"
+    },
+    "rejection": {
+      "title": "Auditor observation"
+    }
   },
   "welcome": {
     "subtitle": "Corporate platform to manage operations, teams, and reports securely.",
@@ -48,14 +173,197 @@
     "forgotSuccess": "If the email is registered, you'll receive instructions shortly.",
     "forgotCheckInbox": "Check your inbox and spam folder.",
     "sendResetLink": "Send reset link",
-    "backToLogin": "Back to sign in"
+    "backToLogin": "Back to sign in",
+    "invalidCredentials": "Incorrect email or password.",
+    "genericError": "Something went wrong. Please try again.",
+    "demoAccess": "Demo access",
+    "loginAsPicker": "Picker",
+    "loginAsLead": "Lead",
+    "loginAsAuditor": "Auditor",
+    "loginAsSupervisor": "Supervisor"
   },
   "tabs": {
     "home": "Home",
-    "picking": "Picking",
-    "search": "Search",
+    "orders": "Orders",
     "profile": "Profile",
+    "notifications": "Notifications",
+    "auditQueue": "Queue",
+    "team": "Team",
+    "warehouse": "Warehouse",
     "settings": "Settings"
+  },
+  "notifications": {
+    "screen": {
+      "subtitle": "Activity",
+      "title": "Notifications",
+      "unreadCount": "{{count}} unread",
+      "allRead": "All caught up",
+      "markAll": "Mark all",
+      "emptyTitle": "No notifications",
+      "emptySubtitle": "Relevant events will appear here."
+    },
+    "type": {
+      "order_assigned": "Order assigned",
+      "order_rejected": "Order rejected",
+      "team_released": "Released from team",
+      "order_ready_to_audit": "Ready to audit",
+      "team_member_done": "Member done",
+      "picker_idle": "Picker idle"
+    }
+  },
+  "teams": {
+    "screen": {
+      "subtitle": "Coordinate teams and oversee your large orders",
+      "title": "Orders",
+      "count": "{{count}} assigned order(s)",
+      "emptyTitle": "No assigned orders",
+      "emptySubtitle": "Large orders assigned to you will appear here."
+    },
+    "stats": {
+      "total": "Total orders",
+      "noTeam": "No team",
+      "withTeam": "With team",
+      "inProgress": "In progress"
+    },
+    "card": {
+      "skus": "SKUs",
+      "bultos": "Packages",
+      "team": "Team",
+      "teamLabel": "Team",
+      "teamCount": "{{count}} picker(s)",
+      "teamMembers": "{{count}} picker(s)",
+      "teamActive": "Active",
+      "teamNone": "No team"
+    },
+    "manage": {
+      "notFound": "Order not found.",
+      "bultos": "Packages",
+      "skus": "SKUs",
+      "teamStatus": "Team",
+      "teamActive": "Active",
+      "teamNone": "No team",
+      "membersTitle": "Active team ({{count}} member(s))",
+      "availableTitle": "Available pickers ({{count}})",
+      "noMembers": "All members have been released.",
+      "noPickers": "No available pickers at the moment."
+    },
+    "bultosToday": "pkg(s) today",
+    "create": {
+      "btn": "Assign {{count}} picker(s)",
+      "title": "Create team",
+      "body": "Assign {{count}} picker(s) to this order?",
+      "confirm": "Create team"
+    },
+    "releasePicker": {
+      "title": "Release picker",
+      "body": "Release {{name}} from the team?",
+      "confirm": "Release"
+    },
+    "releaseTeam": {
+      "btn": "Dissolve entire team",
+      "title": "Dissolve team",
+      "body": "All pickers will be released and notified.",
+      "confirm": "Dissolve"
+    }
+  },
+  "audit": {
+    "screen": {
+      "subtitle": "Packed orders ready for review",
+      "title": "Review queue",
+      "count": "{{count}} order(s) to review",
+      "ordersCount": "orders",
+      "searchPlaceholder": "Search order or client...",
+      "emptyTitle": "No orders to audit",
+      "emptySubtitle": "Packed orders will appear here."
+    },
+    "filter": {
+      "extra_bultos": "Extra packages",
+      "standard": "No extra packages"
+    },
+    "card": {
+      "picker": "Picker",
+      "bultos": "Packages",
+      "packed": "Packed",
+      "extraBultos": "Extra packages"
+    },
+    "detail": {
+      "notFound": "Order not found.",
+      "picker": "Picker",
+      "bultos": "Packages",
+      "skus": "SKUs",
+      "extraBultosFlag": "Extra packages",
+      "packedAt": "Packed",
+      "comparisonTitle": "Profit vs picked comparison",
+      "comparisonAlert": "There are differences between the order and what was picked. Review before approving.",
+      "comparisonOk": "Quantities match the Profit order.",
+      "legendOk": "Correct",
+      "legendOver": "Excess",
+      "legendUnder": "Missing",
+      "colProduct": "Product",
+      "colRequired": "Req.",
+      "colPicked": "Picked",
+      "colDiff": "Diff.",
+      "bultosTitle": "Built packages",
+      "observationsTitle": "Previous observations",
+      "reviewProgress": "{{reviewed}}/{{total}} packages reviewed",
+      "reviewAllHint": "Approve or reject each package before finishing.",
+      "allApprovedHint": "All packages approved. You can approve the order.",
+      "hasRejectedHint": "Some packages were rejected. Finish with rejection and write the reason.",
+      "comparisonNote": "Green = correct · Amber = excess · Red = missing (vs. Profit order)"
+    },
+    "bulto": {
+      "title": "Package {{number}}",
+      "itemCount": "{{count}} item(s)",
+      "empty": "No items",
+      "tapToExpand": "Tap to review contents",
+      "approve": "Approve",
+      "reject": "Reject",
+      "reviewApproved": "Approved",
+      "reviewRejected": "Rejected",
+      "pendingReview": "Pending",
+      "picked": "Picked",
+      "required": "Req."
+    },
+    "approve": {
+      "btn": "Approve",
+      "title": "Approve order",
+      "body": "Confirm that order {{order}} is correct?",
+      "confirm": "Approve"
+    },
+    "reject": {
+      "btn": "Reject",
+      "title": "Reject order",
+      "subtitle": "Describe the reason for rejection. The picker will see this when correcting the order.",
+      "placeholder": "E.g. Missing 5 units of SKU X in package 2...",
+      "required": "Observation is required.",
+      "confirm": "Reject order",
+      "bultoLine": "Package {{number}}: review contents."
+    }
+  },
+  "supervision": {
+    "screen": {
+      "subtitle": "Supervisor",
+      "title": "Warehouse status",
+      "emptyTitle": "No pickers registered",
+      "emptySubtitle": "Pickers will appear here when active."
+    },
+    "summary": {
+      "total": "Total",
+      "disponible": "Available",
+      "en_proceso": "In progress",
+      "reservado": "Reserved",
+      "por_embalar": "To pack"
+    },
+    "card": {
+      "timeInStatus": "In this status",
+      "bultosToday": "Pkgs today"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "role": "User",
+    "defaultName": "User",
+    "signOut": "Sign out"
   },
   "home": {
     "title": "Home",
@@ -68,6 +376,91 @@
       "tasks": "Tasks",
       "reports": "Reports",
       "alerts": "Alerts"
+    }
+  },
+  "orders": {
+    "title": "Orders",
+    "subtitle": "Manage and review your orders",
+    "searchPlaceholder": "Search order, customer or SKU...",
+    "ordersCount": "{{count}} orders",
+    "summary": {
+      "total": "Total orders",
+      "pending": "Pending",
+      "inPicking": "In picking",
+      "prepared": "Prepared"
+    },
+    "sortRecent": "Most recent",
+    "sortOldest": "Oldest first",
+    "itemCount": "{{count}} items",
+    "critical": "Critical",
+    "clientLabel": "Customer:",
+    "clientLine": "Customer: {{name}}",
+    "takenBy": "Taken by",
+    "unassigned": "Unassigned",
+    "pickingProcess": "Picking process",
+    "pickingInProgress": "In progress",
+    "uniqueSkus": "Unique SKUs",
+    "skusCount": "{{count}} items",
+    "totalQty": "Total qty",
+    "unitsCount": "{{count}} units",
+    "elapsed": {
+      "label": "Time in queue",
+      "justNow": "Just now",
+      "minutes": "{{count}} min ago",
+      "hours": "{{count}} h ago",
+      "hoursMinutes": "{{hours}} h {{minutes}} min ago",
+      "days": "{{count}} d ago",
+      "daysHours": "{{days}} d {{hours}} h ago"
+    },
+    "pickingNotStarted": "Picking not started",
+    "startPicking": "Start picking >",
+    "pickingProgress": "Picking progress",
+    "readyToShip": "Ready to ship",
+    "deliveredOn": "Delivered on {{date}}",
+    "emptyTitle": "No orders found",
+    "emptySubtitle": "Try a different filter or search term.",
+    "filter": {
+      "title": "Filter orders",
+      "byStatus": "Order status",
+      "allStatuses": "All"
+    },
+    "tabs": {
+      "all": "All",
+      "pending": "Pending",
+      "pickers": "Pickers"
+    },
+    "picker": {
+      "subtitleAvailable": "Pick a pending order to claim it",
+      "subtitleActive": "Your order in progress",
+      "emptyAvailableTitle": "No pending orders",
+      "emptyAvailableSubtitle": "There are no unassigned orders right now.",
+      "emptyActiveTitle": "No active order",
+      "emptyActiveSubtitle": "Your order in progress is not available."
+    },
+    "pickers": {
+      "totalCount": "{{count}} pickers",
+      "ordersCount_one": "{{count}} order",
+      "ordersCount_other": "{{count}} orders",
+      "searchPlaceholder": "Search picker...",
+      "backToPickers": "Back to pickers",
+      "emptyTitle": "No pickers",
+      "emptySubtitle": "No orders are currently assigned to a picker."
+    },
+    "status": {
+      "pending": "Pending",
+      "inPicking": "In picking",
+      "prepared": "Prepared",
+      "delivered": "Delivered"
+    },
+    "detail": {
+      "title": "Order details",
+      "zone": "Zone: {{zone}}",
+      "itemsTitle": "Items to pick",
+      "itemsCount": "{{count}} items",
+      "instructions": "Special instructions",
+      "startPicking": "Start picking",
+      "continuePicking": "Continue picking",
+      "notFound": "Order not found."
     }
   },
   "settings": {

@@ -1,15 +1,13 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
-import { ArrowRight } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
+import { loginTheme } from '@/features/auth/constants/login-theme';
 import { Text } from '@/shared/components/ui/text';
-import { useResolvedColorScheme } from '@/theme';
 
 interface AuthPrimaryButtonProps {
   label: string;
-  onPress: () => void;
+  onPress?: () => void;
   disabled?: boolean;
   loading?: boolean;
+  variant?: 'default' | 'dark';
 }
 
 export function AuthPrimaryButton({
@@ -17,74 +15,49 @@ export function AuthPrimaryButton({
   onPress,
   disabled = false,
   loading = false,
+  variant = 'default',
 }: AuthPrimaryButtonProps) {
-  const scheme = useResolvedColorScheme();
-  const isDark = scheme === 'dark';
-
-  const gradientColors = isDark
-    ? (['#4A8BC4', '#2E5A85', '#1E4976'] as const)
-    : (['#3B7CB8', '#2563A8', '#1E4976'] as const);
+  const isDark = variant === 'dark';
 
   return (
     <Pressable
-      onPress={() => {
-        if (disabled || loading) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
+      onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
-        styles.wrapper,
-        pressed && !disabled && styles.pressed,
-        (disabled || loading) && styles.disabled,
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      style={({ pressed }) => ({
+        opacity: pressed || disabled ? 0.72 : 1,
+        transform: pressed ? [{ scale: 0.985 }] : [],
+      })}
     >
-      <LinearGradient
-        colors={gradientColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          minHeight: 52,
+          paddingHorizontal: 20,
+          borderRadius: 12,
+          backgroundColor: isDark ? '#ffffff' : loginTheme.buttonBg,
+          borderWidth: isDark ? 0 : 1,
+          borderColor: loginTheme.buttonBorder,
+        }}
       >
-        <View className="absolute inset-0 rounded-2xl bg-white/10" pointerEvents="none" />
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" size="small" />
-        ) : (
-          <View className="flex-row items-center justify-center gap-2.5">
-            <Text className="text-[17px] font-semibold text-white tracking-wide">{label}</Text>
-            <View className="h-8 w-8 items-center justify-center rounded-full bg-white/20">
-              <ArrowRight size={18} color="#FFFFFF" strokeWidth={2.5} />
-            </View>
-          </View>
-        )}
-      </LinearGradient>
+          <ActivityIndicator size="small" color={isDark ? '#000000' : loginTheme.text} />
+        ) : null}
+        <Text
+          numberOfLines={1}
+          style={{
+            flexShrink: 1,
+            fontSize: 15,
+            fontWeight: '600',
+            lineHeight: 18,
+            color: isDark ? '#000000' : loginTheme.text,
+          }}
+        >
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    borderRadius: 16,
-    shadowColor: '#1E4976',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  pressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.985 }],
-  },
-  disabled: {
-    opacity: 0.65,
-  },
-  gradient: {
-    minHeight: 54,
-    borderRadius: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-});

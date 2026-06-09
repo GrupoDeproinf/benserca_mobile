@@ -5,6 +5,9 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { AUTH_ROUTES } from '@/features/auth/constants/routes';
 import { logout } from '@/features/auth/services/auth.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { useOrdersStore } from '@/features/picking/store/orders.store';
+import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { useNotificationsStore } from '@/features/notifications/store/notifications.store';
 import { SettingsSection } from '@/features/settings/components';
 import { Screen } from '@/shared/components/layout/screen';
 import { Button } from '@/shared/components/ui/button';
@@ -35,6 +38,9 @@ export function SettingsScreen() {
 
   const handleSignOut = async () => {
     await logout();
+    useOrdersStore.getState().resetOrders();
+    usePickersStore.getState().resetPickers();
+    useNotificationsStore.getState().resetNotifications();
     signOut();
     router.replace(AUTH_ROUTES.login);
   };

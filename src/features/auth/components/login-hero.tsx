@@ -32,7 +32,7 @@ export function LoginHero({ height, style }: LoginHeroProps) {
         pointerEvents="none"
       />
 
-      <View className="flex-1 items-center justify-center px-6 pb-6">
+      <View className="flex-1 items-center justify-center px-4 pb-3">
         <BrandMark size="lg" showTagline tone="onDark" />
       </View>
     </View>

@@ -18,6 +18,9 @@ interface AuthScreenLayoutProps {
   showBack?: boolean;
   showBrand?: boolean;
   showFooter?: boolean;
+  footerTone?: 'default' | 'onDark';
+  /** Menos espacio arriba y entre logo y tarjeta (login) */
+  compact?: boolean;
 }
 
 /**
@@ -28,9 +31,13 @@ export function AuthScreenLayout({
   showBack = false,
   showBrand = true,
   showFooter = true,
+  footerTone = 'default',
+  compact = false,
 }: AuthScreenLayoutProps) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const topPadding = showBack ? insets.top + 28 : insets.top + (compact ? 36 : 80);
+  const headerGap = compact ? 36 : 90;
 
   const content = (
     <View
@@ -38,13 +45,13 @@ export function AuthScreenLayout({
         styles.column,
         {
           minHeight: height,
-          paddingTop: showBack ? insets.top + 28 : insets.top + 80,
+          paddingTop: topPadding,
           paddingBottom: Math.max(insets.bottom, 12),
         },
       ]}
     >
       {showBrand ? (
-        <View style={styles.header}>
+        <View style={{ paddingBottom: headerGap }}>
           {showBack ? (
             <>
               <AuthBackLink variant="icon" />
@@ -60,7 +67,11 @@ export function AuthScreenLayout({
 
       <View style={styles.cardSlot}>{children}</View>
 
-      {showFooter ? <View style={styles.footerSlot}><AuthBrandFooter /></View> : null}
+      {showFooter ? (
+        <View style={styles.footerSlot}>
+          <AuthBrandFooter tone={footerTone} />
+        </View>
+      ) : null}
     </View>
   );
 
@@ -98,9 +109,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flex: 1,
     paddingHorizontal: 20,
-  },
-  header: {
-    paddingBottom: 90,
   },
   brandSection: {
     alignItems: 'center',

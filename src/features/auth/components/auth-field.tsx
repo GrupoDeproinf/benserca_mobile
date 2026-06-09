@@ -3,8 +3,9 @@ import type { LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Platform, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { cssInterop } from 'nativewind';
+import { loginTheme } from '@/features/auth/constants/login-theme';
 import { Text } from '@/shared/components/ui/text';
-import { useResolvedColorScheme } from '@/theme';
+import { useResolvedColorScheme } from '@/theme/hooks';
 import { colors } from '@/theme/tokens';
 
 cssInterop(TextInput, { className: 'style' });
@@ -14,7 +15,7 @@ interface AuthFieldProps extends TextInputProps {
   error?: string;
   leftIcon?: LucideIcon;
   rightElement?: ReactNode;
-  variant?: 'default' | 'floating' | 'glass' | 'inset';
+  variant?: 'default' | 'floating' | 'glass' | 'inset' | 'dark';
   /** Etiqueta clara sobre fondos oscuros (login con degradado) */
   labelTone?: 'default' | 'onDark';
 }
@@ -35,7 +36,61 @@ const insetShadow = {
   elevation: 4,
 } as const;
 
-export function AuthField({
+function AuthFieldDark({
+  label,
+  error,
+  leftIcon: LeftIcon,
+  rightElement,
+  className = '',
+  ...rest
+}: AuthFieldProps) {
+  const inputRow = (
+    <>
+      {LeftIcon ? (
+        <View className="pl-4">
+          <LeftIcon size={20} color={loginTheme.muted} strokeWidth={2} />
+        </View>
+      ) : null}
+      <TextInput
+        placeholderTextColor={loginTheme.muted}
+        {...rest}
+        className={`flex-1 h-[52px] px-3 text-base ${className}`}
+        style={{ backgroundColor: 'transparent', color: loginTheme.text }}
+      />
+      {rightElement ? <View className="pr-4">{rightElement}</View> : null}
+    </>
+  );
+
+  return (
+    <View className="gap-2">
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: '600',
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+          color: loginTheme.label,
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        style={[
+          styles.darkRow,
+          {
+            backgroundColor: loginTheme.inputBg,
+            borderColor: error ? loginTheme.inputBorderError : loginTheme.inputBorder,
+          },
+        ]}
+      >
+        {inputRow}
+      </View>
+      {error ? <Text className="text-sm text-red-500">{error}</Text> : null}
+    </View>
+  );
+}
+
+function AuthFieldDefault({
   label,
   error,
   leftIcon: LeftIcon,
@@ -116,9 +171,23 @@ export function AuthField({
   );
 }
 
+export function AuthField(props: AuthFieldProps) {
+  if (props.variant === 'dark') {
+    return <AuthFieldDark {...props} />;
+  }
+  return <AuthFieldDefault {...props} />;
+}
+
 const styles = StyleSheet.create({
   glassRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  darkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
 });

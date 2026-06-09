@@ -1,16 +1,150 @@
 {
   "brand": {
-    "tagline": "Gestión inteligente para tu negocio",
+    "tagline": "",
+    "headerTitle": "BENSERCA 18",
     "copyright": "© Benserca",
     "version": "Versión {{version}}"
   },
   "common": {
     "appName": "Benserca",
     "continue": "Continuar",
+    "all": "Todos",
     "cancel": "Cancelar",
     "save": "Guardar",
     "back": "Atrás",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "empty": "Sin resultados",
+    "retry": "Reintentar",
+    "understood": "Entendido",
+    "remove": "Quitar"
+  },
+  "roles": {
+    "picker": "Picker",
+    "warehouse_lead": "Jefe / Supervisor",
+    "auditor": "Auditor",
+    "supervisor": "Jefe / Supervisor"
+  },
+  "orderStatus": {
+    "new": "Nuevo",
+    "assigned": "Asignado",
+    "inProgress": "En proceso",
+    "toPack": "Por embalar",
+    "packed": "Empaquetado",
+    "rejectedReview": "Rechazado - Revisión",
+    "audited": "Auditado",
+    "dispatched": "Despachado"
+  },
+  "pickerStatus": {
+    "disponible": "Disponible",
+    "enProceso": "En proceso",
+    "reservado": "Reservado",
+    "porEmbalar": "Por embalar"
+  },
+  "picking": {
+    "screen": {
+      "title": "Pedidos",
+      "titlePicker": "Mis pedidos",
+      "subtitle": "Consulta y supervisa el estado de tus pedidos",
+      "subtitlePicker": "Tus pedidos asignados",
+      "searchPlaceholder": "Buscar pedido, cliente o documento…",
+      "scan": "Escanear código",
+      "ordersCount": "pedidos",
+      "sortRecent": "Más recientes",
+      "emptyTitle": "Sin pedidos asignados",
+      "emptySubtitle": "No tienes pedidos en este filtro."
+    },
+    "stats": {
+      "total": "Pedidos totales",
+      "pending": "Pendientes",
+      "inPicking": "En picking",
+      "prepared": "Preparados",
+      "assigned": "Asignados",
+      "inProgress": "En proceso",
+      "toPack": "Por embalar"
+    },
+    "filter": {
+      "title": "Filtrar pedidos",
+      "subtitle": "Elige un estatus para ver solo esos pedidos",
+      "btn": "Filtros",
+      "showing": "{{count}} pedido(s)",
+      "clear": "Limpiar"
+    },
+    "card": {
+      "bultos": "Bultos",
+      "definedBultos": "Bultos definidos",
+      "assignedAt": "Fecha de asignación",
+      "skus": "SKUs",
+      "assigned": "Asignado",
+      "assignedTo": "Tomado por",
+      "assignedToYou": "Asignado a ti",
+      "unassigned": "Sin asignar",
+      "client": "Cliente",
+      "critical": "CRÍTICO",
+      "progress": "Progreso picking",
+      "process": "Proceso picking",
+      "notStarted": "No iniciado",
+      "needsReview": "Requiere revisión",
+      "pickingDone": "Picking terminado",
+      "statusPending": "Pendiente",
+      "statusPicking": "En picking",
+      "statusPrepared": "Preparado",
+      "timeInQueue": "Tiempo en cola",
+      "extraBultos": "Bultos adicionales"
+    },
+    "detail": {
+      "notFound": "Pedido no encontrado.",
+      "startPicking": "Iniciar picking",
+      "reopenPicking": "Reabrir picking",
+      "openBulto": "Abrir nuevo bulto",
+      "finishPicking": "Finalizar picking",
+      "markPacked": "Marcar como empaquetado",
+      "linesTitle": "SKUs requeridos (Profit)",
+      "bultosTitle": "Bultos armados",
+      "definedBultos": "Definidos",
+      "bultosDone": "Creados",
+      "skus": "SKUs",
+      "extraBultosFlag": "Bultos adicionales"
+    },
+    "bulto": {
+      "title": "Bulto {{number}}",
+      "open": "Abierto",
+      "closed": "Cerrado",
+      "itemCount": "{{count}} ítem(s)",
+      "empty": "Sin ítems agregados",
+      "addItem": "Agregar ítem",
+      "close": "Cerrar bulto",
+      "reopen": "Reabrir"
+    },
+    "addItem": {
+      "title": "Agregar ítem al bulto",
+      "searchPlaceholder": "Buscar SKU o nombre…",
+      "noResults": "Sin resultados",
+      "qty": "Cantidad",
+      "add": "Agregar al bulto",
+      "addWithCount": "Agregar al bulto ({{count}} uds.)"
+    },
+    "extraBultos": {
+      "title": "Bultos adicionales",
+      "body": "Estás creando más bultos de los definidos ({{defined}}). El pedido se marcará con bultos adicionales.",
+      "confirmTitle": "Bultos adicionales",
+      "confirmBody": "Estás creando más bultos de los definidos ({{defined}}). ¿Deseas continuar?",
+      "continue": "Continuar"
+    },
+    "finish": {
+      "openBultosTitle": "Bultos abiertos",
+      "openBultosBody": "Cierra todos los bultos antes de finalizar el picking.",
+      "confirmTitle": "Finalizar picking",
+      "confirmBody": "Se calculará el estado final. El pedido pasará a 'Por embalar'.",
+      "confirm": "Finalizar"
+    },
+    "pack": {
+      "confirmTitle": "Marcar empaquetado",
+      "confirmBody": "El pedido pasará a la cola de auditoría.",
+      "confirm": "Empaquetar"
+    },
+    "rejection": {
+      "title": "Observación del auditor"
+    }
   },
   "welcome": {
     "subtitle": "Plataforma corporativa para gestionar operaciones, equipos y reportes de forma segura.",
@@ -48,14 +182,228 @@
     "forgotSuccess": "Si el correo está registrado, recibirás las instrucciones en breve.",
     "forgotCheckInbox": "Revisa tu bandeja de entrada y la carpeta de spam.",
     "sendResetLink": "Enviar enlace",
-    "backToLogin": "Volver al inicio de sesión"
+    "backToLogin": "Volver al inicio de sesión",
+    "invalidCredentials": "Correo o contraseña incorrectos.",
+    "genericError": "Ocurrió un error. Intenta de nuevo.",
+    "demoAccess": "Acceso demo",
+    "loginAsPicker": "Picker",
+    "loginAsLead": "Jefe / Supervisor",
+    "loginAsAuditor": "Auditor",
+    "loginAsSupervisor": "Supervisor"
   },
   "tabs": {
     "home": "Inicio",
-    "picking": "Picking",
-    "search": "Buscar",
+    "orders": "Pedidos",
     "profile": "Perfil",
+    "notifications": "Notificaciones",
+    "auditQueue": "Cola",
+    "team": "Equipo",
+    "pickers": "Pickers",
+    "warehouse": "Almacén",
     "settings": "Ajustes"
+  },
+  "notifications": {
+    "screen": {
+      "subtitle": "Actividad",
+      "title": "Notificaciones",
+      "unreadCount": "{{count}} sin leer",
+      "allRead": "Todo al día",
+      "markAll": "Marcar todo",
+      "listCount": "{{count}} notificación(es)",
+      "emptyTitle": "Sin notificaciones",
+      "emptySubtitle": "Los eventos relevantes aparecerán aquí."
+    },
+    "viewOrder": "Ver pedido",
+    "timeAgo": {
+      "now": "Ahora",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
+    },
+    "type": {
+      "order_assigned": "Pedido asignado",
+      "order_rejected": "Pedido rechazado",
+      "team_released": "Liberado del equipo",
+      "order_ready_to_audit": "Listo para auditar",
+      "team_member_done": "Miembro completó",
+      "picker_idle": "Picker sin actividad"
+    }
+  },
+  "teams": {
+    "screen": {
+      "subtitle": "Pedidos grandes asignados a ti",
+      "title": "Pedidos",
+      "count": "{{count}} pedido(s) asignado(s)",
+      "emptyTitle": "Sin pedidos asignados",
+      "emptySubtitle": "Los pedidos grandes asignados a ti aparecerán aquí."
+    },
+    "stats": {
+      "total": "Pedidos totales",
+      "noTeam": "Sin equipo",
+      "withTeam": "Con equipo",
+      "inProgress": "En proceso"
+    },
+    "card": {
+      "skus": "SKUs",
+      "bultos": "Bultos",
+      "team": "Equipo",
+      "teamLabel": "Equipo",
+      "teamCount": "{{count}} picker(s)",
+      "teamMembers": "{{count}} picker(s)",
+      "teamActive": "Activo",
+      "teamNone": "Sin equipo"
+    },
+    "manage": {
+      "notFound": "Pedido no encontrado.",
+      "bultos": "Bultos",
+      "skus": "SKUs",
+      "teamStatus": "Equipo",
+      "teamActive": "Activo",
+      "teamNone": "Sin equipo",
+      "membersTitle": "Equipo activo ({{count}} miembro(s))",
+      "availableTitle": "Pickers disponibles ({{count}})",
+      "noMembers": "Todos los miembros han sido liberados.",
+      "noPickers": "No hay pickers disponibles en este momento."
+    },
+    "assign": {
+      "title": "Armar equipo",
+      "subtitle": "Selecciona quién trabajará en este pedido",
+      "yourTeam": "Tu equipo",
+      "emptyTeam": "Nadie en el equipo aún",
+      "emptyTeamHint": "Elige pickers de la lista de abajo",
+      "tapToRemove": "Toca un miembro para quitarlo",
+      "selectedBadge": "Seleccionado",
+      "availableSection": "{{count}} pickers disponibles",
+      "searchPlaceholder": "Buscar picker...",
+      "selectedCount": "{{count}} seleccionado(s)",
+      "availableLabel": "disponibles",
+      "confirmBtn": "Confirmar equipo ({{count}})",
+      "emptyTitle": "No hay pickers disponibles",
+      "emptySubtitle": "Todos los pickers están ocupados en este momento."
+    },
+    "bultosToday": "bulto(s) hoy",
+    "create": {
+      "btn": "Asignar {{count}} picker(s)",
+      "title": "Crear equipo",
+      "body": "¿Asignar {{count}} picker(s) a este pedido?",
+      "confirm": "Crear equipo"
+    },
+    "releasePicker": {
+      "title": "Liberar picker",
+      "body": "¿Liberar a {{name}} del equipo?",
+      "confirm": "Liberar"
+    },
+    "releaseTeam": {
+      "btn": "Disolver equipo completo",
+      "title": "Disolver equipo",
+      "body": "Todos los pickers serán liberados y recibirán una notificación.",
+      "confirm": "Disolver"
+    }
+  },
+  "audit": {
+    "screen": {
+      "subtitle": "Pedidos empaquetados listos para revisar",
+      "title": "Cola de revisión",
+      "count": "{{count}} pedido(s) para revisar",
+      "ordersCount": "pedidos",
+      "searchPlaceholder": "Buscar pedido o cliente...",
+      "emptyTitle": "Sin pedidos para auditar",
+      "emptySubtitle": "Los pedidos empaquetados aparecerán aquí."
+    },
+    "filter": {
+      "extra_bultos": "Bultos adicionales",
+      "standard": "Sin bultos extra"
+    },
+    "card": {
+      "picker": "Picker",
+      "bultos": "Bultos",
+      "packed": "Empaquetado",
+      "extraBultos": "Bultos adicionales"
+    },
+    "detail": {
+      "notFound": "Pedido no encontrado.",
+      "picker": "Picker",
+      "bultos": "Bultos",
+      "skus": "SKUs",
+      "extraBultosFlag": "Bultos adicionales",
+      "packedAt": "Empaquetado",
+      "comparisonTitle": "Comparación Profit vs armado",
+      "comparisonAlert": "Hay diferencias entre lo pedido y lo armado. Revisa antes de aprobar.",
+      "comparisonOk": "Las cantidades coinciden con el pedido Profit.",
+      "legendOk": "Correcto",
+      "legendOver": "Exceso",
+      "legendUnder": "Faltante",
+      "colProduct": "Producto",
+      "colRequired": "Req.",
+      "colPicked": "Armado",
+      "colDiff": "Dif.",
+      "bultosTitle": "Bultos armados",
+      "observationsTitle": "Observaciones previas",
+      "reviewProgress": "{{reviewed}}/{{total}} bultos revisados",
+      "reviewAllHint": "Aprueba o rechaza cada bulto antes de finalizar.",
+      "allApprovedHint": "Todos los bultos aprobados. Puedes aprobar el pedido.",
+      "hasRejectedHint": "Hay bultos rechazados. Finaliza con rechazo y escribe el motivo.",
+      "comparisonNote": "Verde = cantidad correcta · Ámbar = exceso · Rojo = faltante (vs. pedido Profit)"
+    },
+    "bulto": {
+      "title": "Bulto {{number}}",
+      "itemCount": "{{count}} ítem(s)",
+      "empty": "Sin ítems",
+      "tapToExpand": "Toca para revisar el contenido",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "reviewApproved": "Aprobado",
+      "reviewRejected": "Rechazado",
+      "pendingReview": "Pendiente",
+      "picked": "Armado",
+      "required": "Req."
+    },
+    "approve": {
+      "btn": "Aprobar",
+      "title": "Aprobar pedido",
+      "body": "¿Confirmas que el pedido {{order}} está correcto?",
+      "confirm": "Aprobar"
+    },
+    "reject": {
+      "btn": "Rechazar",
+      "title": "Rechazar pedido",
+      "subtitle": "Describe el motivo del rechazo. El picker lo verá al corregir el pedido.",
+      "placeholder": "Ej: Faltan 5 unidades del SKU X en el bulto 2...",
+      "required": "La observación es obligatoria.",
+      "confirm": "Rechazar pedido",
+      "bultoLine": "Bulto {{number}}: revisar contenido."
+    }
+  },
+  "supervision": {
+    "screen": {
+      "subtitle": "Estado en tiempo real",
+      "title": "Pickers",
+      "pickersCount": "pickers",
+      "searchPlaceholder": "Buscar picker...",
+      "emptyTitle": "Sin pickers registrados",
+      "emptySubtitle": "Los pickers aparecerán aquí cuando estén activos."
+    },
+    "summary": {
+      "total": "Total",
+      "disponible": "Disponible",
+      "en_proceso": "En proceso",
+      "reservado": "Reservado",
+      "por_embalar": "Por embalar"
+    },
+    "card": {
+      "timeInStatus": "En este estado",
+      "bultosToday": "Bultos hoy",
+      "noActiveOrder": "Sin pedido activo"
+    }
+  },
+  "profile": {
+    "title": "Perfil",
+    "subtitle": "Tu cuenta y sesión",
+    "role": "Usuario",
+    "roleLabel": "Rol",
+    "emailLabel": "Correo",
+    "defaultName": "Usuario",
+    "signOut": "Cerrar sesión"
   },
   "home": {
     "title": "Inicio",
@@ -68,6 +416,91 @@
       "tasks": "Tareas",
       "reports": "Reportes",
       "alerts": "Alertas"
+    }
+  },
+  "orders": {
+    "title": "Pedidos",
+    "subtitle": "Consulta y supervisa el estado de tus pedidos",
+    "searchPlaceholder": "Buscar pedido, cliente o SKU...",
+    "ordersCount": "{{count}} pedidos",
+    "summary": {
+      "total": "Pedidos totales",
+      "pending": "Pendientes",
+      "inPicking": "En picking",
+      "prepared": "Preparados"
+    },
+    "sortRecent": "Más recientes",
+    "sortOldest": "Más antiguos",
+    "itemCount": "{{count}} items",
+    "critical": "Crítico",
+    "clientLabel": "Cliente:",
+    "clientLine": "Cliente: {{name}}",
+    "takenBy": "Tomado por",
+    "unassigned": "Sin asignar",
+    "pickingProcess": "Proceso picking",
+    "pickingInProgress": "En curso",
+    "uniqueSkus": "SKUs únicos",
+    "skusCount": "{{count}} Items",
+    "totalQty": "Cant. total",
+    "unitsCount": "{{count}} Unidades",
+    "elapsed": {
+      "label": "Tiempo en cola",
+      "justNow": "Hace un momento",
+      "minutes": "Hace {{count}} min",
+      "hours": "Hace {{count}} h",
+      "hoursMinutes": "Hace {{hours}} h {{minutes}} min",
+      "days": "Hace {{count}} d",
+      "daysHours": "Hace {{days}} d {{hours}} h"
+    },
+    "pickingNotStarted": "Picking no iniciado",
+    "startPicking": "Iniciar picking >",
+    "pickingProgress": "Progreso de picking",
+    "readyToShip": "Listo para envío",
+    "deliveredOn": "Entregado el {{date}}",
+    "emptyTitle": "No hay pedidos",
+    "emptySubtitle": "Prueba con otro filtro o término de búsqueda.",
+    "filter": {
+      "title": "Filtrar pedidos",
+      "byStatus": "Estado del pedido",
+      "allStatuses": "Todos"
+    },
+    "tabs": {
+      "all": "Todos",
+      "pending": "Pendientes",
+      "pickers": "Pickers"
+    },
+    "picker": {
+      "subtitleAvailable": "Elige un pedido pendiente para tomarlo",
+      "subtitleActive": "Tu pedido en curso",
+      "emptyAvailableTitle": "No hay pedidos pendientes",
+      "emptyAvailableSubtitle": "No hay pedidos sin asignar en este momento.",
+      "emptyActiveTitle": "Sin pedido activo",
+      "emptyActiveSubtitle": "Tu pedido en curso no está disponible."
+    },
+    "pickers": {
+      "totalCount": "{{count}} pickers",
+      "ordersCount_one": "{{count}} pedido",
+      "ordersCount_other": "{{count}} pedidos",
+      "searchPlaceholder": "Buscar picker...",
+      "backToPickers": "Volver a pickers",
+      "emptyTitle": "No hay pickers",
+      "emptySubtitle": "Aún no hay pedidos asignados a un picker."
+    },
+    "status": {
+      "pending": "Pendiente",
+      "inPicking": "En picking",
+      "prepared": "Preparado",
+      "delivered": "Entregado"
+    },
+    "detail": {
+      "title": "Detalle del pedido",
+      "zone": "Zona: {{zone}}",
+      "itemsTitle": "Artículos a preparar",
+      "itemsCount": "{{count}} artículos",
+      "instructions": "Instrucciones especiales",
+      "startPicking": "Iniciar picking",
+      "continuePicking": "Continuar picking",
+      "notFound": "No se encontró el pedido."
     }
   },
   "settings": {

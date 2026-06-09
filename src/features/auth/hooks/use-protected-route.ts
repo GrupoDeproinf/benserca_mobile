@@ -1,15 +1,16 @@
 import { useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { APP_ROUTES, AUTH_ROUTES } from '@/features/auth/constants/routes';
+import { AUTH_ROUTES, getRoleHomePath } from '@/features/auth/constants/routes';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 
 /**
- * Redirige según sesión. Entrada no autenticada → login directo.
+ * Sin sesión → solo `(auth)`. Con sesión → home del rol en `(app)`.
  */
 export function useProtectedRoute() {
   const router = useRouter();
   const segments = useSegments();
+  const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isHydrated = useAuthStore((s) => s.isHydrated);
 
@@ -17,16 +18,24 @@ export function useProtectedRoute() {
     if (!isHydrated) return;
     SplashScreen.hideAsync().catch(() => null);
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const authPage = segments[1];
-    const isAuthForm = authPage === 'login';
+    const rootSegment = segments[0];
+    const inAuthGroup = rootSegment === '(auth)';
+    const inAppGroup = rootSegment === '(app)';
 
-    if (!isAuthenticated) {
-      if (!inAuthGroup || !isAuthForm) {
+    if (!isAuthenticated || !user) {
+      if (!inAuthGroup) {
         router.replace(AUTH_ROUTES.login);
       }
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace(APP_ROUTES.tabs);
+      return;
     }
-  }, [isAuthenticated, isHydrated, segments, router]);
+
+    if (inAuthGroup) {
+      router.replace(getRoleHomePath(user.role));
+      return;
+    }
+
+    if (!inAppGroup) {
+      router.replace(getRoleHomePath(user.role));
+    }
+  }, [isAuthenticated, isHydrated, user, segments, router]);
 }

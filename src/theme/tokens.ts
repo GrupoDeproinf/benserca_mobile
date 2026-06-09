@@ -68,5 +68,29 @@ export const typography = {
   },
 } as const;
 
+/**
+ * Sombras premium por nivel de elevación. En dark mode las sombras
+ * son más profundas y opacas para mantener separación visual.
+ */
+export const elevation = {
+  light: {
+    sm: { shadowColor: '#0B1220', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+    md: { shadowColor: '#0B1220', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+    lg: { shadowColor: '#0B1220', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.12, shadowRadius: 28, elevation: 12 },
+  },
+  dark: {
+    sm: { shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 4, elevation: 1 },
+    md: { shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 18, elevation: 6 },
+    lg: { shadowColor: '#000000', shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.6, shadowRadius: 30, elevation: 14 },
+  },
+} as const;
+
+/** Gradiente de header por tema (de marca → más oscuro para profundidad). */
+export const headerGradient = {
+  light: ['#23578C', '#1E4976', '#173A5E'] as const,
+  dark: ['#1B2C44', '#142133', '#0D1626'] as const,
+};
+
 export type ColorScheme = 'light' | 'dark';
 export type Theme = (typeof colors)[ColorScheme];
+export type ElevationLevel = keyof (typeof elevation)['light'];
