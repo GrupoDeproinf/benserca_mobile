@@ -4,3 +4,7 @@
 
 expo-env.d.ts
 # @end expo-cli
+
+# Firebase (no subir al repo; mantener copia local para builds)
+google-services.json
+android/app/google-services.json
