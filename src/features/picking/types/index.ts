@@ -14,14 +14,19 @@ export interface OrderLine {
   sku: string;
   name: string;
   requiredQty: number;
+  unitsPerBundle: number;
 }
 
-/** Ítem realmente metido dentro de un bulto por el picker. */
+/** Ítem metido en un bulto por el picker. */
 export interface BultoItem {
   id: string;
+  /** SKU realmente empaquetado. */
   sku: string;
   name: string;
   qty: number;
+  /** SKU original del pedido si hubo sustitución. */
+  originalSku?: string;
+  substitutionNote?: string;
 }
 
 export type BultoStatus = 'open' | 'closed';
@@ -31,6 +36,23 @@ export interface Bulto {
   number: number;
   status: BultoStatus;
   items: BultoItem[];
+}
+
+export interface FinalSkuBundle {
+  bundleNum: number;
+  quantity: number;
+}
+
+/** Estado final por SKU original (schema Firestore). */
+export interface FinalSku {
+  originalSku: string;
+  originalQuantity: number;
+  packedSku: string;
+  packedQuantity: number;
+  difference: number;
+  substituted: boolean;
+  substitutionNote: string | null;
+  bundles: FinalSkuBundle[];
 }
 
 /** Observación obligatoria que deja el auditor al rechazar. */
@@ -48,11 +70,17 @@ export interface Order {
   client: string;
   status: OrderStatus;
 
-  /** Prioridad visual en listas (ej. pedidos urgentes en cola). */
   isCritical?: boolean;
 
   definedBultos: number;
   hasExtraBultos: boolean;
+  bundlesCreated: number;
+  progressPercentage: number;
+  /** Último hito de guardado parcial alcanzado (0, 25, 50, 75, 100). */
+  lastSavedMilestone: number;
+
+  /** Posición en cola del picker (1 = puede iniciar). */
+  queuePosition: number;
 
   assignedPickerId: string | null;
   assignedLeadId: string | null;
@@ -62,7 +90,7 @@ export interface Order {
   bultos: Bulto[];
 
   snapshotOriginal: OrderLine[] | null;
-  finalState: BultoItem[] | null;
+  finalSkus: FinalSku[];
 
   auditObservations: AuditObservation[];
 
@@ -88,7 +116,13 @@ export type OrderDomainAction =
   | 'start_picking'
   | 'open_bulto'
   | 'finish_picking'
-  | 'mark_packed'
+  | 'mark_wrapped'
   | 'approve_audit'
   | 'reject_audit'
   | 'reopen_for_revision';
+
+export type PickerActionError =
+  | 'not_queue_head'
+  | 'already_active_order'
+  | 'empty_open_bulto_exists'
+  | 'cannot_close_empty_bulto';

@@ -18,6 +18,11 @@ export {
   logout,
   requestPasswordReset,
   DEMO_CREDENTIALS,
-  MOCK_USERS,
+  InvalidCredentialsError,
+  ProfileNotFoundError,
+  InvalidProfileError,
+  FirestorePermissionError,
+  AuthNotEnabledError,
+  NetworkAuthError,
 } from './services/auth.service';
 export { useAuthStore, type User } from './store/auth.store';

@@ -4,12 +4,14 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useProtectedRoute } from '@/features/auth/hooks/use-protected-route';
+import { useFirebaseAuthSync } from '@/features/auth/hooks/use-firebase-auth-sync';
 import { AppProviders } from '@/providers/app-providers';
 import { useResolvedColorScheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => null);
 
 function ProtectedRouter() {
+  useFirebaseAuthSync();
   useProtectedRoute();
 
   return (

@@ -1,4 +1,5 @@
-import type { Order } from '../types';
+import type { FinalSku, Order, OrderLine } from '../types';
+import { buildFinalSkus } from '../utils/order-snapshot';
 
 const now = Date.now();
 const minutes = (m: number) => new Date(now - m * 60 * 1000).toISOString();
@@ -10,39 +11,60 @@ export const MOCK_PICKER_ANA_UID = 'user-picker-1';
 export const MOCK_LEAD_CARLOS_UID = 'user-lead-1';
 export const MOCK_AUDITOR_LUISA_UID = 'user-auditor-1';
 
+function line(
+  sku: string,
+  name: string,
+  requiredQty: number,
+  unitsPerBundle = 12,
+): OrderLine {
+  return { sku, name, requiredQty, unitsPerBundle };
+}
+
 const linesPed502 = [
-  { sku: 'PW-500-IND', name: 'Fuente de Poder Industrial 500W', requiredQty: 12 },
-  { sku: 'CBL-HD-2M', name: 'Cable de Conexión Reforzado', requiredQty: 5 },
-  { sku: 'VRM-X100', name: 'Módulo Regulador de Voltaje', requiredQty: 2 },
+  line('PW-500-IND', 'Fuente de Poder Industrial 500W', 12, 12),
+  line('CBL-HD-2M', 'Cable de Conexión Reforzado', 5, 6),
+  line('VRM-X100', 'Módulo Regulador de Voltaje', 2, 4),
 ];
 
 const linesPed508 = [
-  { sku: 'MON-LED-24', name: 'Monitor LED 24" Full HD', requiredQty: 10 },
-  { sku: 'SOP-MON-01', name: 'Soporte Ajustable para Monitor', requiredQty: 10 },
-  { sku: 'CBL-HDMI-2M', name: 'Cable HDMI 2.0 (2m)', requiredQty: 8 },
+  line('MON-LED-24', 'Monitor LED 24" Full HD', 10, 10),
+  line('SOP-MON-01', 'Soporte Ajustable para Monitor', 10, 10),
+  line('CBL-HDMI-2M', 'Cable HDMI 2.0 (2m)', 8, 8),
 ];
 
 const linesPed512 = [
-  { sku: 'BOX-C-05', name: 'Caja de Cartón Reforzada #5', requiredQty: 20 },
-  { sku: 'FILM-STR-01', name: 'Film Stretch para Embalaje', requiredQty: 15 },
-  { sku: 'TAPE-IND-01', name: 'Cinta de Embalaje Industrial', requiredQty: 12 },
-  { sku: 'CORN-CART-01', name: 'Esquinero Protector de Cartón', requiredQty: 9 },
+  line('BOX-C-05', 'Caja de Cartón Reforzada #5', 20, 20),
+  line('FILM-STR-01', 'Film Stretch para Embalaje', 15, 15),
+  line('TAPE-IND-01', 'Cinta de Embalaje Industrial', 12, 12),
+  line('CORN-CART-01', 'Esquinero Protector de Cartón', 9, 9),
+];
+
+const linesPed4424 = [
+  line('0101010040015', 'Aceite de Motor 1L', 12, 12),
+  line('0201010020007', 'Casco Azul Talla M', 9, 18),
+  line('0201010020008', 'Casco Verde Talla S', 12, 18),
+  line('0201010020009', 'Guantes de Trabajo', 10, 120),
 ];
 
 const linesPedLarge = [
-  { sku: 'CEM-PORT-50', name: 'Cemento Portland Tipo I (50kg)', requiredQty: 100 },
-  { sku: 'VAR-COR-38', name: 'Varilla Corrugada 3/8"', requiredQty: 80 },
-  { sku: 'MALLA-ELT-01', name: 'Malla Electrosoldada 6x6', requiredQty: 30 },
-  { sku: 'PAP-BOND-75', name: 'Resma Papel Bond 75g (500 hojas)', requiredQty: 50 },
-  { sku: 'BOL-BIC-AZ', name: 'Bolígrafo BIC Cristal Azul', requiredQty: 40 },
-  { sku: 'ACE-MOT-20W', name: 'Aceite de Motor 20W-50 (1L)', requiredQty: 25 },
+  line('CEM-PORT-50', 'Cemento Portland Tipo I (50kg)', 100, 50),
+  line('VAR-COR-38', 'Varilla Corrugada 3/8"', 80, 40),
+  line('MALLA-ELT-01', 'Malla Electrosoldada 6x6', 30, 15),
+  line('PAP-BOND-75', 'Resma Papel Bond 75g (500 hojas)', 50, 25),
+  line('BOL-BIC-AZ', 'Bolígrafo BIC Cristal Azul', 40, 20),
+  line('ACE-MOT-20W', 'Aceite de Motor 20W-50 (1L)', 25, 12),
 ];
 
 const linesPed530 = [
-  { sku: 'TERM-DIG-01', name: 'Termómetro Digital Infrarrojo', requiredQty: 8 },
-  { sku: 'OXIM-PORT-01', name: 'Oxímetro de Pulso Portátil', requiredQty: 6 },
-  { sku: 'GEL-ALC-500', name: 'Gel Antibacterial 500ml', requiredQty: 24 },
+  line('TERM-DIG-01', 'Termómetro Digital Infrarrojo', 8, 8),
+  line('OXIM-PORT-01', 'Oxímetro de Pulso Portátil', 6, 6),
+  line('GEL-ALC-500', 'Gel Antibacterial 500ml', 24, 12),
 ];
+
+function withFinalSkus(order: Order): FinalSku[] {
+  if (order.bultos.length === 0) return [];
+  return buildFinalSkus(order, order.bultos.filter((b) => b.status === 'closed'));
+}
 
 export const MOCK_ORDERS: Order[] = [
   {
@@ -52,13 +74,17 @@ export const MOCK_ORDERS: Order[] = [
     status: 'assigned',
     definedBultos: 2,
     hasExtraBultos: false,
+    bundlesCreated: 0,
+    progressPercentage: 0,
+    lastSavedMilestone: 0,
+    queuePosition: 2,
     assignedPickerId: MOCK_PICKER_ANA_UID,
     assignedLeadId: null,
     teamId: null,
     lines: linesPed530,
     bultos: [],
     snapshotOriginal: null,
-    finalState: null,
+    finalSkus: [],
     auditObservations: [],
     createdAt: minutes(15),
     assignedAt: minutes(2),
@@ -72,13 +98,17 @@ export const MOCK_ORDERS: Order[] = [
     isCritical: true,
     definedBultos: 2,
     hasExtraBultos: false,
+    bundlesCreated: 0,
+    progressPercentage: 0,
+    lastSavedMilestone: 0,
+    queuePosition: 3,
     assignedPickerId: MOCK_PICKER_ANA_UID,
     assignedLeadId: null,
     teamId: null,
     lines: linesPed502,
     bultos: [],
     snapshotOriginal: null,
-    finalState: null,
+    finalSkus: [],
     auditObservations: [],
     createdAt: days(2),
     assignedAt: minutes(25),
@@ -91,6 +121,10 @@ export const MOCK_ORDERS: Order[] = [
     status: 'in_progress',
     definedBultos: 2,
     hasExtraBultos: false,
+    bundlesCreated: 1,
+    progressPercentage: 50,
+    lastSavedMilestone: 50,
+    queuePosition: 1,
     assignedPickerId: MOCK_PICKER_ANA_UID,
     assignedLeadId: null,
     teamId: null,
@@ -101,12 +135,7 @@ export const MOCK_ORDERS: Order[] = [
         number: 1,
         status: 'closed',
         items: [
-          {
-            id: 'bi-1',
-            sku: 'MON-LED-24',
-            name: 'Monitor LED 24" Full HD',
-            qty: 6,
-          },
+          { id: 'bi-1', sku: 'MON-LED-24', name: 'Monitor LED 24" Full HD', qty: 6 },
         ],
       },
       {
@@ -117,7 +146,7 @@ export const MOCK_ORDERS: Order[] = [
       },
     ],
     snapshotOriginal: linesPed508.map((l) => ({ ...l })),
-    finalState: null,
+    finalSkus: [],
     auditObservations: [],
     createdAt: days(1),
     assignedAt: minutes(8),
@@ -130,6 +159,10 @@ export const MOCK_ORDERS: Order[] = [
     status: 'to_pack',
     definedBultos: 2,
     hasExtraBultos: false,
+    bundlesCreated: 2,
+    progressPercentage: 100,
+    lastSavedMilestone: 100,
+    queuePosition: 1,
     assignedPickerId: MOCK_PICKER_ANA_UID,
     assignedLeadId: null,
     teamId: null,
@@ -155,30 +188,29 @@ export const MOCK_ORDERS: Order[] = [
       },
     ],
     snapshotOriginal: linesPed512.map((l) => ({ ...l })),
-    finalState: [
-      { id: 'fs-1', sku: 'BOX-C-05', name: 'Caja de Cartón Reforzada #5', qty: 20 },
-      { id: 'fs-2', sku: 'FILM-STR-01', name: 'Film Stretch para Embalaje', qty: 15 },
-      { id: 'fs-3', sku: 'TAPE-IND-01', name: 'Cinta de Embalaje Industrial', qty: 12 },
-      { id: 'fs-4', sku: 'CORN-CART-01', name: 'Esquinero Protector de Cartón', qty: 9 },
-    ],
+    finalSkus: [],
     auditObservations: [],
     createdAt: days(3),
     assignedAt: minutes(18),
     packedAt: null,
   },
   {
-    id: 'ord-packed-1',
+    id: 'ord-audit-queue-1',
     orderNumber: 'PED-519',
     client: 'Distribuidora Mercantil XYZ',
-    status: 'packed',
+    status: 'to_pack',
     definedBultos: 1,
     hasExtraBultos: false,
+    bundlesCreated: 1,
+    progressPercentage: 100,
+    lastSavedMilestone: 100,
+    queuePosition: 1,
     assignedPickerId: 'picker-maria',
     assignedLeadId: null,
     teamId: null,
     lines: [
-      { sku: 'ACE-MOT-20W', name: 'Aceite de Motor 20W-50 (1L)', requiredQty: 12 },
-      { sku: 'FIL-ACE-UNI', name: 'Filtro de Aceite Universal', requiredQty: 6 },
+      line('ACE-MOT-20W', 'Aceite de Motor 20W-50 (1L)', 12, 12),
+      line('FIL-ACE-UNI', 'Filtro de Aceite Universal', 6, 6),
     ],
     bultos: [
       {
@@ -192,17 +224,14 @@ export const MOCK_ORDERS: Order[] = [
       },
     ],
     snapshotOriginal: [
-      { sku: 'ACE-MOT-20W', name: 'Aceite de Motor 20W-50 (1L)', requiredQty: 12 },
-      { sku: 'FIL-ACE-UNI', name: 'Filtro de Aceite Universal', requiredQty: 6 },
+      line('ACE-MOT-20W', 'Aceite de Motor 20W-50 (1L)', 12, 12),
+      line('FIL-ACE-UNI', 'Filtro de Aceite Universal', 6, 6),
     ],
-    finalState: [
-      { id: 'fs-5', sku: 'ACE-MOT-20W', name: 'Aceite de Motor 20W-50 (1L)', qty: 12 },
-      { id: 'fs-6', sku: 'FIL-ACE-UNI', name: 'Filtro de Aceite Universal', qty: 6 },
-    ],
+    finalSkus: [],
     auditObservations: [],
     createdAt: days(1),
     assignedAt: hours(20),
-    packedAt: hours(2),
+    packedAt: null,
   },
   {
     id: 'ord-rejected-1',
@@ -212,13 +241,17 @@ export const MOCK_ORDERS: Order[] = [
     isCritical: true,
     definedBultos: 2,
     hasExtraBultos: true,
+    bundlesCreated: 3,
+    progressPercentage: 100,
+    lastSavedMilestone: 100,
+    queuePosition: 1,
     assignedPickerId: MOCK_PICKER_ANA_UID,
     assignedLeadId: null,
     teamId: null,
     lines: [
-      { sku: 'PAP-BOND-75', name: 'Resma Papel Bond 75g (500 hojas)', requiredQty: 150 },
-      { sku: 'BOL-BIC-AZ', name: 'Bolígrafo BIC Cristal Azul', requiredQty: 100 },
-      { sku: 'CUA-UNI-100', name: 'Cuaderno Universitario 100 hojas', requiredQty: 50 },
+      line('PAP-BOND-75', 'Resma Papel Bond 75g (500 hojas)', 150, 50),
+      line('BOL-BIC-AZ', 'Bolígrafo BIC Cristal Azul', 100, 50),
+      line('CUA-UNI-100', 'Cuaderno Universitario 100 hojas', 50, 25),
     ],
     bultos: [
       {
@@ -233,9 +266,7 @@ export const MOCK_ORDERS: Order[] = [
         id: 'bulto-523-2',
         number: 2,
         status: 'closed',
-        items: [
-          { id: 'bi-9', sku: 'BOL-BIC-AZ', name: 'Bolígrafo BIC Cristal Azul', qty: 100 },
-        ],
+        items: [{ id: 'bi-9', sku: 'BOL-BIC-AZ', name: 'Bolígrafo BIC Cristal Azul', qty: 100 }],
       },
       {
         id: 'bulto-523-3',
@@ -247,15 +278,11 @@ export const MOCK_ORDERS: Order[] = [
       },
     ],
     snapshotOriginal: [
-      { sku: 'PAP-BOND-75', name: 'Resma Papel Bond 75g (500 hojas)', requiredQty: 150 },
-      { sku: 'BOL-BIC-AZ', name: 'Bolígrafo BIC Cristal Azul', requiredQty: 100 },
-      { sku: 'CUA-UNI-100', name: 'Cuaderno Universitario 100 hojas', requiredQty: 50 },
+      line('PAP-BOND-75', 'Resma Papel Bond 75g (500 hojas)', 150, 50),
+      line('BOL-BIC-AZ', 'Bolígrafo BIC Cristal Azul', 100, 50),
+      line('CUA-UNI-100', 'Cuaderno Universitario 100 hojas', 50, 25),
     ],
-    finalState: [
-      { id: 'fs-7', sku: 'PAP-BOND-75', name: 'Resma Papel Bond 75g (500 hojas)', qty: 140 },
-      { id: 'fs-8', sku: 'BOL-BIC-AZ', name: 'Bolígrafo BIC Cristal Azul', qty: 100 },
-      { id: 'fs-9', sku: 'CUA-UNI-100', name: 'Cuaderno Universitario 100 hojas', qty: 50 },
-    ],
+    finalSkus: [],
     auditObservations: [
       {
         id: 'obs-1',
@@ -276,13 +303,17 @@ export const MOCK_ORDERS: Order[] = [
     status: 'assigned',
     definedBultos: 4,
     hasExtraBultos: false,
+    bundlesCreated: 0,
+    progressPercentage: 0,
+    lastSavedMilestone: 0,
+    queuePosition: 1,
     assignedPickerId: null,
     assignedLeadId: MOCK_LEAD_CARLOS_UID,
     teamId: null,
     lines: linesPedLarge,
     bultos: [],
     snapshotOriginal: null,
-    finalState: null,
+    finalSkus: [],
     auditObservations: [],
     createdAt: hours(2),
     assignedAt: hours(1),
@@ -295,12 +326,16 @@ export const MOCK_ORDERS: Order[] = [
     status: 'audited',
     definedBultos: 1,
     hasExtraBultos: false,
+    bundlesCreated: 1,
+    progressPercentage: 100,
+    lastSavedMilestone: 100,
+    queuePosition: 1,
     assignedPickerId: 'picker-luis',
     assignedLeadId: null,
     teamId: null,
     lines: [
-      { sku: 'TERM-DIG-01', name: 'Termómetro Digital Infrarrojo', requiredQty: 20 },
-      { sku: 'OXIM-PORT-01', name: 'Oxímetro de Pulso Portátil', requiredQty: 14 },
+      line('TERM-DIG-01', 'Termómetro Digital Infrarrojo', 20, 20),
+      line('OXIM-PORT-01', 'Oxímetro de Pulso Portátil', 14, 14),
     ],
     bultos: [
       {
@@ -314,16 +349,39 @@ export const MOCK_ORDERS: Order[] = [
       },
     ],
     snapshotOriginal: [
-      { sku: 'TERM-DIG-01', name: 'Termómetro Digital Infrarrojo', requiredQty: 20 },
-      { sku: 'OXIM-PORT-01', name: 'Oxímetro de Pulso Portátil', requiredQty: 14 },
+      line('TERM-DIG-01', 'Termómetro Digital Infrarrojo', 20, 20),
+      line('OXIM-PORT-01', 'Oxímetro de Pulso Portátil', 14, 14),
     ],
-    finalState: [
-      { id: 'fs-10', sku: 'TERM-DIG-01', name: 'Termómetro Digital Infrarrojo', qty: 20 },
-      { id: 'fs-11', sku: 'OXIM-PORT-01', name: 'Oxímetro de Pulso Portátil', qty: 14 },
-    ],
+    finalSkus: [],
     auditObservations: [],
     createdAt: days(5),
     assignedAt: days(4),
-    packedAt: days(3),
+    packedAt: null,
   },
-];
+  {
+    id: 'ord-mock-4424',
+    orderNumber: 'PF-4424',
+    client: 'Distribuidora Los Andes C.A.',
+    status: 'assigned',
+    definedBultos: 5,
+    hasExtraBultos: false,
+    bundlesCreated: 0,
+    progressPercentage: 0,
+    lastSavedMilestone: 0,
+    queuePosition: 4,
+    assignedPickerId: MOCK_PICKER_ANA_UID,
+    assignedLeadId: null,
+    teamId: null,
+    lines: linesPed4424,
+    bultos: [],
+    snapshotOriginal: null,
+    finalSkus: [],
+    auditObservations: [],
+    createdAt: days(1),
+    assignedAt: hours(3),
+    packedAt: null,
+  },
+].map((order) => ({
+  ...order,
+  finalSkus: order.finalSkus.length > 0 ? order.finalSkus : withFinalSkus(order as Order),
+})) as Order[];

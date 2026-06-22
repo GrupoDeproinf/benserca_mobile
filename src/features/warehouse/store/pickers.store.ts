@@ -8,6 +8,8 @@ function clonePickers(): PickerEstado[] {
 
 interface PickersState {
   pickers: PickerEstado[];
+  /** Hidrata el store con datos de Firestore, preservando estado local si el uid ya existe. */
+  setPickers: (incoming: PickerEstado[]) => void;
   getPicker: (uid: string) => PickerEstado | undefined;
   getPickersByStatus: (status: PickerStatus) => PickerEstado[];
   getAvailablePickers: () => PickerEstado[];
@@ -21,6 +23,26 @@ interface PickersState {
 
 export const usePickersStore = create<PickersState>((set, get) => ({
   pickers: clonePickers(),
+
+  setPickers: (incoming) => {
+    set((s) => {
+      const localMap = new Map(s.pickers.map((p) => [p.uid, p]));
+      const merged = incoming.map((firestorePicker) => {
+        const local = localMap.get(firestorePicker.uid);
+        // Preserve local status mutations (setPickerStatus is called during picking)
+        if (local) {
+          return {
+            ...firestorePicker,
+            status: local.status,
+            activeOrderId: local.activeOrderId,
+            bultosToday: local.bultosToday,
+          };
+        }
+        return firestorePicker;
+      });
+      return { pickers: merged };
+    });
+  },
 
   getPicker: (uid) => get().pickers.find((p) => p.uid === uid),
   getPickersByStatus: (status) => get().pickers.filter((p) => p.status === status),

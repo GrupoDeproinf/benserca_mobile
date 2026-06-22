@@ -1,6 +1,7 @@
 import { Tabs, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
+import { useFirestorePickers } from '@/features/warehouse/hooks/use-firestore-pickers';
 import { AppHeroTopBar } from '@/features/tabs/components/app-hero-top-bar';
 import { AppTabBar } from '@/features/tabs/components/app-tab-bar';
 import { ROLE_TABS_CONFIG } from '@/features/tabs/constants/role-tabs';
@@ -16,6 +17,9 @@ export default function LeadTabsLayout() {
   const { t } = useTranslation();
   const router = useRouter();
   const config = ROLE_TABS_CONFIG.warehouse_lead;
+
+  // Single pickers listener for the entire lead session
+  useFirestorePickers();
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F2F2F7' }}>

@@ -16,7 +16,12 @@ import {
 } from '@/features/auth/schemas/forgot-password.schema';
 import { LoginQuickAccess } from '@/features/auth/components/login-quick-access';
 import {
+  AuthNotEnabledError,
+  FirestorePermissionError,
   InvalidCredentialsError,
+  InvalidProfileError,
+  NetworkAuthError,
+  ProfileNotFoundError,
   login,
   loginWithDemoRole,
   requestPasswordReset,
@@ -27,6 +32,19 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 import { Text } from '@/shared/components/ui/text';
 
 type Mode = 'login' | 'forgot' | 'sent';
+
+function resolveAuthErrorMessage(err: unknown, t: (key: string) => string): string {
+  if (err instanceof InvalidCredentialsError) return t('auth.invalidCredentials');
+  if (err instanceof ProfileNotFoundError) return t('auth.profileNotFound');
+  if (err instanceof InvalidProfileError) return t('auth.invalidProfile');
+  if (err instanceof FirestorePermissionError) return t('auth.firestorePermission');
+  if (err instanceof AuthNotEnabledError) return t('auth.authNotEnabled');
+  if (err instanceof NetworkAuthError) return t('auth.networkError');
+  if (__DEV__) {
+    console.warn('[auth] Login failed:', err);
+  }
+  return t('auth.genericError');
+}
 
 export function LoginScreen() {
   const { t } = useTranslation();
@@ -53,11 +71,7 @@ export function LoginScreen() {
       const user = await login(values);
       setUser(user);
     } catch (err) {
-      if (err instanceof InvalidCredentialsError) {
-        setAuthError(t('auth.invalidCredentials'));
-      } else {
-        setAuthError(t('auth.genericError'));
-      }
+      setAuthError(resolveAuthErrorMessage(err, t));
     } finally {
       setSubmitting(false);
     }
@@ -72,11 +86,7 @@ export function LoginScreen() {
       const user = await loginWithDemoRole(role);
       setUser(user);
     } catch (err) {
-      if (err instanceof InvalidCredentialsError) {
-        setAuthError(t('auth.invalidCredentials'));
-      } else {
-        setAuthError(t('auth.genericError'));
-      }
+      setAuthError(resolveAuthErrorMessage(err, t));
     } finally {
       setSubmitting(false);
     }

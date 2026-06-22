@@ -1,9 +1,10 @@
 import type { Order } from '../types';
-import { buildFinalState } from './order-snapshot';
+import { countClosedBultosWithItems } from './order-snapshot';
 
-/** Progreso de picking 0–1 según cantidades pickeadas vs requeridas. */
+/** Progreso 0–1 según bultos cerrados / bultos definidos (tope 100%). */
 export function computePickingProgress(order: Order): number {
   if (order.status === 'assigned' || order.status === 'new') return 0;
+
   if (
     order.status === 'to_pack' ||
     order.status === 'packed' ||
@@ -13,9 +14,16 @@ export function computePickingProgress(order: Order): number {
     return 1;
   }
 
-  const requiredTotal = order.lines.reduce((sum, line) => sum + line.requiredQty, 0);
-  if (requiredTotal === 0) return 0;
+  if (order.definedBultos <= 0) return 0;
 
-  const picked = buildFinalState(order.bultos).reduce((sum, item) => sum + item.qty, 0);
-  return Math.min(1, picked / requiredTotal);
+  const closed = countClosedBultosWithItems(order.bultos);
+  return Math.min(1, closed / order.definedBultos);
+}
+
+export function computeProgressPercentage(order: Order): number {
+  return Math.round(computePickingProgress(order) * 100);
+}
+
+export function computeBundlesCreated(bultos: Order['bultos']): number {
+  return countClosedBultosWithItems(bultos);
 }

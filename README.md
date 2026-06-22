@@ -468,7 +468,7 @@ No es un fallo de tu código de pantallas; ocurre cuando Tailwind regenera estil
 | Paquete npm | `benserca_mobile` |
 | Repositorio Git | `https://github.com/GrupoDeproinf/template_app_reactnative.git` |
 | Organización | GrupoDeproinf |
-| Bundle ID (iOS/Android) | `com.grupodeproinf.benserca_Mobile` |
+| Bundle ID (iOS/Android) | `com.benserca.app` |
 | Deep link scheme | `benserca_mobile` |
 
 ### Inventario de capacidades disponibles (resumen ejecutable)

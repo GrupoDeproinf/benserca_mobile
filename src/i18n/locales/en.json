@@ -93,7 +93,7 @@
       "openBulto": "Open new package",
       "finishPicking": "Finish picking",
       "markPacked": "Mark as packed",
-      "linesTitle": "Required SKUs (Profit)",
+      "linesTitle": "Order items",
       "bultosTitle": "Built packages",
       "definedBultos": "Defined",
       "bultosDone": "Created",
@@ -111,11 +111,16 @@
       "reopen": "Reopen"
     },
     "addItem": {
-      "title": "Add item to package",
-      "searchPlaceholder": "Search SKU or name…",
+      "title": "Add item to Bulto {{number}}",
+      "searchPlaceholder": "Search item…",
       "noResults": "No results",
       "qty": "Quantity",
-      "add": "Add to package"
+      "add": "Add to package",
+      "addWithCount": "Add to package ({{count}} units)",
+      "maxPerArticle": "Max {{max}} units",
+      "noSpace": "No space",
+      "capacityExceededTooltip": "Bundle capacity exceeded",
+      "searchHint": "Type at least 2 characters to search"
     },
     "extraBultos": {
       "title": "Extra packages",
@@ -124,6 +129,9 @@
     "finish": {
       "openBultosTitle": "Open packages",
       "openBultosBody": "Close all packages before finishing picking.",
+      "emptyBlockTitle": "Empty open package",
+      "emptyBlockBody": "Package {{number}} is open and has no items. Add items or delete it before finishing.",
+      "emptyBlockBodyGeneric": "There is an open package with no items. Add items or delete it before finishing.",
       "confirmTitle": "Finish picking",
       "confirmBody": "Final state will be calculated. The order will move to 'To pack'.",
       "confirm": "Finish"
@@ -175,6 +183,11 @@
     "sendResetLink": "Send reset link",
     "backToLogin": "Back to sign in",
     "invalidCredentials": "Incorrect email or password.",
+    "profileNotFound": "Your account has no profile configured. Contact an administrator.",
+    "invalidProfile": "Your profile has no valid role. Contact an administrator.",
+    "firestorePermission": "You do not have permission to read your profile. Check Firestore rules.",
+    "authNotEnabled": "Email sign-in is not enabled in Firebase.",
+    "networkError": "No connection. Check your network and try again.",
     "genericError": "Something went wrong. Please try again.",
     "demoAccess": "Demo access",
     "loginAsPicker": "Picker",

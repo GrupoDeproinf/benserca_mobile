@@ -8,4 +8,4 @@ export {
   ORDER_STATUS_I18N_KEY,
   statusLabelKey,
 } from './utils/order-status';
-export { buildFinalState } from './utils/order-snapshot';
+export { buildFinalSkus, buildFinalState } from './utils/order-snapshot';

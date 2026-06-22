@@ -29,9 +29,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth',
       storage: createJSONStorage(() => zustandMMKVStorage),
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHydrated();
-      },
     },
   ),
 );

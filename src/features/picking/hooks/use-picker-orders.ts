@@ -6,7 +6,7 @@ import type { Order, OrderStatus } from '../types';
 /** Filtros que puede activar el picker en su lista. */
 export type PickerOrderFilter = OrderStatus | 'all';
 
-/** Devuelve los pedidos del picker autenticado, opcionalmente filtrados. */
+/** Devuelve los pedidos del picker autenticado desde el store (alimentado por useSessionOrdersListener). */
 export function usePickerOrders(filter: PickerOrderFilter = 'all'): Order[] {
   const user = useCurrentUser();
   const orders = useOrdersStore((s) => s.orders);

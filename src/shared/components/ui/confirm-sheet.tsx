@@ -14,11 +14,15 @@ interface ConfirmSheetProps {
   onClose: () => void;
   /** Solo en modo confirm */
   onConfirm?: () => void;
+  /** Acción del botón cancelar; si no se define, usa onClose. */
+  onCancel?: () => void;
   confirmLabel?: string;
   cancelLabel?: string;
   mode?: 'confirm' | 'info';
   tone?: ConfirmSheetTone;
   icon?: LucideIcon;
+  /** Si es false, no se cierra al tocar fuera ni con botón atrás. */
+  dismissible?: boolean;
 }
 
 export function ConfirmSheet({
@@ -27,11 +31,13 @@ export function ConfirmSheet({
   message,
   onClose,
   onConfirm,
+  onCancel,
   confirmLabel,
   cancelLabel,
   mode = 'confirm',
   tone = 'default',
   icon: IconProp,
+  dismissible = true,
 }: ConfirmSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -56,10 +62,14 @@ export function ConfirmSheet({
       transparent
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={dismissible ? onClose : () => {}}
     >
       <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" />
+        {dismissible ? (
+          <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" />
+        ) : (
+          <View style={styles.backdrop} accessibilityElementsHidden importantForAccessibility="no" />
+        )}
 
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.handle} />
@@ -74,7 +84,10 @@ export function ConfirmSheet({
           <View style={[styles.actions, !isInfo && styles.actionsRow]}>
             {!isInfo ? (
               <Pressable
-                onPress={onClose}
+                onPress={() => {
+                  if (onCancel) onCancel();
+                  onClose();
+                }}
                 android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
                 style={({ pressed }) => [styles.btnPressable, pressed && styles.pressed]}
               >

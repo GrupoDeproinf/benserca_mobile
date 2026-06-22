@@ -11,6 +11,9 @@ import { QtyStepper } from './qty-stepper';
 interface BultoCardProps {
   bulto: Bulto;
   editable: boolean;
+  capacityFull?: boolean;
+  getItemMaxQty?: (itemId: string) => number;
+  onCapacityExceeded?: () => void;
   onClose: (bultoId: string) => void;
   onReopen: (bultoId: string) => void;
   onAddItem: (bultoId: string) => void;
@@ -21,6 +24,9 @@ interface BultoCardProps {
 export function BultoCard({
   bulto,
   editable,
+  capacityFull = false,
+  getItemMaxQty,
+  onCapacityExceeded,
   onClose,
   onReopen,
   onAddItem,
@@ -75,6 +81,8 @@ export function BultoCard({
                   <QtyStepper
                     value={item.qty}
                     min={0}
+                    max={getItemMaxQty?.(item.id) ?? 9999}
+                    onAtMax={onCapacityExceeded}
                     onChange={(qty) => {
                       if (qty < 1) {
                         Haptics.selectionAsync();
@@ -93,7 +101,7 @@ export function BultoCard({
 
           {editable ? (
             <View style={styles.actions}>
-              {!isClosed ? (
+              {!isClosed && !capacityFull ? (
                 <BultoActionButton
                   label={t('picking.bulto.addItem')}
                   icon={Plus}

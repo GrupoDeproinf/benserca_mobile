@@ -7,6 +7,7 @@ import { EmptyState } from '@/shared/components/ui/empty-state';
 import { OrdersListCard } from '../components/orders-list-card';
 import { OrdersListPage } from '../components/orders-list-page';
 import { usePickerOrders, type PickerOrderFilter } from '../hooks/use-picker-orders';
+import { sortPickerOrders } from '../utils/picker-queue';
 
 function matchesSearch(order: { orderNumber: string; client: string }, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -25,14 +26,7 @@ export function PickingScreen() {
   const filteredOrders = usePickerOrders(filter);
 
   const orders = useMemo(
-    () =>
-      filteredOrders
-        .filter((o) => matchesSearch(o, search))
-        .sort((a, b) => {
-          const aTime = new Date(a.assignedAt ?? a.createdAt).getTime();
-          const bTime = new Date(b.assignedAt ?? b.createdAt).getTime();
-          return bTime - aTime;
-        }),
+    () => sortPickerOrders(filteredOrders.filter((o) => matchesSearch(o, search))),
     [filteredOrders, search],
   );
 

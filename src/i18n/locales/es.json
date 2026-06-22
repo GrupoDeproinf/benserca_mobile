@@ -28,8 +28,8 @@
     "new": "Nuevo",
     "assigned": "Asignado",
     "inProgress": "En proceso",
-    "toPack": "Por embalar",
-    "packed": "Empaquetado",
+    "toPack": "Empaquetado",
+    "packed": "Embalado",
     "rejectedReview": "Rechazado - Revisión",
     "audited": "Auditado",
     "dispatched": "Despachado"
@@ -97,13 +97,25 @@
       "reopenPicking": "Reabrir picking",
       "openBulto": "Abrir nuevo bulto",
       "finishPicking": "Finalizar picking",
+      "markWrapped": "Marcar como embalado",
       "markPacked": "Marcar como empaquetado",
-      "linesTitle": "SKUs requeridos (Profit)",
+      "linesTitle": "Artículos del pedido",
       "bultosTitle": "Bultos armados",
       "definedBultos": "Definidos",
+      "bultosClosed": "Cerrados",
       "bultosDone": "Creados",
+      "queuePosition": "Cola",
+      "progressLabel": "Progreso",
+      "lineMeta": "Pedido: {{required}} · Por bulto: {{perBundle}} · Asignado: {{assigned}} · Pendiente: {{pending}}",
       "skus": "SKUs",
       "extraBultosFlag": "Bultos adicionales"
+    },
+    "queue": {
+      "blockTitle": "No puedes iniciar",
+      "notHead": "Solo puedes iniciar el pedido en posición #1 de tu cola.",
+      "alreadyActive": "Ya tienes un pedido en proceso. Finalízalo antes de iniciar otro.",
+      "waitTitle": "En espera",
+      "waitBody": "Este pedido está en posición #{{position}} de tu cola."
     },
     "bulto": {
       "title": "Bulto {{number}}",
@@ -113,15 +125,31 @@
       "empty": "Sin ítems agregados",
       "addItem": "Agregar ítem",
       "close": "Cerrar bulto",
-      "reopen": "Reabrir"
+      "reopen": "Reabrir",
+      "fraction": "{{pct}}% capacidad",
+      "capacityFull": "Bulto lleno",
+      "bultoFullTitle": "Bulto al 100%",
+      "bultoFullBody": "Este bulto está lleno. Ciérralo para continuar o reduce cantidades de los ítems actuales.",
+      "emptyOpenBlockTitle": "Bulto vacío abierto",
+      "emptyOpenBlockBody": "Hay un bulto abierto sin ítems. Agrégale artículos o elimínalo antes de abrir otro.",
+      "cannotCloseEmptyTitle": "Bulto vacío",
+      "cannotCloseEmptyBody": "No puedes cerrar un bulto sin ítems.",
+      "emptyModalTitle": "Bulto {{number}} quedó vacío",
+      "emptyModalBody": "Este bulto no tiene artículos. ¿Qué deseas hacer?",
+      "deleteBulto": "Eliminar bulto"
     },
     "addItem": {
-      "title": "Agregar ítem al bulto",
-      "searchPlaceholder": "Buscar SKU o nombre…",
+      "title": "Agregar artículo al Bulto {{number}}",
+      "searchPlaceholder": "Buscar artículo…",
       "noResults": "Sin resultados",
       "qty": "Cantidad",
       "add": "Agregar al bulto",
-      "addWithCount": "Agregar al bulto ({{count}} uds.)"
+      "addWithCount": "Agregar al bulto ({{count}} uds.)",
+      "capacityBanner": "Espacio disponible en el bulto: {{pct}}%",
+      "maxPerArticle": "Máx. {{max}} uds.",
+      "noSpace": "Sin espacio",
+      "capacityExceededTooltip": "Has excedido la capacidad del bulto",
+      "searchHint": "Escribe al menos 2 caracteres para buscar"
     },
     "extraBultos": {
       "title": "Bultos adicionales",
@@ -131,16 +159,38 @@
       "continue": "Continuar"
     },
     "finish": {
-      "openBultosTitle": "Bultos abiertos",
-      "openBultosBody": "Cierra todos los bultos antes de finalizar el picking.",
       "confirmTitle": "Finalizar picking",
-      "confirmBody": "Se calculará el estado final. El pedido pasará a 'Por embalar'.",
-      "confirm": "Finalizar"
+      "confirmBody": "Se cerrarán los bultos abiertos con ítems y el pedido pasará a Empaquetado.",
+      "confirm": "Finalizar",
+      "emptyBlockTitle": "Bulto vacío abierto",
+      "emptyBlockBody": "El bulto {{number}} está abierto y sin artículos. Agrégale ítems o elimínalo antes de finalizar.",
+      "emptyBlockBodyGeneric": "Hay un bulto abierto sin artículos. Agrégale ítems o elimínalo antes de finalizar.",
+      "missingTitle": "Finalizar con faltantes",
+      "missingBody": "Hay cantidades sin asignar:",
+      "missingLine": "{{qty}} uds. de {{name}}",
+      "missingConfirm": "Finalizar igual"
     },
-    "pack": {
-      "confirmTitle": "Marcar empaquetado",
-      "confirmBody": "El pedido pasará a la cola de auditoría.",
-      "confirm": "Empaquetar"
+    "wrap": {
+      "confirmTitle": "Marcar como embalado",
+      "confirmBody": "Confirmas que el embalaje físico está listo.",
+      "confirm": "Embalar"
+    },
+    "fraction": {
+      "overTitle": "Capacidad del bulto",
+      "overBody": "No hay espacio suficiente en este bulto para esa cantidad.",
+      "continue": "Entendido"
+    },
+    "substitute": {
+      "title": "Sustituir artículo",
+      "original": "Artículo original",
+      "maxQtyHint": "Puedes agregar hasta {{max}} uds.",
+      "noSpace": "El bulto no tiene espacio para esta sustitución",
+      "noteLabel": "Motivo de sustitución (opcional)",
+      "notePlaceholder": "Ej: No había existencia del artículo pedido…",
+      "confirm": "Confirmar sustitución",
+      "btn": "Sustituir",
+      "needBultoTitle": "Abre un bulto",
+      "needBultoBody": "Abre un bulto antes de registrar una sustitución."
     },
     "rejection": {
       "title": "Observación del auditor"
@@ -184,6 +234,11 @@
     "sendResetLink": "Enviar enlace",
     "backToLogin": "Volver al inicio de sesión",
     "invalidCredentials": "Correo o contraseña incorrectos.",
+    "profileNotFound": "Tu cuenta no tiene perfil configurado. Contacta al administrador.",
+    "invalidProfile": "Tu perfil no tiene un rol válido. Contacta al administrador.",
+    "firestorePermission": "No tienes permiso para leer tu perfil. Revisa las reglas de Firestore.",
+    "authNotEnabled": "El inicio de sesión por correo no está habilitado en Firebase.",
+    "networkError": "Sin conexión. Revisa tu red e intenta de nuevo.",
     "genericError": "Ocurrió un error. Intenta de nuevo.",
     "demoAccess": "Acceso demo",
     "loginAsPicker": "Picker",
