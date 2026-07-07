@@ -201,7 +201,7 @@ export function applyAddBultoItem(
   sku: string,
   name: string,
   qty: number,
-  options?: { originalSku?: string; substitutionNote?: string },
+  options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
 ): Partial<Order> {
   const bultos = order.bultos.map((b) => {
     if (b.id !== bultoId) return b;
@@ -218,6 +218,7 @@ export function applyAddBultoItem(
                 ...i,
                 qty: i.qty + qty,
                 substitutionNote: options?.substitutionNote ?? i.substitutionNote,
+                unitsPerBundle: options?.unitsPerBundle ?? i.unitsPerBundle,
               }
             : i,
         )
@@ -230,6 +231,7 @@ export function applyAddBultoItem(
             qty,
             originalSku: options?.originalSku,
             substitutionNote: options?.substitutionNote,
+            unitsPerBundle: options?.unitsPerBundle,
           },
         ];
 

@@ -11,6 +11,8 @@ interface ConfirmSheetProps {
   visible: boolean;
   title: string;
   message: string;
+  /** Lista opcional que se muestra en un bloque alineado a la izquierda debajo del mensaje. */
+  messageItems?: string[];
   onClose: () => void;
   /** Solo en modo confirm */
   onConfirm?: () => void;
@@ -29,6 +31,7 @@ export function ConfirmSheet({
   visible,
   title,
   message,
+  messageItems,
   onClose,
   onConfirm,
   onCancel,
@@ -42,6 +45,7 @@ export function ConfirmSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const isInfo = mode === 'info';
+  const hasItems = Array.isArray(messageItems) && messageItems.length > 0;
 
   const Icon =
     IconProp ?? (tone === 'warning' || tone === 'info' ? AlertCircle : Info);
@@ -79,7 +83,21 @@ export function ConfirmSheet({
           </View>
 
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[styles.message, hasItems && styles.messageWithList]}>{message}</Text>
+
+          {hasItems ? (
+            <View style={[styles.itemsBox, { borderLeftColor: iconColor }]}>
+              {messageItems!.map((item, index) => (
+                <View
+                  key={`${item}-${index}`}
+                  style={[styles.itemRow, index === 0 && styles.itemRowFirst]}
+                >
+                  <View style={[styles.itemDot, { backgroundColor: iconColor }]} />
+                  <Text style={styles.itemText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <View style={[styles.actions, !isInfo && styles.actionsRow]}>
             {!isInfo ? (
@@ -177,6 +195,40 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 24,
+  },
+  messageWithList: {
+    marginBottom: 12,
+  },
+  itemsBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 14,
+    marginBottom: 24,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E7EB',
+  },
+  itemRowFirst: {
+    borderTopWidth: 0,
+  },
+  itemDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  itemText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#374151',
+    fontWeight: '500',
   },
   actions: {
     gap: 10,

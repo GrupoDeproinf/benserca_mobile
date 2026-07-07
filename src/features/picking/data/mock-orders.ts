@@ -1,5 +1,6 @@
 import type { FinalSku, Order, OrderLine } from '../types';
 import { buildFinalSkus } from '../utils/order-snapshot';
+import { MOCK_SKU_CATALOG } from './mock-skus';
 
 const now = Date.now();
 const minutes = (m: number) => new Date(now - m * 60 * 1000).toISOString();
@@ -17,7 +18,16 @@ function line(
   requiredQty: number,
   unitsPerBundle = 12,
 ): OrderLine {
-  return { sku, name, requiredQty, unitsPerBundle };
+  const catalog = MOCK_SKU_CATALOG.find((s) => s.sku === sku);
+  return {
+    sku,
+    name,
+    requiredQty,
+    unitsPerBundle: catalog?.unitsPerBundle ?? unitsPerBundle,
+    category: catalog?.category,
+    brand: catalog?.brand,
+    family: catalog?.family,
+  };
 }
 
 const linesPed502 = [
@@ -66,7 +76,34 @@ function withFinalSkus(order: Order): FinalSku[] {
   return buildFinalSkus(order, order.bultos.filter((b) => b.status === 'closed'));
 }
 
+const linesPedTestPlacas = [
+  line('PLACA-MOTO-FORZA', 'Placa Moto Forza', 9, 9),
+];
+
 export const MOCK_ORDERS: Order[] = [
+  {
+    id: 'ord-test-placas',
+    orderNumber: 'PED-TEST-PLACAS',
+    client: 'Cliente Prueba Capacidad',
+    status: 'assigned',
+    definedBultos: 9,
+    hasExtraBultos: false,
+    bundlesCreated: 0,
+    progressPercentage: 0,
+    lastSavedMilestone: 0,
+    queuePosition: 1,
+    assignedPickerId: MOCK_PICKER_ANA_UID,
+    assignedLeadId: null,
+    teamId: null,
+    lines: linesPedTestPlacas,
+    bultos: [],
+    snapshotOriginal: null,
+    finalSkus: [],
+    auditObservations: [],
+    createdAt: minutes(5),
+    assignedAt: minutes(1),
+    packedAt: null,
+  },
   {
     id: 'ord-assigned-new',
     orderNumber: 'PED-530',

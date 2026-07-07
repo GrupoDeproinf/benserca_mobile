@@ -48,6 +48,7 @@
       "scan": "Scan code",
       "ordersCount": "orders",
       "sortRecent": "Most recent",
+      "sortOldest": "Oldest first",
       "emptyTitle": "No assigned orders",
       "emptySubtitle": "No orders match this filter."
     },
@@ -95,6 +96,7 @@
       "markPacked": "Mark as packed",
       "linesTitle": "Order items",
       "bultosTitle": "Built packages",
+      "noBultos": "No packages built",
       "definedBultos": "Defined",
       "bultosDone": "Created",
       "skus": "SKUs",
@@ -143,6 +145,29 @@
     },
     "rejection": {
       "title": "Auditor observation"
+    },
+    "substitute": {
+      "title": "Substitute item",
+      "original": "Original item",
+      "perBundle": "Per bundle: {{count}} units",
+      "relatedHint": "Related items · {{brand}} · {{category}}",
+      "searchAnyHint": "Searching entire catalog (no brand/category restriction)",
+      "noRelated": "No related items for this brand and category",
+      "maxQtyHint": "Max {{max}} units ({{perBundle}} per bundle)",
+      "noSpace": "Not enough space in this bundle for this substitution",
+      "noteLabel": "Substitution reason (optional)",
+      "notePlaceholder": "E.g. Out of stock for ordered item…",
+      "confirm": "Confirm substitution",
+      "btn": "Substitute",
+      "needBultoTitle": "Open a bundle",
+      "needBultoBody": "Open a bundle before recording a substitution."
+    },
+    "queue": {
+      "blockTitle": "Cannot start",
+      "notHead": "You can only start the order at position #1 in your queue.",
+      "alreadyActive": "You already have an order in progress. Finish it before starting another.",
+      "waitTitle": "Waiting",
+      "waitBody": "This order is at position #{{position}} in your queue."
     }
   },
   "welcome": {

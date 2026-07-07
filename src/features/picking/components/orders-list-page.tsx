@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react-native';
-import { ArrowUpDown, ClipboardList } from 'lucide-react-native';
+import { ClipboardList } from 'lucide-react-native';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, View, type ListRenderItem } from 'react-native';
@@ -100,24 +100,16 @@ export function OrdersListPage<T>({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
           paddingHorizontal: 16,
-          marginTop: showStats && stats.length > 0 ? 20 : isHero ? 0 : 4,
+          marginTop: showStats && stats.length > 0 ? 20 : isHero ? 16 : 4,
           marginBottom: 12,
+          gap: 8,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <ClipboardList size={18} color="#374151" />
-          <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-            {ordersCount} {t('picking.screen.ordersCount')}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <ArrowUpDown size={14} color="#6B7280" />
-          <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>
-            {t('picking.screen.sortRecent')}
-          </Text>
-        </View>
+        <ClipboardList size={18} color="#374151" />
+        <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
+          {ordersCount} {t('picking.screen.ordersCount')}
+        </Text>
       </View>
     </View>
   );

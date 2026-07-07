@@ -1,8 +1,10 @@
 import type { Bulto, BultoItem, Order, OrderLine } from '../types';
+import { getAssignedQtyForLine } from './order-snapshot';
 import {
   computeBultoFraction,
   computeBundleFraction,
   getLineUnitsPerBundle,
+  resolveItemUnitsPerBundle,
 } from './order-snapshot';
 
 /** Capacidad total de un bulto (fracción). */
@@ -18,12 +20,7 @@ export function getActiveOrderLines(order: Order): OrderLine[] {
  * Ej: TV con 2 por bulto → cada TV = 0.5. Soporte con 4 por bulto → cada uno = 0.25.
  */
 export function getItemFractionContribution(item: BultoItem, lines: OrderLine[]): number {
-  const originalSku = item.originalSku ?? item.sku;
-  const units =
-    getLineUnitsPerBundle(lines, originalSku) ||
-    getLineUnitsPerBundle(lines, item.sku) ||
-    1;
-  return computeBundleFraction(item.qty, units);
+  return computeBundleFraction(item.qty, resolveItemUnitsPerBundle(item, lines));
 }
 
 export function getBultoRemainingFraction(bulto: Bulto, lines: OrderLine[]): number {
@@ -39,7 +36,16 @@ export function getUnitsPerBundleForItem(
   lines: OrderLine[],
   sku: string,
   originalSku?: string,
+  itemUnitsPerBundle?: number,
 ): number {
+  if (itemUnitsPerBundle != null && itemUnitsPerBundle > 0) return itemUnitsPerBundle;
+
+  const isSubstitution = Boolean(originalSku && originalSku !== sku);
+  if (isSubstitution) {
+    const fromPackedSku = getLineUnitsPerBundle(lines, sku);
+    return fromPackedSku > 0 ? fromPackedSku : 1;
+  }
+
   const key = originalSku ?? sku;
   const fromLine = getLineUnitsPerBundle(lines, key);
   if (fromLine > 0) return fromLine;
@@ -47,7 +53,12 @@ export function getUnitsPerBundleForItem(
   return fromSku > 0 ? fromSku : 1;
 }
 
-export type PendingAdd = { sku: string; qty: number; originalSku?: string };
+export type PendingAdd = {
+  sku: string;
+  qty: number;
+  originalSku?: string;
+  unitsPerBundle?: number;
+};
 
 function maxQtyFromRemainingFraction(remainingFraction: number, unitsPerBundle: number): number {
   if (remainingFraction <= EPS) return 0;
@@ -89,11 +100,42 @@ function getOtherFractionInBulto(
     if (p.qty <= 0) continue;
     other += computeBundleFraction(
       p.qty,
-      getUnitsPerBundleForItem(lines, p.sku, p.originalSku),
+      getUnitsPerBundleForItem(lines, p.sku, p.originalSku, p.unitsPerBundle),
     );
   }
 
   return other;
+}
+
+export function getPendingQtyForLine(order: Order, lineSku: string): number {
+  const lines = getActiveOrderLines(order);
+  const line = lines.find((l) => l.sku === lineSku);
+  if (!line) return 0;
+  return Math.max(0, line.requiredQty - getAssignedQtyForLine(order, lineSku));
+}
+
+/**
+ * Máximo a agregar considerando capacidad del bulto Y cantidad pendiente del pedido.
+ */
+export function getMaxAddQtyForOrderLine(
+  order: Order,
+  bulto: Bulto,
+  lineSku: string,
+  pending: PendingAdd[] = [],
+  options?: { originalSku?: string; unitsPerBundleOverride?: number },
+): number {
+  const lines = getActiveOrderLines(order);
+  const lineKey = options?.originalSku ?? lineSku;
+  const pendingQty = getPendingQtyForLine(order, lineKey);
+  const bultoMax = getMaxAddQtyForSku(
+    bulto,
+    lines,
+    lineSku,
+    pending,
+    options?.originalSku,
+    options?.unitsPerBundleOverride,
+  );
+  return Math.min(bultoMax, pendingQty);
 }
 
 /**
@@ -105,8 +147,9 @@ export function getMaxAddQtyForSku(
   sku: string,
   pending: PendingAdd[] = [],
   originalSku?: string,
+  unitsPerBundleOverride?: number,
 ): number {
-  const units = getUnitsPerBundleForItem(lines, sku, originalSku);
+  const units = getUnitsPerBundleForItem(lines, sku, originalSku, unitsPerBundleOverride);
   const lineKey = originalSku ?? sku;
 
   const existingInBulto = getExistingQtyInBulto(bulto, sku, lineKey);
@@ -133,7 +176,7 @@ export function getMaxQtyForBultoItem(
   const item = bulto.items.find((i) => i.id === itemId);
   if (!item) return 0;
 
-  const units = getUnitsPerBundleForItem(lines, item.sku, item.originalSku);
+  const units = getUnitsPerBundleForItem(lines, item.sku, item.originalSku, item.unitsPerBundle);
   const lineKey = item.originalSku ?? item.sku;
 
   const otherFraction = getOtherFractionInBulto(bulto, lines, item.sku, lineKey);

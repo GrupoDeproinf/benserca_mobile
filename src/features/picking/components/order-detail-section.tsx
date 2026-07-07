@@ -1,7 +1,23 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
+import {
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  StyleSheet,
+  UIManager,
+  View,
+} from 'react-native';
 import { Text } from '@/shared/components/ui/text';
+
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const styles = StyleSheet.create({
   wrap: {
@@ -13,10 +29,20 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 10,
   },
+  headerCollapsed: {
+    marginBottom: 0,
+  },
+  headerPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
   title: {
     fontSize: 15,
     fontWeight: '700',
     color: '#111827',
+    flex: 1,
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -36,16 +62,61 @@ interface OrderDetailSectionProps {
   title: string;
   icon?: LucideIcon;
   children: ReactNode;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
+  badge?: string;
+  marginTop?: number;
 }
 
-export function OrderDetailSection({ title, icon: Icon, children }: OrderDetailSectionProps) {
+export function OrderDetailSection({
+  title,
+  icon: Icon,
+  children,
+  collapsible = false,
+  defaultExpanded = true,
+  badge,
+  marginTop = 0,
+}: OrderDetailSectionProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const isOpen = collapsible ? expanded : true;
+
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((v) => !v);
+  };
+
+  const headerContent = (
+    <>
+      {Icon ? <Icon size={18} color="#374151" strokeWidth={2} /> : null}
+      <Text style={styles.title}>{title}</Text>
+      {badge ? (
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280' }}>{badge}</Text>
+      ) : null}
+      {collapsible ? (
+        isOpen ? (
+          <ChevronUp size={18} color="#6B7280" />
+        ) : (
+          <ChevronDown size={18} color="#6B7280" />
+        )
+      ) : null}
+    </>
+  );
+
   return (
-    <View style={styles.wrap}>
-      <View style={styles.header}>
-        {Icon ? <Icon size={18} color="#374151" strokeWidth={2} /> : null}
-        <Text style={styles.title}>{title}</Text>
-      </View>
-      {children}
+    <View style={[styles.wrap, marginTop > 0 ? { marginTop } : null]}>
+      {collapsible ? (
+        <Pressable
+          onPress={toggle}
+          style={[styles.header, !isOpen && styles.headerCollapsed]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isOpen }}
+        >
+          <View style={styles.headerPressable}>{headerContent}</View>
+        </Pressable>
+      ) : (
+        <View style={styles.header}>{headerContent}</View>
+      )}
+      {isOpen ? children : null}
     </View>
   );
 }

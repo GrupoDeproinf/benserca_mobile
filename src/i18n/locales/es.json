@@ -50,6 +50,7 @@
       "scan": "Escanear código",
       "ordersCount": "pedidos",
       "sortRecent": "Más recientes",
+      "sortOldest": "Más antiguos",
       "emptyTitle": "Sin pedidos asignados",
       "emptySubtitle": "No tienes pedidos en este filtro."
     },
@@ -101,6 +102,7 @@
       "markPacked": "Marcar como empaquetado",
       "linesTitle": "Artículos del pedido",
       "bultosTitle": "Bultos armados",
+      "noBultos": "Sin bultos armados",
       "definedBultos": "Definidos",
       "bultosClosed": "Cerrados",
       "bultosDone": "Creados",
@@ -183,7 +185,11 @@
     "substitute": {
       "title": "Sustituir artículo",
       "original": "Artículo original",
-      "maxQtyHint": "Puedes agregar hasta {{max}} uds.",
+      "perBundle": "Por bulto: {{count}} uds.",
+      "relatedHint": "Artículos relacionados · {{brand}} · {{category}}",
+      "searchAnyHint": "Buscando en todo el catálogo (sin restricción de marca/categoría)",
+      "noRelated": "No hay artículos relacionados con esta marca y categoría",
+      "maxQtyHint": "Máx. {{max}} uds. ({{perBundle}} por bulto)",
       "noSpace": "El bulto no tiene espacio para esta sustitución",
       "noteLabel": "Motivo de sustitución (opcional)",
       "notePlaceholder": "Ej: No había existencia del artículo pedido…",

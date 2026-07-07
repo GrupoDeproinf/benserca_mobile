@@ -31,3 +31,13 @@ export function isPickerQueueHead(order: Order, pickerOrders: Order[]): boolean 
   );
   return sorted[0]?.id === order.id;
 }
+
+/** Posición efectiva en la cola (1 = cabeza), según el orden actual. */
+export function getEffectiveQueuePosition(order: Order, pickerOrders: Order[]): number | null {
+  const sorted = sortPickerOrders(
+    pickerOrders.filter((o) => o.status === 'assigned' || o.status === 'in_progress'),
+  );
+  const idx = sorted.findIndex((o) => o.id === order.id);
+  if (idx < 0) return null;
+  return idx + 1;
+}

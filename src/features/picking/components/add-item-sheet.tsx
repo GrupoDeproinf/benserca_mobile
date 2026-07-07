@@ -16,8 +16,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toast, useToast } from '@/shared/components/ui/toast';
 import type { Articulo } from '../hooks/use-articulos-search';
 import { useArticulosSearch } from '../hooks/use-articulos-search';
+import {
+  resolveEffectiveUnitsPerBundle,
+  useOrderLineArticulos,
+} from '../hooks/use-order-line-articulos';
 import type { Bulto, Order, OrderLine } from '../types';
-import { getActiveOrderLines, getMaxAddQtyForSku, type PendingAdd } from '../utils/bulto-capacity';
+import {
+  getActiveOrderLines,
+  getMaxAddQtyForOrderLine,
+  type PendingAdd,
+} from '../utils/bulto-capacity';
 import { OrderActionButton } from './order-action-button';
 import { QtyStepper } from './qty-stepper';
 
@@ -25,6 +33,8 @@ export interface AddItemEntry {
   sku: string;
   name: string;
   qty: number;
+  /** Unidades por bulto resueltas (misma fuente que la lista de artículos). */
+  unitsPerBundle?: number;
 }
 
 interface AddItemSheetProps {
@@ -64,13 +74,30 @@ export function AddItemSheet({
     search,
     visible,
   );
+  const catalogBySku = useOrderLineArticulos(activeLines, visible);
+
+  const resolveUnits = (item: Articulo): number => {
+    const line = activeLines.find((l) => l.sku === item.sku);
+    return resolveEffectiveUnitsPerBundle(
+      line?.unitsPerBundle ?? 0,
+      item.unitsPerBundle > 0 ? item.unitsPerBundle : catalogBySku[item.sku]?.unitsPerBundle,
+      item.sku,
+    );
+  };
 
   // When no search: show the order's active lines.
   // When searching: show Firestore results.
   const displayList: Articulo[] = useMemo(() => {
     if (search.trim().length >= 2) return firestoreResults;
-    return activeLines.map(orderLineToArticulo);
-  }, [search, firestoreResults, activeLines]);
+    return activeLines.map((line) => ({
+      ...orderLineToArticulo(line),
+      unitsPerBundle: resolveEffectiveUnitsPerBundle(
+        line.unitsPerBundle,
+        catalogBySku[line.sku]?.unitsPerBundle,
+        line.sku,
+      ),
+    }));
+  }, [search, firestoreResults, activeLines, catalogBySku]);
 
   const pendingAdds: PendingAdd[] = useMemo(
     () =>
@@ -97,11 +124,14 @@ export function AddItemSheet({
 
   const setSkuQty = (sku: string, qty: number) => {
     if (!bulto) return;
-    const max = getMaxAddQtyForSku(
+    const item = displayList.find((s) => s.sku === sku);
+    const units = item ? resolveUnits(item) : undefined;
+    const max = getMaxAddQtyForOrderLine(
+      order,
       bulto,
-      activeLines,
       sku,
       pendingAdds.filter((p) => p.sku !== sku),
+      { unitsPerBundleOverride: units },
     );
     if (qty > max) showToast(capacityTooltip);
     const clamped = Math.max(0, Math.min(qty, max));
@@ -119,7 +149,12 @@ export function AddItemSheet({
   const handleAdd = () => {
     const items: AddItemEntry[] = displayList
       .filter((s) => (quantities[s.sku] ?? 0) > 0)
-      .map((s) => ({ sku: s.sku, name: s.name, qty: quantities[s.sku] }));
+      .map((s) => ({
+        sku: s.sku,
+        name: s.name,
+        qty: quantities[s.sku],
+        unitsPerBundle: resolveUnits(s),
+      }));
     if (items.length === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onAddItems(items);
@@ -128,12 +163,14 @@ export function AddItemSheet({
 
   const renderRow = ({ item }: { item: Articulo }) => {
     const qty = quantities[item.sku] ?? 0;
+    const units = resolveUnits(item);
     const maxAdd = bulto
-      ? getMaxAddQtyForSku(
+      ? getMaxAddQtyForOrderLine(
+          order,
           bulto,
-          activeLines,
           item.sku,
           pendingAdds.filter((p) => p.sku !== item.sku),
+          { unitsPerBundleOverride: units },
         )
       : 0;
     const canAdd = maxAdd > 0;
@@ -173,10 +210,11 @@ export function AddItemSheet({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
+      statusBarTranslucent={false}
       onRequestClose={handleClose}
     >
       <View style={styles.screen}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Text style={styles.headerTitle}>
             {t('picking.addItem.title', { number: bulto?.number ?? '—' })}
           </Text>
@@ -252,7 +290,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth * 2,
     borderBottomColor: '#E5E5EA',

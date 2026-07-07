@@ -26,17 +26,30 @@ export function computeBundleFraction(
   return qty / unitsPerBundle;
 }
 
-export function computeBultoFraction(bulto: Bulto, lines: OrderLine[]): number {
-  const unitsBySku = new Map(lines.map((l) => [l.sku, l.unitsPerBundle]));
-  return bulto.items.reduce((sum, item) => {
-    const originalSku = item.originalSku ?? item.sku;
-    const units = unitsBySku.get(originalSku) ?? unitsBySku.get(item.sku) ?? 1;
-    return sum + computeBundleFraction(item.qty, units);
-  }, 0);
+export function getLineUnitsPerBundle(lines: OrderLine[], sku: string): number {
+  const value = lines.find((l) => l.sku === sku)?.unitsPerBundle ?? 0;
+  return value > 0 ? value : 0;
 }
 
-export function getLineUnitsPerBundle(lines: OrderLine[], sku: string): number {
-  return lines.find((l) => l.sku === sku)?.unitsPerBundle ?? 1;
+/** Resuelve unidades por bulto de un ítem (incluye sustituciones). */
+export function resolveItemUnitsPerBundle(item: BultoItem, lines: OrderLine[]): number {
+  if (item.unitsPerBundle != null && item.unitsPerBundle > 0) return item.unitsPerBundle;
+
+  const isSubstitution = Boolean(item.originalSku && item.originalSku !== item.sku);
+  if (isSubstitution) {
+    const fromPackedSku = getLineUnitsPerBundle(lines, item.sku);
+    return fromPackedSku > 0 ? fromPackedSku : 1;
+  }
+
+  const key = item.originalSku ?? item.sku;
+  return getLineUnitsPerBundle(lines, key) || getLineUnitsPerBundle(lines, item.sku) || 1;
+}
+
+export function computeBultoFraction(bulto: Bulto, lines: OrderLine[]): number {
+  return bulto.items.reduce(
+    (sum, item) => sum + computeBundleFraction(item.qty, resolveItemUnitsPerBundle(item, lines)),
+    0,
+  );
 }
 
 export function getAssignedQtyForLine(order: Order, lineSku: string): number {
@@ -116,6 +129,68 @@ export function buildFinalSkus(
       bundles,
     };
   });
+}
+
+/** Reconstruye bultos cerrados desde final_skus de Firestore (solo lectura post-picking). */
+export function reconstructBultosFromFinalSkus(
+  orderId: string,
+  finalSkus: FinalSku[],
+  lines: OrderLine[],
+): Bulto[] {
+  const itemsByBundle = new Map<number, BultoItem[]>();
+
+  const lineBySku = new Map(lines.map((line) => [line.sku, line]));
+
+  const resolveItemName = (finalSku: FinalSku): string => {
+    const packedLine = lineBySku.get(finalSku.packedSku);
+    if (packedLine) return packedLine.name;
+    const originalLine = lineBySku.get(finalSku.originalSku);
+    return originalLine?.name ?? finalSku.packedSku;
+  };
+
+  const resolveUnitsPerBundle = (finalSku: FinalSku): number | undefined => {
+    const packed = lineBySku.get(finalSku.packedSku)?.unitsPerBundle ?? 0;
+    if (packed > 0) return packed;
+    const original = lineBySku.get(finalSku.originalSku)?.unitsPerBundle ?? 0;
+    return original > 0 ? original : undefined;
+  };
+
+  for (const finalSku of finalSkus) {
+    const substituted =
+      finalSku.substituted && finalSku.packedSku !== finalSku.originalSku;
+    const unitsPerBundle = resolveUnitsPerBundle(finalSku);
+
+    for (const bundle of finalSku.bundles) {
+      if (!itemsByBundle.has(bundle.bundleNum)) {
+        itemsByBundle.set(bundle.bundleNum, []);
+      }
+
+      const item: BultoItem = {
+        id: `${orderId}-b${bundle.bundleNum}-${finalSku.originalSku}-${finalSku.packedSku}`,
+        sku: finalSku.packedSku,
+        name: resolveItemName(finalSku),
+        qty: bundle.quantity,
+        ...(substituted
+          ? {
+              originalSku: finalSku.originalSku,
+              substitutionNote: finalSku.substitutionNote ?? undefined,
+            }
+          : {}),
+        ...(unitsPerBundle != null ? { unitsPerBundle } : {}),
+      };
+
+      itemsByBundle.get(bundle.bundleNum)!.push(item);
+    }
+  }
+
+  return [...itemsByBundle.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([number, items]) => ({
+      id: `bulto-${orderId}-${number}`,
+      number,
+      status: 'closed' as const,
+      items,
+    }));
 }
 
 /** @deprecated Usar buildFinalSkus. Mantenido para compatibilidad de auditoría. */

@@ -15,6 +15,9 @@ export interface OrderLine {
   name: string;
   requiredQty: number;
   unitsPerBundle: number;
+  category?: string;
+  brand?: string;
+  family?: string;
 }
 
 /** Ítem metido en un bulto por el picker. */
@@ -27,6 +30,8 @@ export interface BultoItem {
   /** SKU original del pedido si hubo sustitución. */
   originalSku?: string;
   substitutionNote?: string;
+  /** Unidades por bulto del SKU empaquetado (sustituto). */
+  unitsPerBundle?: number;
 }
 
 export type BultoStatus = 'open' | 'closed';

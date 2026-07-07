@@ -34,6 +34,7 @@ import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
 import { PickingProgressBar } from '../components/picking-progress-bar';
 import { SubstituteItemSheet } from '../components/substitute-item-sheet';
+import { resolveEffectiveUnitsPerBundle, useOrderLineArticulos } from '../hooks/use-order-line-articulos';
 import { useOrdersStore } from '../store/orders.store';
 import type { OrderLine } from '../types';
 import {
@@ -46,7 +47,7 @@ import {
   getAssignedQtyForLine,
   getMissingQuantities,
 } from '../utils/order-snapshot';
-import { isPickerQueueHead } from '../utils/picker-queue';
+import { getEffectiveQueuePosition, isPickerQueueHead } from '../utils/picker-queue';
 
 interface PickingDetailScreenProps {
   orderId: string;
@@ -57,6 +58,7 @@ const SCREEN_BG = '#F2F2F7';
 type ConfirmState = {
   title: string;
   message: string;
+  messageItems?: string[];
   mode: 'confirm' | 'info';
   tone?: ConfirmSheetTone;
   confirmLabel?: string;
@@ -85,6 +87,10 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
     if (!user) return EMPTY_PICKER_ORDERS;
     return allOrders.filter((o) => o.assignedPickerId === user.uid);
   }, [allOrders, user?.uid]);
+  const effectiveQueuePosition = useMemo(() => {
+    if (!order) return null;
+    return getEffectiveQueuePosition(order, pickerOrders);
+  }, [order, pickerOrders]);
   const startPicking = useOrdersStore((s) => s.startPicking);
   const finishPicking = useOrdersStore((s) => s.finishPicking);
   const markWrapped = useOrdersStore((s) => s.markWrapped);
@@ -103,6 +109,11 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
   const { message: capacityToast, nudgeToken: capacityToastNudge, show: showCapacityToast } =
     useToast();
   const capacityTooltip = t('picking.addItem.capacityExceededTooltip');
+  const activeLines = useMemo(
+    () => (order ? getActiveOrderLines(order) : []),
+    [order],
+  );
+  const catalogBySku = useOrderLineArticulos(activeLines, Boolean(order));
 
   if (!order) {
     return (
@@ -124,7 +135,6 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
 
   const lastObservation = order.auditObservations[order.auditObservations.length - 1];
   const closedBultos = order.bultos.filter((b) => b.status === 'closed' && b.items.length > 0).length;
-  const activeLines = getActiveOrderLines(order);
 
   const performOpenBulto = () => {
     const result = openBulto(order.id);
@@ -220,12 +230,13 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
 
     const missing = getMissingQuantities(order);
     if (missing.length > 0) {
-      const summary = missing
-        .map((m) => t('picking.finish.missingLine', { qty: m.missing, name: m.name }))
-        .join('\n');
+      const items = missing.map((m) =>
+        t('picking.finish.missingLine', { qty: m.missing, name: m.name }),
+      );
       setConfirmSheet({
         title: t('picking.finish.missingTitle'),
-        message: `${t('picking.finish.missingBody')}\n\n${summary}`,
+        message: t('picking.finish.missingBody'),
+        messageItems: items,
         mode: 'confirm',
         tone: 'warning',
         confirmLabel: t('picking.finish.missingConfirm'),
@@ -302,10 +313,13 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
   const commitAddItems = (
     bultoId: string,
     items: AddItemEntry[],
-    options?: { originalSku?: string; substitutionNote?: string },
+    options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
   ) => {
-    items.forEach(({ sku, name, qty }) => {
-      addBultoItem(order.id, bultoId, sku, name, qty, options);
+    items.forEach(({ sku, name, qty, unitsPerBundle }) => {
+      addBultoItem(order.id, bultoId, sku, name, qty, {
+        ...options,
+        unitsPerBundle: unitsPerBundle ?? options?.unitsPerBundle,
+      });
     });
     setAddSheetBultoId(null);
     setSubstituteLine(null);
@@ -314,7 +328,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
   const tryAddItems = (
     bultoId: string,
     items: AddItemEntry[],
-    options?: { originalSku?: string; substitutionNote?: string },
+    options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
   ) => {
     const bulto = order.bultos.find((b) => b.id === bultoId);
     if (!bulto) return;
@@ -331,6 +345,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
           name: item.name,
           qty: item.qty,
           originalSku: options?.originalSku,
+          unitsPerBundle: item.unitsPerBundle ?? options?.unitsPerBundle,
         });
       }
     }
@@ -438,7 +453,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
           { label: t('picking.detail.bultosClosed'), value: String(closedBultos) },
           {
             label: t('picking.detail.queuePosition'),
-            value: String(order.queuePosition),
+            value: effectiveQueuePosition != null ? String(effectiveQueuePosition) : '—',
           },
         ]}
         footer={
@@ -477,18 +492,30 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
             />
           ) : null}
 
-          {order.status === 'assigned' && !canStart ? (
+          {order.status === 'assigned' && !canStart && effectiveQueuePosition != null ? (
             <OrderDetailAlertBanner
               title={t('picking.queue.waitTitle')}
-              body={t('picking.queue.waitBody', { position: order.queuePosition })}
+              body={t('picking.queue.waitBody', { position: effectiveQueuePosition })}
             />
           ) : null}
 
-          <OrderDetailSection title={t('picking.detail.linesTitle')} icon={ClipboardList}>
+          <OrderDetailSection
+            title={t('picking.detail.linesTitle')}
+            icon={ClipboardList}
+            collapsible
+            defaultExpanded
+            badge={String(order.lines.length)}
+            marginTop={16}
+          >
             <OrderDetailCard>
               {order.lines.map((line, idx) => {
                 const assigned = getAssignedQtyForLine(order, line.sku);
                 const pending = Math.max(0, line.requiredQty - assigned);
+                const perBundle = resolveEffectiveUnitsPerBundle(
+                  line.unitsPerBundle,
+                  catalogBySku[line.sku]?.unitsPerBundle,
+                  line.sku,
+                );
                 return (
                   <View
                     key={line.sku}
@@ -502,7 +529,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
                       <Text style={styles.lineMeta}>
                         {t('picking.detail.lineMeta', {
                           required: line.requiredQty,
-                          perBundle: line.unitsPerBundle,
+                          perBundle,
                           assigned,
                           pending,
                         })}
@@ -542,7 +569,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
             <OrderDetailSection title={t('picking.detail.bultosTitle')} icon={Package}>
               {order.bultos.length === 0 ? (
                 <OrderDetailCard>
-                  <Text style={styles.emptyBultosTitle}>{t('picking.bulto.empty')}</Text>
+                  <Text style={styles.emptyBultosTitle}>{t('picking.detail.noBultos')}</Text>
                   {order.status === 'in_progress' ? (
                     <View style={styles.emptyBultosCta}>
                       <OrderActionButton
@@ -615,7 +642,11 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
           tryAddItems(
             openBultoTarget.id,
             [{ sku: entry.sku, name: entry.name, qty: entry.qty }],
-            { originalSku: entry.originalSku, substitutionNote: entry.substitutionNote },
+            {
+              originalSku: entry.originalSku,
+              substitutionNote: entry.substitutionNote,
+              unitsPerBundle: entry.unitsPerBundle,
+            },
           );
         }}
       />
@@ -630,6 +661,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
         visible={confirmSheet !== null}
         title={confirmSheet?.title ?? ''}
         message={confirmSheet?.message ?? ''}
+        messageItems={confirmSheet?.messageItems}
         mode={confirmSheet?.mode ?? 'confirm'}
         tone={confirmSheet?.tone}
         confirmLabel={confirmSheet?.confirmLabel}

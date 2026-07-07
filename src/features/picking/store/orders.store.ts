@@ -66,7 +66,7 @@ interface OrdersState {
     sku: string,
     name: string,
     qty: number,
-    options?: { originalSku?: string; substitutionNote?: string },
+    options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
   ) => void;
   updateBultoItem: (orderId: string, bultoId: string, itemId: string, qty: number) => void;
   removeBultoItem: (orderId: string, bultoId: string, itemId: string) => RemoveItemResult;
@@ -80,8 +80,10 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
       const localMap = new Map(s.orders.map((o) => [o.id, o]));
       const merged = incoming.map((firestoreOrder) => {
         const local = localMap.get(firestoreOrder.id);
+        if (!local) return firestoreOrder;
+
         // Preserve local bulto state if the order is actively being picked
-        if (local && local.status === 'in_progress' && firestoreOrder.status === 'in_progress') {
+        if (local.status === 'in_progress' && firestoreOrder.status === 'in_progress') {
           // Firestore may lag behind local state during active picking.
           // Keep all locally-computed picking fields authoritative.
           return {
@@ -92,8 +94,28 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
             finalSkus: local.finalSkus,
             hasExtraBultos: local.hasExtraBultos,
             lastSavedMilestone: local.lastSavedMilestone,
+            snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
           };
         }
+
+        // Tras finalizar, Firestore puede llegar antes de tener final_skus mapeados.
+        // Conservar bultos locales si el remoto aún no los trae.
+        if (local.bultos.length > 0 && firestoreOrder.bultos.length === 0) {
+          return {
+            ...firestoreOrder,
+            bultos: local.bultos,
+            finalSkus: local.finalSkus.length > 0 ? local.finalSkus : firestoreOrder.finalSkus,
+            progressPercentage:
+              local.progressPercentage > 0
+                ? local.progressPercentage
+                : firestoreOrder.progressPercentage,
+            bundlesCreated:
+              local.bundlesCreated > 0 ? local.bundlesCreated : firestoreOrder.bundlesCreated,
+            hasExtraBultos: local.hasExtraBultos || firestoreOrder.hasExtraBultos,
+            snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
+          };
+        }
+
         return firestoreOrder;
       });
       return { orders: merged };

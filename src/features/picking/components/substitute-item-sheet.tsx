@@ -1,12 +1,24 @@
 import * as Haptics from 'expo-haptics';
-import { Plus, X } from 'lucide-react-native';
+import { Plus, Search, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { Articulo } from '../hooks/use-articulos-search';
+import { useSubstituteArticulos } from '../hooks/use-substitute-articulos';
 import type { Bulto, Order, OrderLine } from '../types';
-import { MOCK_SKU_CATALOG, type MockSku } from '../data/mock-skus';
-import { getActiveOrderLines, getMaxAddQtyForSku } from '../utils/bulto-capacity';
+import { getActiveOrderLines, getMaxAddQtyForOrderLine } from '../utils/bulto-capacity';
 import { OrderActionButton } from './order-action-button';
 import { QtyStepper } from './qty-stepper';
 
@@ -15,6 +27,7 @@ export interface SubstituteItemEntry {
   name: string;
   qty: number;
   originalSku: string;
+  unitsPerBundle: number;
   substitutionNote?: string;
 }
 
@@ -39,19 +52,28 @@ export function SubstituteItemSheet({
   const insets = useSafeAreaInsets();
 
   const [search, setSearch] = useState('');
-  const [selectedSku, setSelectedSku] = useState<MockSku | null>(null);
+  const [selectedSku, setSelectedSku] = useState<Articulo | null>(null);
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
   const activeLines = getActiveOrderLines(order);
 
+  const { results: relatedArticulos, loading, isGlobalSearch } = useSubstituteArticulos(
+    originalLine,
+    search,
+    visible,
+  );
+
   const maxQty = useMemo(() => {
     if (!targetBulto || !originalLine || !selectedSku) return 0;
-    return getMaxAddQtyForSku(
+    return getMaxAddQtyForOrderLine(
+      order,
       targetBulto,
-      activeLines,
       selectedSku.sku,
       [],
-      originalLine.sku,
+      {
+        originalSku: originalLine.sku,
+        unitsPerBundleOverride: selectedSku.unitsPerBundle,
+      },
     );
   }, [targetBulto, activeLines, originalLine, selectedSku]);
 
@@ -63,12 +85,13 @@ export function SubstituteItemSheet({
     setQty((prev) => Math.min(Math.max(1, prev), maxQty));
   }, [maxQty, selectedSku?.sku]);
 
-  const filtered = MOCK_SKU_CATALOG.filter(
-    (s) =>
-      s.sku !== originalLine?.sku &&
-      (s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.sku.toLowerCase().includes(search.toLowerCase())),
-  );
+  useEffect(() => {
+    if (!visible) return;
+    setSelectedSku(null);
+    setQty(1);
+    setNote('');
+    setSearch('');
+  }, [visible, originalLine?.sku]);
 
   const reset = () => {
     setSearch('');
@@ -90,6 +113,7 @@ export function SubstituteItemSheet({
       name: selectedSku.name,
       qty,
       originalSku: originalLine.sku,
+      unitsPerBundle: selectedSku.unitsPerBundle,
       ...(note.trim().length > 0 ? { substitutionNote: note.trim() } : {}),
     });
     reset();
@@ -97,10 +121,28 @@ export function SubstituteItemSheet({
 
   const canConfirm = Boolean(selectedSku && maxQty > 0 && qty >= 1);
 
+  const taxonomyHint = isGlobalSearch
+    ? t('picking.substitute.searchAnyHint')
+    : originalLine?.brand || originalLine?.category
+      ? t('picking.substitute.relatedHint', {
+          brand: originalLine?.brand ?? '—',
+          category: originalLine?.category ?? '—',
+        })
+      : null;
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <View style={styles.screen}>
-        <View style={styles.header}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      statusBarTranslucent={false}
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Text style={styles.headerTitle}>{t('picking.substitute.title')}</Text>
           <Pressable onPress={handleClose} hitSlop={12}>
             <X size={22} color="#8E8E93" />
@@ -112,28 +154,52 @@ export function SubstituteItemSheet({
             <Text style={styles.originalLabel}>{t('picking.substitute.original')}</Text>
             <Text style={styles.originalName}>{originalLine.name}</Text>
             <Text style={styles.originalSku}>{originalLine.sku}</Text>
+            <Text style={styles.originalMeta}>
+              {t('picking.substitute.perBundle', { count: originalLine.unitsPerBundle })}
+            </Text>
           </View>
         ) : null}
 
+        {taxonomyHint ? <Text style={styles.relatedHint}>{taxonomyHint}</Text> : null}
+
         <View style={styles.searchWrap}>
-          <TextInput
-            placeholder={t('picking.addItem.searchPlaceholder')}
-            placeholderTextColor="#8E8E93"
-            value={search}
-            onChangeText={setSearch}
-            style={styles.searchInput}
-          />
+          <View style={styles.searchRow}>
+            <Search size={16} color="#8E8E93" />
+            <TextInput
+              placeholder={t('picking.addItem.searchPlaceholder')}
+              placeholderTextColor="#8E8E93"
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+              autoCorrect={false}
+              autoCapitalize="characters"
+            />
+            {loading ? <ActivityIndicator size="small" color="#8E8E93" /> : null}
+          </View>
+          {search.trim().length > 0 && search.trim().length < 2 ? (
+            <Text style={styles.searchHint}>{t('picking.addItem.searchHint')}</Text>
+          ) : null}
         </View>
 
         <FlatList
-          data={filtered}
+          data={relatedArticulos}
           keyExtractor={(i) => i.sku}
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => {
             const maxAdd =
               targetBulto && originalLine
-                ? getMaxAddQtyForSku(targetBulto, activeLines, item.sku, [], originalLine.sku)
+                ? getMaxAddQtyForOrderLine(
+                    order,
+                    targetBulto,
+                    item.sku,
+                    [],
+                    {
+                      originalSku: originalLine.sku,
+                      unitsPerBundleOverride: item.unitsPerBundle,
+                    },
+                  )
                 : 0;
             const canAdd = maxAdd > 0;
 
@@ -152,17 +218,27 @@ export function SubstituteItemSheet({
                     {item.name}
                   </Text>
                   <Text style={styles.rowSku}>{item.sku}</Text>
+                  <Text style={styles.rowTaxonomy}>
+                    {[item.brand, item.category, item.family].filter(Boolean).join(' · ')}
+                  </Text>
                   <Text style={[styles.maxHint, !canAdd && styles.maxHintMuted]}>
                     {canAdd
-                      ? t('picking.addItem.maxPerArticle', { max: maxAdd })
-                      : t('picking.addItem.noSpace')}
+                      ? t('picking.substitute.maxQtyHint', {
+                          max: maxAdd,
+                          perBundle: item.unitsPerBundle,
+                        })
+                      : t('picking.substitute.noSpace')}
                   </Text>
                 </View>
               </Pressable>
             );
           }}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={<Text style={styles.empty}>{t('picking.addItem.noResults')}</Text>}
+          ListEmptyComponent={
+            <Text style={styles.empty}>
+              {loading ? '' : t('picking.substitute.noRelated')}
+            </Text>
+          }
         />
 
         <View style={[styles.footerPanel, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -199,7 +275,7 @@ export function SubstituteItemSheet({
             variant="primary"
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -211,7 +287,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth * 2,
     borderBottomColor: '#E5E5EA',
@@ -220,6 +295,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
   originalBox: {
     margin: 16,
+    marginBottom: 8,
     padding: 14,
     borderRadius: 14,
     backgroundColor: '#FEF3C7',
@@ -229,16 +305,35 @@ const styles = StyleSheet.create({
   originalLabel: { fontSize: 11, fontWeight: '600', color: '#B45309' },
   originalName: { fontSize: 14, fontWeight: '700', color: '#111827', marginTop: 4 },
   originalSku: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  originalMeta: { fontSize: 11, color: '#92400E', marginTop: 4, fontWeight: '600' },
+  relatedHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    paddingHorizontal: 16,
+    marginBottom: 4,
+  },
   searchWrap: { paddingHorizontal: 16, paddingBottom: 8 },
-  searchInput: {
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#DCDCE0',
     backgroundColor: '#E9E9EB',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 14,
     color: '#111827',
+  },
+  searchHint: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 6,
+    marginLeft: 4,
   },
   list: { flex: 1, backgroundColor: '#F2F2F7' },
   listContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 16 },
@@ -255,6 +350,7 @@ const styles = StyleSheet.create({
   rowInfo: { flex: 1, minWidth: 0 },
   rowName: { fontSize: 14, fontWeight: '600', color: '#111827' },
   rowSku: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
+  rowTaxonomy: { fontSize: 11, color: '#6B7280', marginTop: 2 },
   maxHint: {
     fontSize: 11,
     fontWeight: '600',

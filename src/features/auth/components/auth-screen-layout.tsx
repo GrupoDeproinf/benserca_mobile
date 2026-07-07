@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -36,21 +38,53 @@ export function AuthScreenLayout({
 }: AuthScreenLayoutProps) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const topPadding = showBack ? insets.top + 28 : insets.top + (compact ? 36 : 80);
-  const headerGap = compact ? 36 : 90;
+  const scrollRef = useRef<ScrollView>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (event: { endCoordinates: { height: number } }) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      });
+    };
+    const onHide = () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    };
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const collapseForKeyboard = compact && keyboardVisible;
+  const topPadding = showBack
+    ? insets.top + 28
+    : insets.top + (compact ? (collapseForKeyboard ? 12 : 36) : 80);
+  const headerGap = compact ? (collapseForKeyboard ? 0 : 36) : 90;
+  const showBrandBlock = showBrand && !collapseForKeyboard;
 
   const content = (
     <View
       style={[
         styles.column,
         {
-          minHeight: height,
+          minHeight: keyboardVisible ? undefined : height,
           paddingTop: topPadding,
           paddingBottom: Math.max(insets.bottom, 12),
         },
       ]}
     >
-      {showBrand ? (
+      {showBrandBlock ? (
         <View style={{ paddingBottom: headerGap }}>
           {showBack ? (
             <>
@@ -67,7 +101,7 @@ export function AuthScreenLayout({
 
       <View style={styles.cardSlot}>{children}</View>
 
-      {showFooter ? (
+      {showFooter && !collapseForKeyboard ? (
         <View style={styles.footerSlot}>
           <AuthBrandFooter tone={footerTone} />
         </View>
@@ -79,14 +113,20 @@ export function AuthScreenLayout({
     <View style={styles.root}>
       <LoginBackdrop />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         style={styles.flex}
       >
         <ScrollView
+          ref={scrollRef}
           bounces={false}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollGrow}
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={[
+            styles.scrollGrow,
+            keyboardVisible ? { paddingBottom: keyboardHeight * 0.15 + 16 } : null,
+          ]}
         >
           {content}
         </ScrollView>
