@@ -8,6 +8,7 @@ export const PROFILE_COLLECTIONS = [
   'u_pickers',
   'auditors',
   'warehouse_leads',
+  'u_staff',
   'users',
 ] as const;
 

@@ -8,10 +8,22 @@ import {
 export interface Articulo {
   sku: string;
   name: string;
-  unitsPerBundle: number;
+  /** Talla del artículo. Gate de sustitución (sin talla no es sustituible). */
+  talla?: string;
+  /** Categoría Profit (`co_cat`). Filtro de sustitución. Se conserva sin recortar. */
+  coCat?: string;
+  /** Sublínea Profit (`co_subl`). Filtro de sustitución. Se conserva sin recortar. */
+  coSubl?: string;
   category?: string;
   brand?: string;
   family?: string;
+}
+
+/** Lee un string de Firestore sin recortar (co_cat/co_subl vienen con espacios finales). */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readRawString(value: any): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.length > 0 ? value : undefined;
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
@@ -19,7 +31,9 @@ export function docToArticulo(id: string, data: Record<string, any>): Articulo {
   return {
     sku: (data.co_art as string | undefined)?.trim() ?? id,
     name: (data.art_des as string | undefined)?.trim() ?? '',
-    unitsPerBundle: (data.units_per_bundle as number | undefined) ?? 0,
+    talla: (data.talla as string | undefined)?.toString().trim() || undefined,
+    coCat: readRawString(data.co_cat),
+    coSubl: readRawString(data.co_subl),
     category:
       (data.category as string | undefined) ??
       (data.cat_des as string | undefined) ??
@@ -83,7 +97,7 @@ export async function searchArticulosInFirestore(query: string): Promise<Articul
   return merged;
 }
 
-/** Completa o sustituye con catálogo mock cuando Firestore no trae `units_per_bundle`. */
+/** Completa con catálogo mock los SKUs que Firestore no devuelve. */
 export function mergeArticulosWithMock(
   firestoreMap: Record<string, Articulo>,
   skus: string[],
@@ -92,25 +106,15 @@ export function mergeArticulosWithMock(
   const mockMap = getMockArticulosForSkus(skus);
 
   for (const sku of skus) {
-    const fromFs = merged[sku];
-    const fromMock = mockMap[sku];
-    if (!fromMock) continue;
-
-    if (!fromFs || fromFs.unitsPerBundle <= 0) {
-      merged[sku] = fromMock;
-      continue;
-    }
-
-    // En desarrollo: permitir probar capacidad real si Firestore trae 1 por defecto
-    if (__DEV__ && fromFs.unitsPerBundle <= 1 && fromMock.unitsPerBundle > 1) {
-      merged[sku] = { ...fromFs, unitsPerBundle: fromMock.unitsPerBundle };
+    if (!merged[sku] && mockMap[sku]) {
+      merged[sku] = mockMap[sku];
     }
   }
 
   return merged;
 }
 
-/** Mezcla resultados de Firestore con el catálogo mock local. */
+/** Mezcla resultados de Firestore con el catálogo mock local (sin duplicar SKUs). */
 export function mergeSearchResultsWithMock(
   firestoreResults: Articulo[],
   query: string,
@@ -120,18 +124,7 @@ export function mergeSearchResultsWithMock(
   const merged = [...firestoreResults];
 
   for (const mock of mockResults) {
-    if (seen.has(mock.sku)) {
-      const idx = merged.findIndex((a) => a.sku === mock.sku);
-      const existing = merged[idx];
-      if (
-        existing &&
-        (existing.unitsPerBundle <= 0 ||
-          (__DEV__ && existing.unitsPerBundle <= 1 && mock.unitsPerBundle > 1))
-      ) {
-        merged[idx] = { ...existing, unitsPerBundle: mock.unitsPerBundle };
-      }
-      continue;
-    }
+    if (seen.has(mock.sku)) continue;
     seen.add(mock.sku);
     merged.push(mock);
   }

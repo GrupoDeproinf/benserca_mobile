@@ -20,8 +20,8 @@
   "roles": {
     "picker": "Picker",
     "warehouse_lead": "Warehouse lead",
-    "auditor": "Auditor",
-    "supervisor": "Supervisor"
+    "auditor": "Checker",
+    "supervisor_almacen": "Warehouse supervisor"
   },
   "orderStatus": {
     "new": "New",
@@ -99,8 +99,13 @@
       "noBultos": "No packages built",
       "definedBultos": "Defined",
       "bultosDone": "Created",
+      "tallaMeta": "Size: {{talla}}",
       "skus": "SKUs",
       "extraBultosFlag": "Extra packages"
+    },
+    "check": {
+      "waitingTitle": "Under review",
+      "waitingBody": "The order is packed and waiting for the checker to approve it. You can't pack until it's approved."
     },
     "bulto": {
       "title": "Package {{number}}",
@@ -144,17 +149,17 @@
       "confirm": "Pack"
     },
     "rejection": {
-      "title": "Auditor observation"
+      "title": "Checker observation"
     },
     "substitute": {
       "title": "Substitute item",
       "original": "Original item",
-      "perBundle": "Per bundle: {{count}} units",
-      "relatedHint": "Related items · {{brand}} · {{category}}",
-      "searchAnyHint": "Searching entire catalog (no brand/category restriction)",
-      "noRelated": "No related items for this brand and category",
-      "maxQtyHint": "Max {{max}} units ({{perBundle}} per bundle)",
-      "noSpace": "Not enough space in this bundle for this substitution",
+      "tallaLabel": "Size: {{talla}}",
+      "relatedHint": "Substitutable items in the same category (other sizes)",
+      "searchAnyHint": "Searching within the same category",
+      "noRelated": "No substitutable items in this category",
+      "maxQtyHint": "Max {{max}} units",
+      "noSpace": "No pending quantity left to substitute",
       "noteLabel": "Substitution reason (optional)",
       "notePlaceholder": "E.g. Out of stock for ordered item…",
       "confirm": "Confirm substitution",
@@ -217,11 +222,12 @@
     "demoAccess": "Demo access",
     "loginAsPicker": "Picker",
     "loginAsLead": "Lead",
-    "loginAsAuditor": "Auditor",
-    "loginAsSupervisor": "Supervisor"
+    "loginAsAuditor": "Checker",
+    "loginAsSupervisorAlmacen": "Wh. supervisor"
   },
   "tabs": {
     "home": "Home",
+    "dashboard": "Home",
     "orders": "Orders",
     "profile": "Profile",
     "notifications": "Notifications",
@@ -230,23 +236,71 @@
     "warehouse": "Warehouse",
     "settings": "Settings"
   },
+  "supervisorAlmacen": {
+    "dashboard": {
+      "title": "Warehouse status",
+      "subtitle": "Orders by status (read-only)",
+      "refresh": "Refresh",
+      "totalOrders": "Total orders",
+      "newUnassigned": "New to assign",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "sections": {
+        "enCurso": "In progress",
+        "chequeo": "Check"
+      },
+      "sectionTitle": "Summary by status",
+      "orders_one": "{{count}} order",
+      "orders_other": "{{count}} orders",
+      "empty": "No orders"
+    },
+    "list": {
+      "count": "{{count}} order(s)",
+      "emptyTitle": "No orders",
+      "emptySubtitle": "No orders with this status and filters."
+    },
+    "filter": {
+      "title": "Filters",
+      "dateLabel": "Date",
+      "pickerLabel": "Picker",
+      "dateAll": "All",
+      "dateToday": "Today",
+      "dateWeek": "This week",
+      "dateMonth": "This month",
+      "allPickers": "All",
+      "unassigned": "Unassigned",
+      "apply": "Apply",
+      "clear": "Clear"
+    }
+  },
   "notifications": {
     "screen": {
       "subtitle": "Activity",
       "title": "Notifications",
-      "unreadCount": "{{count}} unread",
+      "unreadCount_one": "{{count}} unread notification",
+      "unreadCount_other": "{{count}} unread notifications",
       "allRead": "All caught up",
-      "markAll": "Mark all",
+      "markAll": "Mark all as read",
       "emptyTitle": "No notifications",
       "emptySubtitle": "Relevant events will appear here."
     },
     "type": {
       "order_assigned": "Order assigned",
-      "order_rejected": "Order rejected",
+      "order_updated": "Order updated",
+      "order_recovered": "Order recovered",
+      "order_annulled": "Order annulled",
+      "picking_finished_incomplete": "Incomplete picking",
+      "picking_continued_with_mismatch": "Different SKU",
+      "order_audit_approved": "Order approved",
+      "order_audit_rejected": "Order rejected",
       "team_released": "Released from team",
-      "order_ready_to_audit": "Ready to audit",
+      "order_ready_to_audit": "Ready to check",
       "team_member_done": "Member done",
       "picker_idle": "Picker idle"
+    },
+    "push": {
+      "readyToCheckTitle": "{{order}} ready to check",
+      "readyToCheckBody": "{{client}} — packed order."
     }
   },
   "teams": {
@@ -311,7 +365,7 @@
       "count": "{{count}} order(s) to review",
       "ordersCount": "orders",
       "searchPlaceholder": "Search order or client...",
-      "emptyTitle": "No orders to audit",
+      "emptyTitle": "No orders to check",
       "emptySubtitle": "Packed orders will appear here."
     },
     "filter": {

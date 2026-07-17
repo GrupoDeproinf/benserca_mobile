@@ -11,10 +11,10 @@ export function getNotificationOrderHref(
     case 'picker':
       return `/(app)/${segment}/order/${orderId}`;
     case 'warehouse_lead':
-    case 'supervisor':
       return `/(app)/${segment}/team/${orderId}`;
     case 'auditor':
       return `/(app)/${segment}/audit/${orderId}`;
+    // supervisor_almacen es visualizador: no recibe notificaciones navegables.
     default:
       return null;
   }

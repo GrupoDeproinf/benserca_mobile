@@ -2,7 +2,12 @@
 export interface MockSku {
   sku: string;
   name: string;
-  unitsPerBundle: number;
+  /** Talla del artículo. Solo los artículos con talla son sustituibles. */
+  talla?: string;
+  /** Categoría Profit (`co_cat`) — filtro de sustitución. */
+  coCat?: string;
+  /** Sublínea Profit (`co_subl`) — filtro de sustitución. */
+  coSubl?: string;
   category: string;
   brand: string;
   family?: string;
@@ -12,7 +17,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'PW-500-IND',
     name: 'Fuente de Poder Industrial 500W',
-    unitsPerBundle: 12,
     category: 'Electrónica',
     brand: 'TechPro',
     family: 'Fuentes',
@@ -20,7 +24,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'CBL-HD-2M',
     name: 'Cable de Conexión Reforzado',
-    unitsPerBundle: 6,
     category: 'Electrónica',
     brand: 'TechPro',
     family: 'Cables',
@@ -28,7 +31,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'VRM-X100',
     name: 'Módulo Regulador de Voltaje',
-    unitsPerBundle: 4,
     category: 'Electrónica',
     brand: 'TechPro',
     family: 'Reguladores',
@@ -36,7 +38,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'MON-LED-24',
     name: 'Monitor LED 24" Full HD',
-    unitsPerBundle: 10,
     category: 'Electrónica',
     brand: 'ViewMax',
     family: 'Monitores',
@@ -44,7 +45,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'MON-LED-27',
     name: 'Monitor LED 27" Full HD',
-    unitsPerBundle: 8,
     category: 'Electrónica',
     brand: 'ViewMax',
     family: 'Monitores',
@@ -52,7 +52,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'SOP-MON-01',
     name: 'Soporte Ajustable para Monitor',
-    unitsPerBundle: 10,
     category: 'Electrónica',
     brand: 'ViewMax',
     family: 'Accesorios',
@@ -60,7 +59,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'CBL-HDMI-2M',
     name: 'Cable HDMI 2.0 (2m)',
-    unitsPerBundle: 8,
     category: 'Electrónica',
     brand: 'ViewMax',
     family: 'Cables',
@@ -68,7 +66,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'BOX-C-05',
     name: 'Caja de Cartón Reforzada #5',
-    unitsPerBundle: 20,
     category: 'Embalaje',
     brand: 'PackPro',
     family: 'Cajas',
@@ -76,7 +73,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'FILM-STR-01',
     name: 'Film Stretch para Embalaje',
-    unitsPerBundle: 15,
     category: 'Embalaje',
     brand: 'PackPro',
     family: 'Film',
@@ -84,7 +80,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'TAPE-IND-01',
     name: 'Cinta de Embalaje Industrial',
-    unitsPerBundle: 12,
     category: 'Embalaje',
     brand: 'PackPro',
     family: 'Cintas',
@@ -92,7 +87,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'CORN-CART-01',
     name: 'Esquinero Protector de Cartón',
-    unitsPerBundle: 9,
     category: 'Embalaje',
     brand: 'PackPro',
     family: 'Protección',
@@ -100,7 +94,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'TERM-DIG-01',
     name: 'Termómetro Digital Infrarrojo',
-    unitsPerBundle: 8,
     category: 'Salud',
     brand: 'MediCare',
     family: 'Diagnóstico',
@@ -108,7 +101,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'OXIM-PORT-01',
     name: 'Oxímetro de Pulso Portátil',
-    unitsPerBundle: 6,
     category: 'Salud',
     brand: 'MediCare',
     family: 'Diagnóstico',
@@ -116,7 +108,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'GEL-ALC-500',
     name: 'Gel Antibacterial 500ml',
-    unitsPerBundle: 12,
     category: 'Salud',
     brand: 'MediCare',
     family: 'Higiene',
@@ -124,7 +115,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'PAP-BOND-75',
     name: 'Resma Papel Bond 75g (500 hojas)',
-    unitsPerBundle: 25,
     category: 'Oficina',
     brand: 'OfficeLine',
     family: 'Papel',
@@ -132,7 +122,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'BOL-BIC-AZ',
     name: 'Bolígrafo BIC Cristal Azul',
-    unitsPerBundle: 20,
     category: 'Oficina',
     brand: 'OfficeLine',
     family: 'Escritura',
@@ -140,7 +129,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'ACE-MOT-20W',
     name: 'Aceite de Motor 20W-50 (1L)',
-    unitsPerBundle: 12,
     category: 'Lubricantes',
     brand: 'Castrol',
     family: 'Aceites',
@@ -148,31 +136,46 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: '0201010020010',
     name: 'Casco Azul Talla L',
-    unitsPerBundle: 18,
+    talla: 'L',
     category: 'Seguridad',
     brand: '3M',
+    coCat: 'ACCE',
+    coSubl: 'CASC',
     family: 'Cascos',
   },
   {
     sku: '0201010020011',
     name: 'Casco Azul Talla XL',
-    unitsPerBundle: 18,
+    talla: 'XL',
     category: 'Seguridad',
     brand: '3M',
+    coCat: 'ACCE',
+    coSubl: 'CASC',
     family: 'Cascos',
   },
   {
     sku: '0201010020012',
     name: 'Casco Verde Talla M',
-    unitsPerBundle: 18,
+    talla: 'M',
     category: 'Seguridad',
     brand: '3M',
+    coCat: 'ACCE',
+    coSubl: 'CASC',
+    family: 'Cascos',
+  },
+  {
+    sku: '0201010020013',
+    name: 'Casco Rojo Talla S',
+    talla: 'S',
+    category: 'Seguridad',
+    brand: '3M',
+    coCat: 'ACCE',
+    coSubl: 'CASC',
     family: 'Cascos',
   },
   {
     sku: '0101010040015',
     name: 'Aceite de Motor 1L',
-    unitsPerBundle: 12,
     category: 'Lubricantes',
     brand: 'Castrol',
     family: 'Aceites',
@@ -180,23 +183,26 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: '0201010020007',
     name: 'Casco Azul Talla M',
-    unitsPerBundle: 18,
+    talla: 'M',
     category: 'Seguridad',
     brand: '3M',
+    coCat: 'ACCE',
+    coSubl: 'CASC',
     family: 'Cascos',
   },
   {
     sku: '0201010020008',
     name: 'Casco Verde Talla S',
-    unitsPerBundle: 18,
+    talla: 'S',
     category: 'Seguridad',
     brand: '3M',
+    coCat: 'ACCE',
+    coSubl: 'CASC',
     family: 'Cascos',
   },
   {
     sku: '0201010020009',
     name: 'Guantes de Trabajo',
-    unitsPerBundle: 120,
     category: 'Seguridad',
     brand: 'Honeywell',
     family: 'Guantes',
@@ -204,7 +210,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'FIL-ACE-UNI',
     name: 'Filtro de Aceite Universal',
-    unitsPerBundle: 6,
     category: 'Lubricantes',
     brand: 'Castrol',
     family: 'Filtros',
@@ -212,7 +217,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'PLACA-MOTO-FORZA',
     name: 'Placa Moto Forza',
-    unitsPerBundle: 9,
     category: 'Repuestos',
     brand: 'Forza',
     family: 'Placas',
@@ -220,7 +224,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'TORN-M6-50',
     name: 'Tornillo M6 x 50mm',
-    unitsPerBundle: 50,
     category: 'Ferretería',
     brand: 'FixPro',
     family: 'Tornillería',
@@ -228,7 +231,6 @@ export const MOCK_SKU_CATALOG: readonly MockSku[] = [
   {
     sku: 'TUER-M6',
     name: 'Tuerca M6',
-    unitsPerBundle: 100,
     category: 'Ferretería',
     brand: 'FixPro',
     family: 'Tornillería',
@@ -239,7 +241,9 @@ export function mockSkuToArticulo(item: MockSku) {
   return {
     sku: item.sku,
     name: item.name,
-    unitsPerBundle: item.unitsPerBundle,
+    talla: item.talla,
+    coCat: item.coCat,
+    coSubl: item.coSubl,
     category: item.category,
     brand: item.brand,
     family: item.family,
@@ -269,15 +273,21 @@ export function searchMockArticulos(query: string) {
   ).map(mockSkuToArticulo);
 }
 
+/**
+ * Candidatos de sustitución:
+ *  - Gate: el original DEBE tener `talla` (sin talla no es sustituible → lista vacía).
+ *  - Filtro: mismo `co_cat` y mismo `co_subl` que el original (la talla NO filtra:
+ *    justamente se sustituye por otra talla en existencia).
+ */
 export function filterSubstituteSkus(
   catalog: readonly MockSku[],
-  original: { sku: string; brand?: string; category?: string; family?: string },
+  original: { sku: string; talla?: string; coCat?: string; coSubl?: string },
 ): MockSku[] {
-  return catalog.filter((item) => {
-    if (item.sku === original.sku) return false;
-    if (original.brand && item.brand !== original.brand) return false;
-    if (original.category && item.category !== original.category) return false;
-    if (original.family && item.family !== original.family) return false;
-    return true;
-  });
+  if (!original.talla) return [];
+  return catalog.filter(
+    (item) =>
+      item.sku !== original.sku &&
+      item.coCat === original.coCat &&
+      item.coSubl === original.coSubl,
+  );
 }

@@ -37,7 +37,7 @@ export const MOCK_NOTIFICATIONS: AppNotification[] = [
   {
     id: id(),
     userId: MOCK_PICKER_ANA_UID,
-    type: 'order_rejected',
+    type: 'order_audit_rejected',
     title: 'PED-519 rechazado',
     body: 'Observación: Faltan 5 unidades del SKU ACE-MOT-20W en el bulto 1.',
     orderId: 'ord-packed-1',

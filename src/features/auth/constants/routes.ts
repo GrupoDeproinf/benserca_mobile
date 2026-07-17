@@ -9,14 +9,14 @@ export const ROLE_ROUTE_SEGMENT: Record<UserRole, string> = {
   picker: 'picker',
   warehouse_lead: 'lead',
   auditor: 'auditor',
-  supervisor: 'lead',
+  supervisor_almacen: 'supervisor-almacen',
 };
 
 export const ROLE_HOME_ROUTES = {
   picker: '/(app)/picker/(tabs)/orders',
   warehouse_lead: '/(app)/lead/(tabs)/orders',
   auditor: '/(app)/auditor/(tabs)/queue',
-  supervisor: '/(app)/lead/(tabs)/orders',
+  supervisor_almacen: '/(app)/supervisor-almacen/(tabs)/dashboard',
 } as const satisfies Record<UserRole, `/(app)/${string}`>;
 
 export type RoleHomeRoute = (typeof ROLE_HOME_ROUTES)[UserRole];

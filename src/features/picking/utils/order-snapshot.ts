@@ -18,40 +18,6 @@ export function closeOpenBultosWithItems(bultos: Bulto[]): Bulto[] {
   );
 }
 
-export function computeBundleFraction(
-  qty: number,
-  unitsPerBundle: number,
-): number {
-  if (unitsPerBundle <= 0) return 0;
-  return qty / unitsPerBundle;
-}
-
-export function getLineUnitsPerBundle(lines: OrderLine[], sku: string): number {
-  const value = lines.find((l) => l.sku === sku)?.unitsPerBundle ?? 0;
-  return value > 0 ? value : 0;
-}
-
-/** Resuelve unidades por bulto de un ítem (incluye sustituciones). */
-export function resolveItemUnitsPerBundle(item: BultoItem, lines: OrderLine[]): number {
-  if (item.unitsPerBundle != null && item.unitsPerBundle > 0) return item.unitsPerBundle;
-
-  const isSubstitution = Boolean(item.originalSku && item.originalSku !== item.sku);
-  if (isSubstitution) {
-    const fromPackedSku = getLineUnitsPerBundle(lines, item.sku);
-    return fromPackedSku > 0 ? fromPackedSku : 1;
-  }
-
-  const key = item.originalSku ?? item.sku;
-  return getLineUnitsPerBundle(lines, key) || getLineUnitsPerBundle(lines, item.sku) || 1;
-}
-
-export function computeBultoFraction(bulto: Bulto, lines: OrderLine[]): number {
-  return bulto.items.reduce(
-    (sum, item) => sum + computeBundleFraction(item.qty, resolveItemUnitsPerBundle(item, lines)),
-    0,
-  );
-}
-
 export function getAssignedQtyForLine(order: Order, lineSku: string): number {
   return order.bultos.reduce((sum, bulto) => {
     const inBulto = bulto.items
@@ -148,17 +114,9 @@ export function reconstructBultosFromFinalSkus(
     return originalLine?.name ?? finalSku.packedSku;
   };
 
-  const resolveUnitsPerBundle = (finalSku: FinalSku): number | undefined => {
-    const packed = lineBySku.get(finalSku.packedSku)?.unitsPerBundle ?? 0;
-    if (packed > 0) return packed;
-    const original = lineBySku.get(finalSku.originalSku)?.unitsPerBundle ?? 0;
-    return original > 0 ? original : undefined;
-  };
-
   for (const finalSku of finalSkus) {
     const substituted =
       finalSku.substituted && finalSku.packedSku !== finalSku.originalSku;
-    const unitsPerBundle = resolveUnitsPerBundle(finalSku);
 
     for (const bundle of finalSku.bundles) {
       if (!itemsByBundle.has(bundle.bundleNum)) {
@@ -176,7 +134,6 @@ export function reconstructBultosFromFinalSkus(
               substitutionNote: finalSku.substitutionNote ?? undefined,
             }
           : {}),
-        ...(unitsPerBundle != null ? { unitsPerBundle } : {}),
       };
 
       itemsByBundle.get(bundle.bundleNum)!.push(item);

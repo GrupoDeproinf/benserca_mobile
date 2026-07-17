@@ -7,12 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import { ORDERS_LIST_CARD_GAP } from '@/features/picking/components/orders-list-page';
 import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height';
+import { markNotificationRead } from '@/services/firebase/notifications.service';
 import { EmptyState } from '@/shared/components/ui/empty-state';
-import type { AppNotification } from '@/shared/types';
 import { NotificationItem } from '../components/notification-item';
 import { NOTIFICATIONS_HEADER_BG, NotificationsHeader } from '../components/notifications-header';
+import { useNotificationPress } from '../hooks/use-notification-press';
 import { useNotificationsStore } from '../store/notifications.store';
-import { getNotificationOrderHref } from '../utils/notification-navigation';
 
 interface NotificationsScreenProps {
   /** Pantalla apilada (sin tab bar): muestra botón volver. */
@@ -61,7 +61,6 @@ export function NotificationsScreen({ showBack = false }: NotificationsScreenPro
   const user = useCurrentUser();
 
   const allNotifications = useNotificationsStore((s) => s.notifications);
-  const markRead = useNotificationsStore((s) => s.markRead);
   const markAllRead = useNotificationsStore((s) => s.markAllRead);
 
   const notifications = useMemo(() => {
@@ -85,20 +84,19 @@ export function NotificationsScreen({ showBack = false }: NotificationsScreenPro
     return t('notifications.screen.allRead');
   }, [unreadCount, t]);
 
-  const handlePress = useCallback(
-    (notification: AppNotification) => {
-      markRead(notification.id);
-      if (!user?.role || !notification.orderId) return;
-      const href = getNotificationOrderHref(user.role, notification.orderId);
-      if (href) router.push(href as never);
-    },
-    [markRead, user, router],
-  );
+  const handlePress = useNotificationPress();
 
   const handleMarkAll = useCallback(() => {
     if (!user) return;
     markAllRead(user.uid, user.role);
-  }, [user, markAllRead]);
+
+    for (const n of notifications) {
+      if (!n.firestoreId || n.read) continue;
+      markNotificationRead(n.firestoreId, { uid: user.uid, name: user.name }).catch((e) =>
+        console.error('[notifications.screen] markAll markNotificationRead error', e),
+      );
+    }
+  }, [user, markAllRead, notifications]);
 
   const bottomPadding = showBack ? insets.bottom + 24 : tabBarHeight + 20;
 

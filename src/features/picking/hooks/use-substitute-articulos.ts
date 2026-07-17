@@ -11,21 +11,31 @@ function matchesSearch(item: Articulo, query: string): boolean {
   return item.name.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q);
 }
 
-function filterByTaxonomy(items: Articulo[], original: OrderLine): Articulo[] {
-  return items.filter((item) => {
-    if (item.sku === original.sku) return false;
-    if (original.brand && item.brand && item.brand !== original.brand) return false;
-    if (original.category && item.category && item.category !== original.category) return false;
-    if (original.family && item.family && item.family !== original.family) return false;
-    return true;
-  });
+/**
+ * Candidato válido de sustitución:
+ *  - Gate: el original debe tener `talla` (se valida antes de llamar aquí).
+ *  - Filtro: mismo `co_cat` y mismo `co_subl` que el original. La talla NO filtra.
+ */
+function isSubstituteCandidate(item: Articulo, original: OrderLine): boolean {
+  return (
+    item.sku !== original.sku &&
+    item.coCat === original.coCat &&
+    item.coSubl === original.coSubl
+  );
+}
+
+function filterByCategoria(items: Articulo[], original: OrderLine): Articulo[] {
+  if (!original.talla) return [];
+  return items.filter((item) => isSubstituteCandidate(item, original));
 }
 
 function mockToArticulo(item: (typeof MOCK_SKU_CATALOG)[number]): Articulo {
   return {
     sku: item.sku,
     name: item.name,
-    unitsPerBundle: item.unitsPerBundle,
+    talla: item.talla,
+    coCat: item.coCat,
+    coSubl: item.coSubl,
     category: item.category,
     brand: item.brand,
     family: item.family,
@@ -36,37 +46,35 @@ function mockRelated(original: OrderLine): Articulo[] {
   return filterSubstituteSkus(MOCK_SKU_CATALOG, original).map(mockToArticulo);
 }
 
-function mockSearchAll(query: string, excludeSku: string): Articulo[] {
+/** Búsqueda global también restringida a co_cat + co_subl del original. */
+function mockSearchAll(query: string, original: OrderLine): Articulo[] {
+  if (!original.talla) return [];
   const q = query.trim().toLowerCase();
-  return MOCK_SKU_CATALOG.filter(
-    (item) => item.sku !== excludeSku && matchesSearch(mockToArticulo(item), q),
-  ).map(mockToArticulo);
+  return MOCK_SKU_CATALOG.map(mockToArticulo)
+    .filter((item) => isSubstituteCandidate(item, original) && matchesSearch(item, q));
 }
 
 async function fetchRelatedArticulos(original: OrderLine): Promise<Articulo[]> {
-  if (!original.brand && !original.category) {
-    return mockRelated(original);
-  }
+  // Gate: sin talla no hay sustitución posible.
+  if (!original.talla) return [];
 
   const col = firestore().collection('articulos');
+  // co_cat / co_subl se comparan con el valor crudo (con espacios finales) tal
+  // como viene de Profit. Puede requerir un índice compuesto en Firestore.
   let query = col.where('anulado', '!=', 1);
-
-  if (original.brand) {
-    query = query.where('brand', '==', original.brand);
-  }
-  if (original.category) {
-    query = query.where('category', '==', original.category);
-  }
+  if (original.coCat) query = query.where('co_cat', '==', original.coCat);
+  if (original.coSubl) query = query.where('co_subl', '==', original.coSubl);
 
   const snap = await query.limit(40).get();
   const fetched = snap.docs.map((doc) => docToArticulo(doc.id, doc.data()));
-  const related = filterByTaxonomy(fetched, original);
+  const related = filterByCategoria(fetched, original);
   return related.length > 0 ? related : mockRelated(original);
 }
 
 /**
- * Sin búsqueda: artículos relacionados por marca/categoría.
- * Con búsqueda (≥2 chars): cualquier artículo del catálogo, sin restricción de taxonomía.
+ * Sin búsqueda: artículos de la misma categoría (co_cat + co_subl) del original.
+ * Con búsqueda (≥2 chars): también dentro de la misma categoría.
+ * Si el original no tiene talla, no hay candidatos (no es sustituible).
  */
 export function useSubstituteArticulos(
   originalLine: OrderLine | null,
@@ -80,7 +88,7 @@ export function useSubstituteArticulos(
   const abortRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled || !originalLine) {
+    if (!enabled || !originalLine?.talla) {
       setResults([]);
       setLoading(false);
       setIsGlobalSearch(false);
@@ -98,9 +106,10 @@ export function useSubstituteArticulos(
       try {
         if (globalMode) {
           let items = await searchArticulosInFirestore(q);
-          items = items.filter((item) => item.sku !== originalLine.sku);
+          // Solo candidatos de la misma categoría (co_cat + co_subl) del original.
+          items = items.filter((item) => isSubstituteCandidate(item, originalLine));
           if (items.length === 0) {
-            items = mockSearchAll(q, originalLine.sku);
+            items = mockSearchAll(q, originalLine);
           }
           if (!abortRef.current) setResults(items);
           return;
@@ -112,7 +121,7 @@ export function useSubstituteArticulos(
         console.error('[useSubstituteArticulos]', err);
         if (!abortRef.current) {
           setResults(
-            globalMode ? mockSearchAll(q, originalLine.sku) : mockRelated(originalLine),
+            globalMode ? mockSearchAll(q, originalLine) : mockRelated(originalLine),
           );
         }
       } finally {

@@ -1,7 +1,6 @@
 /**
  * Acciones de dominio puro del picking.
  */
-import { notify } from '@/features/notifications/store/notifications.store';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import type { AuditObservation, Bulto, BultoItem, Order, PickerActionError } from '../types';
 import { buildPartialSavePatch } from '../utils/partial-save';
@@ -51,13 +50,8 @@ export function applyFinishPicking(order: Order, pickerId: string): Partial<Orde
   const progressPercentage = 100;
   const bundlesCreated = computeBundlesCreated(renumbered);
 
-  notify({
-    userId: 'broadcast-auditor',
-    type: 'order_ready_to_audit',
-    title: `${order.orderNumber} listo para auditar`,
-    body: `El pedido ${order.orderNumber} (${order.client}) está empaquetado.`,
-    orderId: order.id,
-  });
+  // Las notificaciones se generan en el dispositivo receptor a partir del
+  // listener de Firestore (ver use-session-orders-listener), no aquí.
 
   return {
     status: 'to_pack',
@@ -103,15 +97,8 @@ export function applyRejectAudit(
     createdAt: new Date().toISOString(),
   };
 
-  if (order.assignedPickerId) {
-    notify({
-      userId: order.assignedPickerId,
-      type: 'order_rejected',
-      title: `${order.orderNumber} rechazado`,
-      body: `Observación: ${observationText.trim()}`,
-      orderId: order.id,
-    });
-  }
+  // La notificación de rechazo se genera en el dispositivo del picker desde el
+  // listener de Firestore (ver use-session-orders-listener), no aquí.
 
   return {
     status: 'rejected_review',
@@ -201,7 +188,7 @@ export function applyAddBultoItem(
   sku: string,
   name: string,
   qty: number,
-  options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
+  options?: { originalSku?: string; substitutionNote?: string },
 ): Partial<Order> {
   const bultos = order.bultos.map((b) => {
     if (b.id !== bultoId) return b;
@@ -218,7 +205,6 @@ export function applyAddBultoItem(
                 ...i,
                 qty: i.qty + qty,
                 substitutionNote: options?.substitutionNote ?? i.substitutionNote,
-                unitsPerBundle: options?.unitsPerBundle ?? i.unitsPerBundle,
               }
             : i,
         )
@@ -231,7 +217,6 @@ export function applyAddBultoItem(
             qty,
             originalSku: options?.originalSku,
             substitutionNote: options?.substitutionNote,
-            unitsPerBundle: options?.unitsPerBundle,
           },
         ];
 

@@ -11,7 +11,6 @@ import { QtyStepper } from './qty-stepper';
 interface BultoCardProps {
   bulto: Bulto;
   editable: boolean;
-  capacityFull?: boolean;
   getItemMaxQty?: (itemId: string) => number;
   onCapacityExceeded?: () => void;
   onClose: (bultoId: string) => void;
@@ -24,7 +23,6 @@ interface BultoCardProps {
 export function BultoCard({
   bulto,
   editable,
-  capacityFull = false,
   getItemMaxQty,
   onCapacityExceeded,
   onClose,
@@ -101,7 +99,7 @@ export function BultoCard({
 
           {editable ? (
             <View style={styles.actions}>
-              {!isClosed && !capacityFull ? (
+              {!isClosed ? (
                 <BultoActionButton
                   label={t('picking.bulto.addItem')}
                   icon={Plus}

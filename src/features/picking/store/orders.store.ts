@@ -29,6 +29,85 @@ import {
 import type { Order, OrderStatus, PickerActionError } from '../types';
 import { canPickerStartOrder } from '../utils/picker-queue';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { createNotification } from '@/services/firebase/notifications.service';
+import type { SessionUser } from '@/shared/types';
+
+/**
+ * Notificaciones App→Web (channel `web`, `recipients: []` = broadcast) al
+ * finalizar picking: SKUs faltantes y/o sustituciones. Ver notifications.md §2.6.
+ */
+function notifyFinishPickingOutcomes(order: Order, user: SessionUser): void {
+  const orderNumber = Number(order.orderNumber);
+  const missing = order.finalSkus.filter((s) => !s.substituted && s.difference > 0);
+  const substituted = order.finalSkus.filter((s) => s.substituted);
+
+  if (missing.length > 0) {
+    const motivo = missing
+      .map(
+        (s) =>
+          `Falta SKU ${s.originalSku} — cantidad pedida ${s.originalQuantity}, encontrada ${s.packedQuantity}`,
+      )
+      .join('; ');
+    createNotification({
+      message: `Picking finalizado con SKUs incompletos en el pedido #${order.orderNumber}`,
+      type: 'picking_finished_incomplete',
+      channel: 'web',
+      recipients: [],
+      orderNumber,
+      motivo,
+      createdBy: user.uid,
+      createdByName: user.name,
+    }).catch((e) => console.error('[orders.store] picking_finished_incomplete notify error', e));
+  }
+
+  if (substituted.length > 0) {
+    const motivo = substituted
+      .map(
+        (s) =>
+          `SKU ${s.originalSku} sustituido por ${s.packedSku}${s.substitutionNote ? ` (${s.substitutionNote})` : ''}`,
+      )
+      .join('; ');
+    createNotification({
+      message: `Se continuó el picking del pedido #${order.orderNumber} aunque hay SKUs diferentes`,
+      type: 'picking_continued_with_mismatch',
+      channel: 'web',
+      recipients: [],
+      orderNumber,
+      motivo,
+      createdBy: user.uid,
+      createdByName: user.name,
+    }).catch((e) =>
+      console.error('[orders.store] picking_continued_with_mismatch notify error', e),
+    );
+  }
+}
+
+/** Notificación App→App (channel `app`) al picker cuando el chequeador resuelve el chequeo. */
+function notifyAuditOutcome(
+  order: Order,
+  user: SessionUser,
+  outcome: 'approved' | 'rejected',
+  observation?: string,
+): void {
+  if (!order.assignedPickerId) return;
+
+  const pickerName = usePickersStore.getState().getPicker(order.assignedPickerId)?.nombre;
+
+  createNotification({
+    message:
+      outcome === 'approved'
+        ? `El pedido #${order.orderNumber} fue aprobado por el chequeador`
+        : `El pedido #${order.orderNumber} fue rechazado por el chequeador`,
+    type: outcome === 'approved' ? 'order_audit_approved' : 'order_audit_rejected',
+    channel: 'app',
+    recipients: [{ uid: order.assignedPickerId, name: pickerName ?? order.assignedPickerId }],
+    orderNumber: Number(order.orderNumber),
+    motivo: observation,
+    createdBy: user.uid,
+    createdByName: user.name,
+  }).catch((e) => console.error(`[orders.store] order_audit_${outcome} notify error`, e));
+}
 
 function patchOrder(orders: Order[], id: string, patch: Partial<Order>): Order[] {
   return orders.map((o) => (o.id === id ? { ...o, ...patch } : o));
@@ -66,10 +145,11 @@ interface OrdersState {
     sku: string,
     name: string,
     qty: number,
-    options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
+    options?: { originalSku?: string; substitutionNote?: string },
   ) => void;
   updateBultoItem: (orderId: string, bultoId: string, itemId: string, qty: number) => void;
   removeBultoItem: (orderId: string, bultoId: string, itemId: string) => RemoveItemResult;
+  resetOrders: () => void;
 }
 
 export const useOrdersStore = create<OrdersState>((set, get) => ({
@@ -165,6 +245,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
       firestoreFinishPicking(orderId, updatedOrder, user).catch((e) =>
         console.error('[orders.store] finishPicking Firestore error', e),
       );
+      notifyFinishPickingOutcomes(updatedOrder, user);
     }
 
     return { ok: true };
@@ -220,6 +301,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
       firestoreApproveAudit(orderId, user).catch((e) =>
         console.error('[orders.store] approveAudit Firestore error', e),
       );
+      notifyAuditOutcome(order, user, 'approved');
     }
   },
 
@@ -235,6 +317,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
       firestoreRejectAudit(orderId, user, observation).catch((e) =>
         console.error('[orders.store] rejectAudit Firestore error', e),
       );
+      notifyAuditOutcome(order, user, 'rejected', observation);
     }
   },
 
@@ -326,4 +409,6 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
       bultoNumber: target?.number ?? 0,
     };
   },
+
+  resetOrders: () => set({ orders: [] }),
 }));

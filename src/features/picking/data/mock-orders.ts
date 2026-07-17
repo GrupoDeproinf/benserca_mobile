@@ -16,14 +16,18 @@ function line(
   sku: string,
   name: string,
   requiredQty: number,
-  unitsPerBundle = 12,
+  // 4º parámetro (antes units_per_bundle) se ignora; se mantiene por compatibilidad
+  // con las llamadas existentes hasta limpiarlas.
+  _legacyUnitsPerBundle?: number,
 ): OrderLine {
   const catalog = MOCK_SKU_CATALOG.find((s) => s.sku === sku);
   return {
     sku,
     name,
     requiredQty,
-    unitsPerBundle: catalog?.unitsPerBundle ?? unitsPerBundle,
+    talla: catalog?.talla,
+    coCat: catalog?.coCat,
+    coSubl: catalog?.coSubl,
     category: catalog?.category,
     brand: catalog?.brand,
     family: catalog?.family,

@@ -17,14 +17,20 @@ function mapStatus(raw: string): OrderStatus {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
-function readUnitsPerBundle(data: Record<string, any>): number {
-  const raw =
-    data.units_per_bundle ??
-    data.unidades_por_bulto ??
-    data.cantidad_por_bulto ??
-    data.qty_per_bundle;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+function readTalla(data: Record<string, any>): string | undefined {
+  const raw = data.talla;
+  const s = typeof raw === 'string' ? raw.trim() : raw != null ? String(raw).trim() : '';
+  return s.length > 0 ? s : undefined;
+}
+
+/**
+ * `co_cat` / `co_subl` se conservan SIN recortar: en Profit vienen con espacios
+ * finales (ej. "ACCE ") y deben coincidir exactamente con los del catálogo
+ * `articulos` para el filtro de sustitución.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readRawString(value: any): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
@@ -59,7 +65,9 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
       sku: s.sku ?? '',
       name: s.description ?? '',
       requiredQty: s.quantity ?? 0,
-      unitsPerBundle: readUnitsPerBundle(s),
+      talla: readTalla(s),
+      coCat: readRawString(s.co_cat),
+      coSubl: readRawString(s.co_subl),
       category: s.category ?? undefined,
       brand: s.brand ?? undefined,
       family: s.family ?? undefined,

@@ -14,7 +14,7 @@ export interface RoleTabsConfig {
   icons: Record<string, RoleTabIconConfig>;
 }
 
-/** Tabs compartidos: jefe de almacén y supervisor móvil. */
+/** Tabs del jefe de almacén (warehouse_lead). */
 const WAREHOUSE_MANAGER_TABS: RoleTabsConfig = {
   initialRoute: 'orders',
   order: ['orders', 'pickers', 'profile'],
@@ -43,9 +43,17 @@ export const ROLE_TABS_CONFIG: Record<UserRole, RoleTabsConfig> = {
       profile: { outline: 'person-outline', filled: 'person' },
     },
   },
-  supervisor: WAREHOUSE_MANAGER_TABS,
+  // Supervisor de almacén: visualizador. Solo dashboard + perfil.
+  supervisor_almacen: {
+    initialRoute: 'dashboard',
+    order: ['dashboard', 'profile'],
+    icons: {
+      dashboard: { outline: 'grid-outline', filled: 'grid' },
+      profile: { outline: 'person-outline', filled: 'person' },
+    },
+  },
 };
 
 export function isWarehouseManagerRole(role: UserRole): boolean {
-  return role === 'warehouse_lead' || role === 'supervisor';
+  return role === 'warehouse_lead';
 }

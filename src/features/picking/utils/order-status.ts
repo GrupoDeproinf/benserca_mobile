@@ -21,7 +21,9 @@ const MOBILE_TRANSITIONS: Partial<
 > = {
   assigned: { picker: ['in_progress'] },
   in_progress: { picker: ['to_pack'] },
-  to_pack: { picker: ['packed'], auditor: ['audited', 'rejected_review'] },
+  // Chequeo obligatorio: desde Empaquetado solo el chequeador aprueba/rechaza.
+  // El picker ya no puede marcar como embalado directamente.
+  to_pack: { auditor: ['audited', 'rejected_review'] },
   audited: { picker: ['packed'] },
   rejected_review: { picker: ['in_progress'] },
 };
@@ -42,11 +44,8 @@ export function nextActionsFor(order: Order, role: UserRole): OrderDomainAction[
     case 'in_progress':
       return role === 'picker' ? ['open_bulto', 'finish_picking'] : [];
     case 'to_pack':
-      return role === 'picker'
-        ? ['mark_wrapped']
-        : role === 'auditor'
-          ? ['approve_audit', 'reject_audit']
-          : [];
+      // Chequeo obligatorio: el picker espera; solo el chequeador actúa.
+      return role === 'auditor' ? ['approve_audit', 'reject_audit'] : [];
     case 'audited':
       return role === 'picker' ? ['mark_wrapped'] : [];
     case 'rejected_review':

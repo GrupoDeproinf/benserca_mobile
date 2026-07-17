@@ -34,16 +34,10 @@ import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
 import { PickingProgressBar } from '../components/picking-progress-bar';
 import { SubstituteItemSheet } from '../components/substitute-item-sheet';
-import { resolveEffectiveUnitsPerBundle, useOrderLineArticulos } from '../hooks/use-order-line-articulos';
 import { useOrdersStore } from '../store/orders.store';
 import type { OrderLine } from '../types';
+import { getMaxQtyForBultoItem } from '../utils/bulto-capacity';
 import {
-  getActiveOrderLines,
-  getMaxQtyForBultoItem,
-  isBultoFull,
-} from '../utils/bulto-capacity';
-import {
-  computeBultoFraction,
   getAssignedQtyForLine,
   getMissingQuantities,
 } from '../utils/order-snapshot';
@@ -51,6 +45,8 @@ import { getEffectiveQueuePosition, isPickerQueueHead } from '../utils/picker-qu
 
 interface PickingDetailScreenProps {
   orderId: string;
+  /** Modo visualizador (supervisor de almacén): oculta toda acción y edición. */
+  readOnly?: boolean;
 }
 
 const SCREEN_BG = '#F2F2F7';
@@ -72,7 +68,7 @@ type ConfirmState = {
 
 const EMPTY_PICKER_ORDERS: never[] = [];
 
-export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
+export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetailScreenProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -108,12 +104,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
   const [confirmSheet, setConfirmSheet] = useState<ConfirmState | null>(null);
   const { message: capacityToast, nudgeToken: capacityToastNudge, show: showCapacityToast } =
     useToast();
-  const capacityTooltip = t('picking.addItem.capacityExceededTooltip');
-  const activeLines = useMemo(
-    () => (order ? getActiveOrderLines(order) : []),
-    [order],
-  );
-  const catalogBySku = useOrderLineArticulos(activeLines, Boolean(order));
+  const maxReachedTooltip = t('picking.addItem.capacityExceededTooltip');
 
   if (!order) {
     return (
@@ -125,7 +116,8 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
 
   if (!user) return null;
 
-  const isEditable = order.status === 'in_progress' || order.status === 'rejected_review';
+  const isEditable =
+    !readOnly && (order.status === 'in_progress' || order.status === 'rejected_review');
   const showBultos =
     order.status === 'in_progress' ||
     order.status === 'to_pack' ||
@@ -313,65 +305,18 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
   const commitAddItems = (
     bultoId: string,
     items: AddItemEntry[],
-    options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
+    options?: { originalSku?: string; substitutionNote?: string },
   ) => {
-    items.forEach(({ sku, name, qty, unitsPerBundle }) => {
-      addBultoItem(order.id, bultoId, sku, name, qty, {
-        ...options,
-        unitsPerBundle: unitsPerBundle ?? options?.unitsPerBundle,
-      });
+    items.forEach(({ sku, name, qty }) => {
+      addBultoItem(order.id, bultoId, sku, name, qty, options);
     });
     setAddSheetBultoId(null);
     setSubstituteLine(null);
   };
 
-  const tryAddItems = (
-    bultoId: string,
-    items: AddItemEntry[],
-    options?: { originalSku?: string; substitutionNote?: string; unitsPerBundle?: number },
-  ) => {
-    const bulto = order.bultos.find((b) => b.id === bultoId);
-    if (!bulto) return;
-
-    const simulatedItems = [...bulto.items];
-    for (const item of items) {
-      const key = options?.originalSku ?? item.sku;
-      const existing = simulatedItems.find((i) => (i.originalSku ?? i.sku) === key && i.sku === item.sku);
-      if (existing) existing.qty += item.qty;
-      else {
-        simulatedItems.push({
-          id: 'sim',
-          sku: item.sku,
-          name: item.name,
-          qty: item.qty,
-          originalSku: options?.originalSku,
-          unitsPerBundle: item.unitsPerBundle ?? options?.unitsPerBundle,
-        });
-      }
-    }
-
-    const fraction = computeBultoFraction({ ...bulto, items: simulatedItems }, activeLines);
-    if (fraction > 1) {
-      setConfirmSheet({
-        title: t('picking.fraction.overTitle'),
-        message: t('picking.fraction.overBody'),
-        mode: 'info',
-        tone: 'warning',
-        confirmLabel: t('common.understood'),
-        icon: AlertCircle,
-      });
-      return;
-    }
-
-    commitAddItems(bultoId, items, options);
-  };
-
   const handleAddItemToBulto = (bultoId: string) => {
     const bulto = order.bultos.find((b) => b.id === bultoId);
     if (!bulto) return;
-    if (isBultoFull(bulto, activeLines)) {
-      return;
-    }
     setAddSheetBultoId(bultoId);
   };
 
@@ -379,7 +324,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
     order.status === 'assigned' &&
     isPickerQueueHead(order, pickerOrders);
 
-  const footerActions: OrderDetailAction[] = (() => {
+  const footerActions: OrderDetailAction[] = readOnly ? [] : (() => {
     switch (order.status) {
       case 'assigned':
         return canStart
@@ -408,14 +353,9 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
           },
         ];
       case 'to_pack':
-        return [
-          {
-            label: t('picking.detail.markWrapped'),
-            onPress: handleMarkWrapped,
-            variant: 'primary',
-            icon: Box,
-          },
-        ];
+        // Auditoría obligatoria: el picker no puede embalar directamente desde
+        // Empaquetado; debe esperar la aprobación del chequeador.
+        return [];
       case 'audited':
         return [
           {
@@ -499,6 +439,13 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
             />
           ) : null}
 
+          {order.status === 'to_pack' ? (
+            <OrderDetailAlertBanner
+              title={t('picking.check.waitingTitle')}
+              body={t('picking.check.waitingBody')}
+            />
+          ) : null}
+
           <OrderDetailSection
             title={t('picking.detail.linesTitle')}
             icon={ClipboardList}
@@ -511,11 +458,8 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
               {order.lines.map((line, idx) => {
                 const assigned = getAssignedQtyForLine(order, line.sku);
                 const pending = Math.max(0, line.requiredQty - assigned);
-                const perBundle = resolveEffectiveUnitsPerBundle(
-                  line.unitsPerBundle,
-                  catalogBySku[line.sku]?.unitsPerBundle,
-                  line.sku,
-                );
+                // Sustitución deshabilitada temporalmente (a pedido del negocio).
+                const canSubstitute = false;
                 return (
                   <View
                     key={line.sku}
@@ -529,15 +473,15 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
                       <Text style={styles.lineMeta}>
                         {t('picking.detail.lineMeta', {
                           required: line.requiredQty,
-                          perBundle,
                           assigned,
                           pending,
                         })}
+                        {line.talla ? ` · ${t('picking.detail.tallaMeta', { talla: line.talla })}` : ''}
                       </Text>
                     </View>
                     <View style={styles.lineActions}>
                       <Text style={styles.lineQty}>×{line.requiredQty}</Text>
-                      {isEditable ? (
+                      {isEditable && canSubstitute ? (
                         <Pressable
                           onPress={() => {
                             const openBultoTarget = order.bultos.find((b) => b.status === 'open');
@@ -570,7 +514,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
               {order.bultos.length === 0 ? (
                 <OrderDetailCard>
                   <Text style={styles.emptyBultosTitle}>{t('picking.detail.noBultos')}</Text>
-                  {order.status === 'in_progress' ? (
+                  {!readOnly && order.status === 'in_progress' ? (
                     <View style={styles.emptyBultosCta}>
                       <OrderActionButton
                         label={t('picking.detail.openBulto')}
@@ -582,35 +526,28 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
                   ) : null}
                 </OrderDetailCard>
               ) : (
-                order.bultos.map((bulto) => {
-                  const bultoFull = isBultoFull(bulto, activeLines);
-
-                  return (
-                    <BultoCard
-                      key={bulto.id}
-                      bulto={bulto}
-                      editable={isEditable}
-                      capacityFull={bultoFull}
-                      getItemMaxQty={(itemId) =>
-                        getMaxQtyForBultoItem(bulto, activeLines, itemId)
+                order.bultos.map((bulto) => (
+                  <BultoCard
+                    key={bulto.id}
+                    bulto={bulto}
+                    editable={isEditable}
+                    getItemMaxQty={(itemId) => getMaxQtyForBultoItem(order, itemId)}
+                    onClose={(bid) => handleCloseBulto(bid)}
+                    onReopen={(bid) => reopenBulto(order.id, bid)}
+                    onAddItem={handleAddItemToBulto}
+                    onCapacityExceeded={() => showCapacityToast(maxReachedTooltip)}
+                    onUpdateItemQty={(bid, iid, qty) => {
+                      if (qty < 1) {
+                        handleRemoveItem(bid, iid);
+                        return;
                       }
-                      onClose={(bid) => handleCloseBulto(bid)}
-                      onReopen={(bid) => reopenBulto(order.id, bid)}
-                      onAddItem={handleAddItemToBulto}
-                      onCapacityExceeded={() => showCapacityToast(capacityTooltip)}
-                      onUpdateItemQty={(bid, iid, qty) => {
-                        if (qty < 1) {
-                          handleRemoveItem(bid, iid);
-                          return;
-                        }
-                        const maxQty = getMaxQtyForBultoItem(bulto, activeLines, iid);
-                        if (qty > maxQty) showCapacityToast(capacityTooltip);
-                        updateBultoItem(order.id, bid, iid, Math.min(qty, maxQty));
-                      }}
-                      onRemoveItem={(bid, iid) => handleRemoveItem(bid, iid)}
-                    />
-                  );
-                })
+                      const maxQty = getMaxQtyForBultoItem(order, iid);
+                      if (qty > maxQty) showCapacityToast(maxReachedTooltip);
+                      updateBultoItem(order.id, bid, iid, Math.min(qty, maxQty));
+                    }}
+                    onRemoveItem={(bid, iid) => handleRemoveItem(bid, iid)}
+                  />
+                ))
               )}
             </OrderDetailSection>
           ) : null}
@@ -626,7 +563,7 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
         onClose={() => setAddSheetBultoId(null)}
         onAddItems={(items) => {
           if (!addSheetBultoId) return;
-          tryAddItems(addSheetBultoId, items);
+          commitAddItems(addSheetBultoId, items);
         }}
       />
 
@@ -639,13 +576,12 @@ export function PickingDetailScreen({ orderId }: PickingDetailScreenProps) {
         onConfirm={(entry) => {
           const openBultoTarget = order.bultos.find((b) => b.status === 'open');
           if (!openBultoTarget) return;
-          tryAddItems(
+          commitAddItems(
             openBultoTarget.id,
             [{ sku: entry.sku, name: entry.name, qty: entry.qty }],
             {
               originalSku: entry.originalSku,
               substitutionNote: entry.substitutionNote,
-              unitsPerBundle: entry.unitsPerBundle,
             },
           );
         }}

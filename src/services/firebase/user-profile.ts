@@ -17,7 +17,7 @@ const VALID_ROLES: ReadonlySet<UserRole> = new Set([
   'picker',
   'warehouse_lead',
   'auditor',
-  'supervisor',
+  'supervisor_almacen',
 ]);
 
 const ROLE_ALIASES: Record<string, UserRole> = {
@@ -26,12 +26,15 @@ const ROLE_ALIASES: Record<string, UserRole> = {
   jefe: 'warehouse_lead',
   chief: 'warehouse_lead',
   auditor: 'auditor',
-  supervisor: 'supervisor',
+  // Acepta aliases históricos / cortos usados en Firestore.
+  supervisor: 'supervisor_almacen',
+  supervisor_almacen: 'supervisor_almacen',
+  almacen: 'supervisor_almacen',
 };
 
 const ROLE_PRIORITY: readonly UserRole[] = [
   'warehouse_lead',
-  'supervisor',
+  'supervisor_almacen',
   'auditor',
   'picker',
 ];

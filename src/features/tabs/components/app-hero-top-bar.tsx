@@ -33,12 +33,18 @@ const styles = StyleSheet.create({
 });
 
 interface AppHeroTopBarProps {
-  onNotificationsPress: () => void;
+  onNotificationsPress?: () => void;
   onScanPress?: () => void;
+  /** Oculta la campana de notificaciones (roles sin notificaciones, p. ej. supervisor). */
+  showNotifications?: boolean;
 }
 
 /** Franja negra fija (logo + campana). Compartida entre tabs del picker. */
-export function AppHeroTopBar({ onNotificationsPress, onScanPress }: AppHeroTopBarProps) {
+export function AppHeroTopBar({
+  onNotificationsPress,
+  onScanPress,
+  showNotifications = true,
+}: AppHeroTopBarProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
@@ -48,7 +54,9 @@ export function AppHeroTopBar({ onNotificationsPress, onScanPress }: AppHeroTopB
         <BensercaLogo variant="text" height={HEADER_LOGO_HEIGHT} />
       </View>
       <View style={styles.actions}>
-        <NotificationBell onPress={onNotificationsPress} color="#FFFFFF" size={22} />
+        {showNotifications && onNotificationsPress ? (
+          <NotificationBell onPress={onNotificationsPress} color="#FFFFFF" size={22} />
+        ) : null}
         {onScanPress ? (
           <Pressable
             onPress={onScanPress}

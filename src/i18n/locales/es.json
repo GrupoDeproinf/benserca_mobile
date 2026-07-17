@@ -21,8 +21,8 @@
   "roles": {
     "picker": "Picker",
     "warehouse_lead": "Jefe / Supervisor",
-    "auditor": "Auditor",
-    "supervisor": "Jefe / Supervisor"
+    "auditor": "Chequeador",
+    "supervisor_almacen": "Supervisor de almacén"
   },
   "orderStatus": {
     "new": "Nuevo",
@@ -108,9 +108,14 @@
       "bultosDone": "Creados",
       "queuePosition": "Cola",
       "progressLabel": "Progreso",
-      "lineMeta": "Pedido: {{required}} · Por bulto: {{perBundle}} · Asignado: {{assigned}} · Pendiente: {{pending}}",
+      "lineMeta": "Pedido: {{required}} · Asignado: {{assigned}} · Pendiente: {{pending}}",
+      "tallaMeta": "Talla: {{talla}}",
       "skus": "SKUs",
       "extraBultosFlag": "Bultos adicionales"
+    },
+    "check": {
+      "waitingTitle": "En chequeo",
+      "waitingBody": "El pedido está empaquetado y a la espera de que el chequeador lo apruebe. No puedes embalar hasta la aprobación."
     },
     "queue": {
       "blockTitle": "No puedes iniciar",
@@ -128,10 +133,6 @@
       "addItem": "Agregar ítem",
       "close": "Cerrar bulto",
       "reopen": "Reabrir",
-      "fraction": "{{pct}}% capacidad",
-      "capacityFull": "Bulto lleno",
-      "bultoFullTitle": "Bulto al 100%",
-      "bultoFullBody": "Este bulto está lleno. Ciérralo para continuar o reduce cantidades de los ítems actuales.",
       "emptyOpenBlockTitle": "Bulto vacío abierto",
       "emptyOpenBlockBody": "Hay un bulto abierto sin ítems. Agrégale artículos o elimínalo antes de abrir otro.",
       "cannotCloseEmptyTitle": "Bulto vacío",
@@ -147,10 +148,9 @@
       "qty": "Cantidad",
       "add": "Agregar al bulto",
       "addWithCount": "Agregar al bulto ({{count}} uds.)",
-      "capacityBanner": "Espacio disponible en el bulto: {{pct}}%",
       "maxPerArticle": "Máx. {{max}} uds.",
-      "noSpace": "Sin espacio",
-      "capacityExceededTooltip": "Has excedido la capacidad del bulto",
+      "noSpace": "Sin pendiente",
+      "capacityExceededTooltip": "No puedes agregar más de lo pedido",
       "searchHint": "Escribe al menos 2 caracteres para buscar"
     },
     "extraBultos": {
@@ -177,20 +177,15 @@
       "confirmBody": "Confirmas que el embalaje físico está listo.",
       "confirm": "Embalar"
     },
-    "fraction": {
-      "overTitle": "Capacidad del bulto",
-      "overBody": "No hay espacio suficiente en este bulto para esa cantidad.",
-      "continue": "Entendido"
-    },
     "substitute": {
       "title": "Sustituir artículo",
       "original": "Artículo original",
-      "perBundle": "Por bulto: {{count}} uds.",
-      "relatedHint": "Artículos relacionados · {{brand}} · {{category}}",
-      "searchAnyHint": "Buscando en todo el catálogo (sin restricción de marca/categoría)",
-      "noRelated": "No hay artículos relacionados con esta marca y categoría",
-      "maxQtyHint": "Máx. {{max}} uds. ({{perBundle}} por bulto)",
-      "noSpace": "El bulto no tiene espacio para esta sustitución",
+      "tallaLabel": "Talla: {{talla}}",
+      "relatedHint": "Artículos sustituibles de la misma categoría (otras tallas)",
+      "searchAnyHint": "Buscando en la misma categoría",
+      "noRelated": "No hay artículos sustituibles en esta categoría",
+      "maxQtyHint": "Máx. {{max}} uds.",
+      "noSpace": "No queda cantidad pendiente para sustituir",
       "noteLabel": "Motivo de sustitución (opcional)",
       "notePlaceholder": "Ej: No había existencia del artículo pedido…",
       "confirm": "Confirmar sustitución",
@@ -199,7 +194,7 @@
       "needBultoBody": "Abre un bulto antes de registrar una sustitución."
     },
     "rejection": {
-      "title": "Observación del auditor"
+      "title": "Observación del chequeador"
     }
   },
   "welcome": {
@@ -249,11 +244,12 @@
     "demoAccess": "Acceso demo",
     "loginAsPicker": "Picker",
     "loginAsLead": "Jefe / Supervisor",
-    "loginAsAuditor": "Auditor",
-    "loginAsSupervisor": "Supervisor"
+    "loginAsAuditor": "Chequeador",
+    "loginAsSupervisorAlmacen": "Supervisor almacén"
   },
   "tabs": {
     "home": "Inicio",
+    "dashboard": "Inicio",
     "orders": "Pedidos",
     "profile": "Perfil",
     "notifications": "Notificaciones",
@@ -263,13 +259,51 @@
     "warehouse": "Almacén",
     "settings": "Ajustes"
   },
+  "supervisorAlmacen": {
+    "dashboard": {
+      "title": "Estado del almacén",
+      "subtitle": "Pedidos por estatus (solo lectura)",
+      "refresh": "Actualizar",
+      "totalOrders": "Total pedidos",
+      "newUnassigned": "Nuevos por asignar",
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "sections": {
+        "enCurso": "En curso",
+        "chequeo": "Chequeo"
+      },
+      "sectionTitle": "Resumen por estatus",
+      "orders_one": "{{count}} pedido",
+      "orders_other": "{{count}} pedidos",
+      "empty": "Sin pedidos"
+    },
+    "list": {
+      "count": "{{count}} pedido(s)",
+      "emptyTitle": "Sin pedidos",
+      "emptySubtitle": "No hay pedidos con este estatus y filtros."
+    },
+    "filter": {
+      "title": "Filtros",
+      "dateLabel": "Fecha",
+      "pickerLabel": "Picker",
+      "dateAll": "Todas",
+      "dateToday": "Hoy",
+      "dateWeek": "Esta semana",
+      "dateMonth": "Este mes",
+      "allPickers": "Todos",
+      "unassigned": "Sin asignar",
+      "apply": "Aplicar",
+      "clear": "Limpiar"
+    }
+  },
   "notifications": {
     "screen": {
       "subtitle": "Actividad",
       "title": "Notificaciones",
-      "unreadCount": "{{count}} sin leer",
+      "unreadCount_one": "{{count}} notificación sin leer",
+      "unreadCount_other": "{{count}} notificaciones sin leer",
       "allRead": "Todo al día",
-      "markAll": "Marcar todo",
+      "markAll": "Marcar todo como leído",
       "listCount": "{{count}} notificación(es)",
       "emptyTitle": "Sin notificaciones",
       "emptySubtitle": "Los eventos relevantes aparecerán aquí."
@@ -283,11 +317,21 @@
     },
     "type": {
       "order_assigned": "Pedido asignado",
-      "order_rejected": "Pedido rechazado",
+      "order_updated": "Pedido actualizado",
+      "order_recovered": "Pedido recuperado",
+      "order_annulled": "Pedido anulado",
+      "picking_finished_incomplete": "Picking incompleto",
+      "picking_continued_with_mismatch": "SKU diferente",
+      "order_audit_approved": "Pedido aprobado",
+      "order_audit_rejected": "Pedido rechazado",
       "team_released": "Liberado del equipo",
-      "order_ready_to_audit": "Listo para auditar",
+      "order_ready_to_audit": "Listo para chequear",
       "team_member_done": "Miembro completó",
       "picker_idle": "Picker sin actividad"
+    },
+    "push": {
+      "readyToCheckTitle": "{{order}} listo para chequear",
+      "readyToCheckBody": "{{client}} — pedido empaquetado."
     }
   },
   "teams": {
@@ -368,7 +412,7 @@
       "count": "{{count}} pedido(s) para revisar",
       "ordersCount": "pedidos",
       "searchPlaceholder": "Buscar pedido o cliente...",
-      "emptyTitle": "Sin pedidos para auditar",
+      "emptyTitle": "Sin pedidos para chequear",
       "emptySubtitle": "Los pedidos empaquetados aparecerán aquí."
     },
     "filter": {

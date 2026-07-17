@@ -14,7 +14,15 @@ export interface OrderLine {
   sku: string;
   name: string;
   requiredQty: number;
-  unitsPerBundle: number;
+  /**
+   * Talla del artículo (ej. cascos S/M/L). Es el "gate" de sustitución:
+   * si no viene, el artículo NO es sustituible.
+   */
+  talla?: string;
+  /** Categoría Profit (`co_cat`). Filtro de candidatos de sustitución. */
+  coCat?: string;
+  /** Sublínea Profit (`co_subl`). Filtro de candidatos de sustitución. */
+  coSubl?: string;
   category?: string;
   brand?: string;
   family?: string;
@@ -30,8 +38,6 @@ export interface BultoItem {
   /** SKU original del pedido si hubo sustitución. */
   originalSku?: string;
   substitutionNote?: string;
-  /** Unidades por bulto del SKU empaquetado (sustituto). */
-  unitsPerBundle?: number;
 }
 
 export type BultoStatus = 'open' | 'closed';

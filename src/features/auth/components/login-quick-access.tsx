@@ -5,13 +5,18 @@ import type { UserRole } from '@/shared/types';
 import { loginTheme } from '../constants/login-theme';
 import { Text } from '@/shared/components/ui/text';
 
-const DEMO_ROLES: UserRole[] = ['picker', 'warehouse_lead', 'auditor'];
+const DEMO_ROLES: UserRole[] = [
+  'picker',
+  'warehouse_lead',
+  'auditor',
+  'supervisor_almacen',
+];
 
 const ROLE_I18N_KEY: Record<UserRole, string> = {
   picker: 'auth.loginAsPicker',
   warehouse_lead: 'auth.loginAsLead',
   auditor: 'auth.loginAsAuditor',
-  supervisor: 'auth.loginAsLead',
+  supervisor_almacen: 'auth.loginAsSupervisorAlmacen',
 };
 
 interface LoginQuickAccessProps {

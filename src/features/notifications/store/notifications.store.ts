@@ -24,11 +24,18 @@ interface NotificationsState {
   add: (payload: Omit<AppNotification, 'id' | 'read' | 'createdAt'>) => void;
   markRead: (notifId: string) => void;
   markAllRead: (userId: string, role?: UserRole) => void;
+  /** Reemplaza las notificaciones de origen Firestore (con `firestoreId`), preservando las locales. */
+  hydrateFirestoreNotifications: (incoming: AppNotification[]) => void;
   resetNotifications: () => void;
+  /** Última notificación recién llegada (Firestore), para el banner global. `null` = no hay nada que mostrar. */
+  incomingToast: AppNotification | null;
+  showIncomingToast: (notification: AppNotification) => void;
+  clearIncomingToast: () => void;
 }
 
 export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   notifications: [...MOCK_NOTIFICATIONS],
+  incomingToast: null,
 
   getForUser: (userId, role) =>
     get()
@@ -65,8 +72,19 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       ),
     })),
 
+  hydrateFirestoreNotifications: (incoming) =>
+    set((state) => ({
+      notifications: [
+        ...incoming,
+        ...state.notifications.filter((n) => !n.firestoreId),
+      ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    })),
+
   resetNotifications: () =>
     set({ notifications: [...MOCK_NOTIFICATIONS] }),
+
+  showIncomingToast: (notification) => set({ incomingToast: notification }),
+  clearIncomingToast: () => set({ incomingToast: null }),
 }));
 
 /** Helper para disparar notificaciones desde acciones de dominio. */

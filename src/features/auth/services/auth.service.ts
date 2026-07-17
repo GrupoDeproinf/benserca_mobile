@@ -28,7 +28,7 @@ export const DEMO_CREDENTIALS = {
   picker: { email: 'picker@benserca.com', password: '123456' },
   warehouse_lead: { email: 'jefe@benserca.com', password: '123456' },
   auditor: { email: 'auditor@benserca.com', password: '123456' },
-  supervisor: { email: 'supervisor@benserca.com', password: '123456' },
+  supervisor_almacen: { email: 'manualmacen@gmail.com', password: '123456' },
 } as const;
 
 function mapFirebaseAuthError(error: unknown): never {

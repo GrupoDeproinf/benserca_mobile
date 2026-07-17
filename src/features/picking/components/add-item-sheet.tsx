@@ -16,10 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toast, useToast } from '@/shared/components/ui/toast';
 import type { Articulo } from '../hooks/use-articulos-search';
 import { useArticulosSearch } from '../hooks/use-articulos-search';
-import {
-  resolveEffectiveUnitsPerBundle,
-  useOrderLineArticulos,
-} from '../hooks/use-order-line-articulos';
 import type { Bulto, Order, OrderLine } from '../types';
 import {
   getActiveOrderLines,
@@ -33,8 +29,6 @@ export interface AddItemEntry {
   sku: string;
   name: string;
   qty: number;
-  /** Unidades por bulto resueltas (misma fuente que la lista de artículos). */
-  unitsPerBundle?: number;
 }
 
 interface AddItemSheetProps {
@@ -50,7 +44,7 @@ function orderLineToArticulo(line: OrderLine): Articulo {
   return {
     sku: line.sku,
     name: line.name,
-    unitsPerBundle: line.unitsPerBundle,
+    talla: line.talla,
   };
 }
 
@@ -64,7 +58,7 @@ export function AddItemSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { message: toastMessage, nudgeToken: toastNudge, show: showToast } = useToast();
-  const capacityTooltip = t('picking.addItem.capacityExceededTooltip');
+  const maxReachedTooltip = t('picking.addItem.capacityExceededTooltip');
   const activeLines = getActiveOrderLines(order);
 
   const [search, setSearch] = useState('');
@@ -74,30 +68,13 @@ export function AddItemSheet({
     search,
     visible,
   );
-  const catalogBySku = useOrderLineArticulos(activeLines, visible);
-
-  const resolveUnits = (item: Articulo): number => {
-    const line = activeLines.find((l) => l.sku === item.sku);
-    return resolveEffectiveUnitsPerBundle(
-      line?.unitsPerBundle ?? 0,
-      item.unitsPerBundle > 0 ? item.unitsPerBundle : catalogBySku[item.sku]?.unitsPerBundle,
-      item.sku,
-    );
-  };
 
   // When no search: show the order's active lines.
   // When searching: show Firestore results.
   const displayList: Articulo[] = useMemo(() => {
     if (search.trim().length >= 2) return firestoreResults;
-    return activeLines.map((line) => ({
-      ...orderLineToArticulo(line),
-      unitsPerBundle: resolveEffectiveUnitsPerBundle(
-        line.unitsPerBundle,
-        catalogBySku[line.sku]?.unitsPerBundle,
-        line.sku,
-      ),
-    }));
-  }, [search, firestoreResults, activeLines, catalogBySku]);
+    return activeLines.map(orderLineToArticulo);
+  }, [search, firestoreResults, activeLines]);
 
   const pendingAdds: PendingAdd[] = useMemo(
     () =>
@@ -124,16 +101,13 @@ export function AddItemSheet({
 
   const setSkuQty = (sku: string, qty: number) => {
     if (!bulto) return;
-    const item = displayList.find((s) => s.sku === sku);
-    const units = item ? resolveUnits(item) : undefined;
     const max = getMaxAddQtyForOrderLine(
       order,
       bulto,
       sku,
       pendingAdds.filter((p) => p.sku !== sku),
-      { unitsPerBundleOverride: units },
     );
-    if (qty > max) showToast(capacityTooltip);
+    if (qty > max) showToast(maxReachedTooltip);
     const clamped = Math.max(0, Math.min(qty, max));
     setQuantities((prev) => {
       const next = { ...prev };
@@ -153,7 +127,6 @@ export function AddItemSheet({
         sku: s.sku,
         name: s.name,
         qty: quantities[s.sku],
-        unitsPerBundle: resolveUnits(s),
       }));
     if (items.length === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -163,14 +136,12 @@ export function AddItemSheet({
 
   const renderRow = ({ item }: { item: Articulo }) => {
     const qty = quantities[item.sku] ?? 0;
-    const units = resolveUnits(item);
     const maxAdd = bulto
       ? getMaxAddQtyForOrderLine(
           order,
           bulto,
           item.sku,
           pendingAdds.filter((p) => p.sku !== item.sku),
-          { unitsPerBundleOverride: units },
         )
       : 0;
     const canAdd = maxAdd > 0;
@@ -193,13 +164,13 @@ export function AddItemSheet({
           onChange={(v) => setSkuQty(item.sku, v)}
           min={0}
           max={maxAdd}
-          onAtMax={() => showToast(capacityTooltip)}
+          onAtMax={() => showToast(maxReachedTooltip)}
         />
       </View>
     );
 
     if (!canAdd) {
-      return <Pressable onPress={() => showToast(capacityTooltip)}>{row}</Pressable>;
+      return <Pressable onPress={() => showToast(maxReachedTooltip)}>{row}</Pressable>;
     }
 
     return row;

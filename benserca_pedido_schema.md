@@ -158,7 +158,6 @@ Ejemplo sustitución: pidieron 10 cascos rojos, enviaron 10 cascos azules → `s
       "sku": "0101010040015",
       "description": "Aceite de Motor 1L",
       "quantity": 12,
-      "units_per_bundle": 12,
       "unit": "UN",
       "weight": 1.0,
       "volume": 0.001,
@@ -169,7 +168,7 @@ Ejemplo sustitución: pidieron 10 cascos rojos, enviaron 10 cascos azules → `s
       "sku": "0201010020007",
       "description": "Casco Azul Talla M",
       "quantity": 9,
-      "units_per_bundle": 18,
+      "talla": "M",
       "unit": "UN",
       "weight": 0.35,
       "volume": 0.008,
@@ -180,7 +179,7 @@ Ejemplo sustitución: pidieron 10 cascos rojos, enviaron 10 cascos azules → `s
       "sku": "0201010020008",
       "description": "Casco Verde Talla S",
       "quantity": 12,
-      "units_per_bundle": 18,
+      "talla": "S",
       "unit": "UN",
       "weight": 0.35,
       "volume": 0.008,
@@ -191,7 +190,6 @@ Ejemplo sustitución: pidieron 10 cascos rojos, enviaron 10 cascos azules → `s
       "sku": "0201010020009",
       "description": "Guantes de Trabajo",
       "quantity": 10,
-      "units_per_bundle": 120,
       "unit": "PAR",
       "weight": 0.05,
       "volume": 0.0002,
@@ -305,9 +303,9 @@ Ejemplo sustitución: pidieron 10 cascos rojos, enviaron 10 cascos azules → `s
 | Asignado | Asignado a picker o jefe de almacén |
 | En proceso | Picker armando bultos activamente |
 | Empaquetado | Picker finalizó el picking (botón "Finalizar picking") |
-| Auditado | Auditor aprobó (opcional, antes del embalaje) |
-| Embalado | Picker confirmó embalaje físico (después de auditoría u omisión) |
-| Rechazado | Auditor rechazó, vuelve a Empaquetado |
+| Auditado | Chequeador aprobó (obligatorio, antes del embalaje) |
+| Embalado | Picker confirmó embalaje físico (solo tras la aprobación del chequeador) |
+| Rechazado | Chequeador rechazó, vuelve a Empaquetado |
 | Despachado | Salió en una guía |
 
 ---
@@ -354,6 +352,8 @@ progress_percentage = (bultos_cerrados / bundles_defined) × 100
 ## Notas importantes
 
 - `original_skus` es un snapshot inmutable — nunca se modifica después de creado. **No lleva `bundle_num`.**
+- **`units_per_bundle` fue eliminado** del schema. Ya no existe capacidad de bulto ni fracción; el picker decide cuánto entra en cada bulto (limitado solo por la cantidad pendiente del pedido).
+- **`talla`** (opcional) es la única dimensión de sustitución: un SKU solo puede sustituirse por otro de la **misma talla**; si no tiene `talla`, no es sustituible. *(Formato exacto del campo por confirmar con Profit.)*
 - `final_skus` se va armando durante el picking en local; en Firestore solo incluye bultos cerrados.
 - `packed_quantity` = suma de `bundles[].quantity` del SKU.
 - `difference` por SKU: si `substituted = true` → `difference = original_quantity`; si no → `original_quantity - packed_quantity`.

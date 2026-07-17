@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Articulo } from '../hooks/use-articulos-search';
 import { useSubstituteArticulos } from '../hooks/use-substitute-articulos';
 import type { Bulto, Order, OrderLine } from '../types';
-import { getActiveOrderLines, getMaxAddQtyForOrderLine } from '../utils/bulto-capacity';
+import { getMaxAddQtyForOrderLine } from '../utils/bulto-capacity';
 import { OrderActionButton } from './order-action-button';
 import { QtyStepper } from './qty-stepper';
 
@@ -27,7 +27,6 @@ export interface SubstituteItemEntry {
   name: string;
   qty: number;
   originalSku: string;
-  unitsPerBundle: number;
   substitutionNote?: string;
 }
 
@@ -55,7 +54,6 @@ export function SubstituteItemSheet({
   const [selectedSku, setSelectedSku] = useState<Articulo | null>(null);
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
-  const activeLines = getActiveOrderLines(order);
 
   const { results: relatedArticulos, loading, isGlobalSearch } = useSubstituteArticulos(
     originalLine,
@@ -65,17 +63,10 @@ export function SubstituteItemSheet({
 
   const maxQty = useMemo(() => {
     if (!targetBulto || !originalLine || !selectedSku) return 0;
-    return getMaxAddQtyForOrderLine(
-      order,
-      targetBulto,
-      selectedSku.sku,
-      [],
-      {
-        originalSku: originalLine.sku,
-        unitsPerBundleOverride: selectedSku.unitsPerBundle,
-      },
-    );
-  }, [targetBulto, activeLines, originalLine, selectedSku]);
+    return getMaxAddQtyForOrderLine(order, targetBulto, selectedSku.sku, [], {
+      originalSku: originalLine.sku,
+    });
+  }, [order, targetBulto, originalLine, selectedSku]);
 
   useEffect(() => {
     if (maxQty < 1) {
@@ -113,7 +104,6 @@ export function SubstituteItemSheet({
       name: selectedSku.name,
       qty,
       originalSku: originalLine.sku,
-      unitsPerBundle: selectedSku.unitsPerBundle,
       ...(note.trim().length > 0 ? { substitutionNote: note.trim() } : {}),
     });
     reset();
@@ -123,11 +113,8 @@ export function SubstituteItemSheet({
 
   const taxonomyHint = isGlobalSearch
     ? t('picking.substitute.searchAnyHint')
-    : originalLine?.brand || originalLine?.category
-      ? t('picking.substitute.relatedHint', {
-          brand: originalLine?.brand ?? '—',
-          category: originalLine?.category ?? '—',
-        })
+    : originalLine?.talla
+      ? t('picking.substitute.relatedHint')
       : null;
 
   return (
@@ -154,9 +141,11 @@ export function SubstituteItemSheet({
             <Text style={styles.originalLabel}>{t('picking.substitute.original')}</Text>
             <Text style={styles.originalName}>{originalLine.name}</Text>
             <Text style={styles.originalSku}>{originalLine.sku}</Text>
-            <Text style={styles.originalMeta}>
-              {t('picking.substitute.perBundle', { count: originalLine.unitsPerBundle })}
-            </Text>
+            {originalLine.talla ? (
+              <Text style={styles.originalMeta}>
+                {t('picking.substitute.tallaLabel', { talla: originalLine.talla })}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -190,16 +179,9 @@ export function SubstituteItemSheet({
           renderItem={({ item }) => {
             const maxAdd =
               targetBulto && originalLine
-                ? getMaxAddQtyForOrderLine(
-                    order,
-                    targetBulto,
-                    item.sku,
-                    [],
-                    {
-                      originalSku: originalLine.sku,
-                      unitsPerBundleOverride: item.unitsPerBundle,
-                    },
-                  )
+                ? getMaxAddQtyForOrderLine(order, targetBulto, item.sku, [], {
+                    originalSku: originalLine.sku,
+                  })
                 : 0;
             const canAdd = maxAdd > 0;
 
@@ -219,14 +201,13 @@ export function SubstituteItemSheet({
                   </Text>
                   <Text style={styles.rowSku}>{item.sku}</Text>
                   <Text style={styles.rowTaxonomy}>
-                    {[item.brand, item.category, item.family].filter(Boolean).join(' · ')}
+                    {[item.talla ? t('picking.substitute.tallaLabel', { talla: item.talla }) : null, item.brand]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Text>
                   <Text style={[styles.maxHint, !canAdd && styles.maxHintMuted]}>
                     {canAdd
-                      ? t('picking.substitute.maxQtyHint', {
-                          max: maxAdd,
-                          perBundle: item.unitsPerBundle,
-                        })
+                      ? t('picking.substitute.maxQtyHint', { max: maxAdd })
                       : t('picking.substitute.noSpace')}
                   </Text>
                 </View>
