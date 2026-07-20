@@ -76,7 +76,6 @@ export function AuditComparisonCard({ rows }: AuditComparisonCardProps) {
 const styles = StyleSheet.create({
   legendRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: 16,
     paddingTop: 14,
@@ -85,11 +84,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   legendChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: '#F2F2F7',
   },

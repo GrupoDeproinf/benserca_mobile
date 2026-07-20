@@ -9,4 +9,3 @@ export { BrandMark } from './brand-mark';
 export { LoginBackdrop } from './login-backdrop';
 export { LoginFormCard } from './login-form-card';
 export { LoginHero } from './login-hero';
-export { LoginQuickAccess } from './login-quick-access';

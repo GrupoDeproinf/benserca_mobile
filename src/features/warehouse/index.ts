@@ -6,3 +6,4 @@ export {
   pickerStatusLabelKey,
   PICKER_STATUS_I18N_KEY,
 } from './utils/picker-status';
+export { resolvePickerName } from './utils/resolve-picker-name';

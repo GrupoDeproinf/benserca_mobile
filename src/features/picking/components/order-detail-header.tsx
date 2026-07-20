@@ -186,6 +186,8 @@ interface OrderDetailHeaderProps {
   orderNumber: string;
   client: string;
   status: OrderStatus;
+  /** Resultado de auditoría (`order.auditResult`); afecta la etiqueta cuando status es "audited". */
+  auditResult?: 'approved' | 'rejected' | null;
   meta: { label: string; value: string }[];
   onBack: () => void;
   footer?: React.ReactNode;
@@ -199,6 +201,7 @@ export function OrderDetailHeader({
   orderNumber,
   client,
   status,
+  auditResult,
   meta,
   onBack,
   footer,
@@ -208,6 +211,14 @@ export function OrderDetailHeader({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const badgeStyle = STATUS_STYLE[status];
+  // "audited" solo cubre el resultado aprobado por diseño (un rechazo pasa a
+  // "rejected_review"), pero se apoya en audit.result como fuente de verdad.
+  const statusLabel =
+    status === 'audited' && auditResult === 'rejected'
+      ? t(ORDER_STATUS_I18N_KEY.rejected_review)
+      : status === 'audited'
+        ? t('orderStatus.approved')
+        : t(ORDER_STATUS_I18N_KEY[status]);
   const progress = useSharedValue(animateEnter ? 0 : 1);
 
   const bandTop = insets.top + 2;
@@ -286,7 +297,7 @@ export function OrderDetailHeader({
               {badgeStyle ? (
                 <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
                   <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
-                    {t(ORDER_STATUS_I18N_KEY[status])}
+                    {statusLabel}
                   </Text>
                 </View>
               ) : null}

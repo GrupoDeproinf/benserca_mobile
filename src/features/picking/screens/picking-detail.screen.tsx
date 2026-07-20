@@ -28,7 +28,6 @@ import {
   OrderDetailActions,
   type OrderDetailAction,
 } from '../components/order-detail-action-bar';
-import { OrderActionButton } from '../components/order-action-button';
 import { OrderDetailAlertBanner, OrderDetailHeader } from '../components/order-detail-header';
 import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
@@ -81,7 +80,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   );
   const pickerOrders = useMemo(() => {
     if (!user) return EMPTY_PICKER_ORDERS;
-    return allOrders.filter((o) => o.assignedPickerId === user.uid);
+    return allOrders.filter(
+      (o) => o.assignedPickerId === user.uid || o.teamPickerUids.includes(user.uid),
+    );
   }, [allOrders, user?.uid]);
   const effectiveQueuePosition = useMemo(() => {
     if (!order) return null;
@@ -204,16 +205,34 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     });
   };
 
+  const showNoBultosBlock = () => {
+    setConfirmSheet({
+      title: t('picking.finish.noBultosTitle'),
+      message: t('picking.finish.noBultosBody'),
+      mode: 'info',
+      tone: 'warning',
+      confirmLabel: t('common.understood'),
+      icon: PackageOpen,
+    });
+  };
+
   const doFinishPicking = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     const result = finishPicking(order.id, user.uid);
     if (!result.ok && result.error === 'empty_open_bulto_exists') {
       const emptyOpen = order.bultos.find((b) => b.status === 'open' && b.items.length === 0);
       showEmptyBultoBlock(emptyOpen?.number);
+    } else if (!result.ok && result.error === 'no_bultos') {
+      showNoBultosBlock();
     }
   };
 
   const handleFinishPicking = () => {
+    if (order.bultos.length === 0) {
+      showNoBultosBlock();
+      return;
+    }
+
     const emptyOpen = order.bultos.find((b) => b.status === 'open' && b.items.length === 0);
     if (emptyOpen) {
       showEmptyBultoBlock(emptyOpen.number);
@@ -387,6 +406,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         orderNumber={order.orderNumber}
         client={order.client}
         status={order.status}
+        auditResult={order.auditResult}
         onBack={() => router.back()}
         meta={[
           { label: t('picking.detail.definedBultos'), value: String(order.definedBultos) },
@@ -514,16 +534,6 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
               {order.bultos.length === 0 ? (
                 <OrderDetailCard>
                   <Text style={styles.emptyBultosTitle}>{t('picking.detail.noBultos')}</Text>
-                  {!readOnly && order.status === 'in_progress' ? (
-                    <View style={styles.emptyBultosCta}>
-                      <OrderActionButton
-                        label={t('picking.detail.openBulto')}
-                        onPress={handleOpenBulto}
-                        variant="secondary"
-                        icon={PackagePlus}
-                      />
-                    </View>
-                  ) : null}
                 </OrderDetailCard>
               ) : (
                 order.bultos.map((bulto) => (
@@ -661,5 +671,4 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  emptyBultosCta: { paddingHorizontal: 16, paddingBottom: 16 },
 });

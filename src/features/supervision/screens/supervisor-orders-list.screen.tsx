@@ -113,7 +113,8 @@ export function SupervisorOrdersListScreen({ status }: SupervisorOrdersListScree
               order={item}
               href={`/(app)/supervisor-almacen/order/${item.id}`}
               variant="lead"
-              hasTeam={Boolean(item.teamId)}
+              hasTeam={item.teamPickerUids.length > 0}
+              teamMemberCount={item.teamPickerUids.length}
             />
           </View>
         )}

@@ -41,19 +41,16 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
   const pickers = usePickersStore((s) => s.pickers);
   const releasePicker = useTeamsStore((s) => s.releasePicker);
   const releaseTeam = useTeamsStore((s) => s.releaseTeam);
-  const activeTeam = useTeamsStore((s) =>
-    s.teams.find((team) => team.orderId === orderId && team.status === 'active'),
-  );
 
   const [confirmReleaseTeam, setConfirmReleaseTeam] = useState(false);
   const [releasePickerTarget, setReleasePickerTarget] = useState<ReleasePickerTarget | null>(null);
 
   const teamMembers = useMemo(() => {
-    if (!activeTeam) return [];
-    return activeTeam.pickerIds
+    if (!order) return [];
+    return order.teamPickerUids
       .map((uid) => pickers.find((p) => p.uid === uid))
       .filter(Boolean);
-  }, [activeTeam, pickers]);
+  }, [order, pickers]);
 
   if (!order || !user) {
     return (
@@ -63,7 +60,7 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
     );
   }
 
-  const hasActiveTeam = !!activeTeam;
+  const hasActiveTeam = order.teamPickerUids.length > 0;
 
   const handleStartPicking = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -71,16 +68,15 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
   };
 
   const handleConfirmReleasePicker = () => {
-    if (!activeTeam || !releasePickerTarget) return;
+    if (!releasePickerTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    releasePicker(activeTeam.id, releasePickerTarget.uid);
+    releasePicker(order.id, releasePickerTarget.uid);
     setReleasePickerTarget(null);
   };
 
   const handleConfirmReleaseTeam = () => {
-    if (!activeTeam) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    releaseTeam(activeTeam.id);
+    releaseTeam(order.id);
     setConfirmReleaseTeam(false);
   };
 
@@ -104,6 +100,7 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
         orderNumber={order.orderNumber}
         client={order.client}
         status={order.status}
+        auditResult={order.auditResult}
         onBack={() => router.back()}
         meta={[
           { label: t('picking.detail.definedBultos'), value: String(order.definedBultos) },

@@ -23,14 +23,6 @@ export {
   ProfileNotFoundError,
 } from '@/features/auth/errors/auth.errors';
 
-/** Accesos rápidos de demo; requieren usuarios reales en Firebase Auth + Firestore. */
-export const DEMO_CREDENTIALS = {
-  picker: { email: 'picker@benserca.com', password: '123456' },
-  warehouse_lead: { email: 'jefe@benserca.com', password: '123456' },
-  auditor: { email: 'auditor@benserca.com', password: '123456' },
-  supervisor_almacen: { email: 'manualmacen@gmail.com', password: '123456' },
-} as const;
-
 function mapFirebaseAuthError(error: unknown): never {
   const code = (error as FirebaseAuthTypes.NativeFirebaseAuthError | undefined)?.code;
   if (
@@ -48,11 +40,6 @@ function mapFirebaseAuthError(error: unknown): never {
     throw new NetworkAuthError();
   }
   throw error;
-}
-
-export async function loginWithDemoRole(role: keyof typeof DEMO_CREDENTIALS): Promise<SessionUser> {
-  const creds = DEMO_CREDENTIALS[role];
-  return login({ email: creds.email, password: creds.password });
 }
 
 export async function login(values: LoginFormValues): Promise<SessionUser> {

@@ -80,6 +80,7 @@ export function BultoCard({
                     value={item.qty}
                     min={0}
                     max={getItemMaxQty?.(item.id) ?? 9999}
+                    editable
                     onAtMax={onCapacityExceeded}
                     onChange={(qty) => {
                       if (qty < 1) {

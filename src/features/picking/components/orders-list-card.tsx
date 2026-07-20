@@ -17,6 +17,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/ui/text';
 import type { Order } from '../types';
 import { formatAssignedDate } from '../utils/format-assigned-date';
+import { ORDER_STATUS_I18N_KEY } from '../utils/order-status';
 import { computePickingProgress } from '../utils/order-progress';
 import { formatTimeInQueue } from '../utils/time-in-queue';
 import { CircularProgress } from './circular-progress';
@@ -123,9 +124,11 @@ interface OrdersListCardProps {
 const CARD_BADGE: Partial<Record<Order['status'], { bg: string; text: string; labelKey: string }>> = {
   assigned: { bg: '#FEF3C7', text: '#B45309', labelKey: 'picking.card.statusPending' },
   in_progress: { bg: '#D1FAE5', text: '#059669', labelKey: 'picking.card.statusPicking' },
-  to_pack: { bg: '#E0E7FF', text: '#4338CA', labelKey: 'picking.card.statusPrepared' },
+  to_pack: { bg: '#E0E7FF', text: '#4338CA', labelKey: 'orderStatus.toPack' },
   rejected_review: { bg: '#FEE2E2', text: '#B91C1C', labelKey: 'orderStatus.rejectedReview' },
+  audited: { bg: '#DCFCE7', text: '#15803D', labelKey: 'orderStatus.approved' },
   packed: { bg: '#DCFCE7', text: '#15803D', labelKey: 'orderStatus.packed' },
+  dispatched: { bg: '#DBEAFE', text: '#1D4ED8', labelKey: 'orderStatus.dispatched' },
 };
 
 function PickerProcessBlock({ order, t }: { order: Order; t: TFunction }) {
@@ -139,7 +142,9 @@ function PickerProcessBlock({ order, t }: { order: Order; t: TFunction }) {
             ? t('picking.card.pickingDone')
             : order.status === 'rejected_review'
               ? t('picking.card.needsReview')
-              : t('picking.card.notStarted')
+              : order.status === 'assigned'
+                ? t('picking.card.notStarted')
+                : t(ORDER_STATUS_I18N_KEY[order.status])
         }
       />
     );
@@ -246,7 +251,13 @@ export function OrdersListCard({
 }: OrdersListCardProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const badge = CARD_BADGE[order.status];
+  // El estatus "audited" solo cubre el resultado aprobado por diseño (un rechazo
+  // pasa a "rejected_review"), pero se apoya en audit.result como fuente de
+  // verdad en vez de asumirlo por el status.
+  const badge =
+    order.status === 'audited' && order.auditResult === 'rejected'
+      ? CARD_BADGE.rejected_review
+      : CARD_BADGE[order.status];
 
   return (
     <Pressable

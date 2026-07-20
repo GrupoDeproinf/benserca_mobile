@@ -10,10 +10,18 @@ import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-s
 import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import type { PickerEstado, PickerStatus } from '@/features/warehouse/types';
+import { derivePickerActivity } from '@/features/warehouse/utils/derive-picker-activity';
+import type { Order } from '@/features/picking/types';
 import { EmptyState } from '@/shared/components/ui/empty-state';
 import { Text } from '@/shared/components/ui/text';
 
 const STATUS_ORDER: PickerStatus[] = ['en_proceso', 'reservado', 'por_embalar', 'disponible'];
+
+/** Picker con estado y pedido activo derivados de sus pedidos reales. */
+interface PickerRow {
+  picker: PickerEstado;
+  activeOrder: Order | null;
+}
 
 function matchesSearch(picker: PickerEstado, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -29,12 +37,22 @@ export function LeadPickersScreen() {
   const pickers = usePickersStore((s) => s.pickers);
   const orders = useOrdersStore((s) => s.orders);
 
-  const sorted = useMemo(
+  const sorted = useMemo<PickerRow[]>(
     () =>
-      [...pickers]
+      pickers
         .filter((p) => matchesSearch(p, search))
-        .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)),
-    [pickers, search],
+        .map((p) => {
+          const { status, activeOrder } = derivePickerActivity(p.uid, orders, p.isAvailable);
+          return {
+            picker: { ...p, status, activeOrderId: activeOrder?.id ?? null },
+            activeOrder,
+          };
+        })
+        .sort(
+          (a, b) =>
+            STATUS_ORDER.indexOf(a.picker.status) - STATUS_ORDER.indexOf(b.picker.status),
+        ),
+    [pickers, orders, search],
   );
 
   const listHeader = (
@@ -72,27 +90,22 @@ export function LeadPickersScreen() {
     <View style={{ flex: 1, backgroundColor: '#F2F2F7' }}>
       <FlatList
         data={sorted}
-        keyExtractor={(p) => p.uid}
+        keyExtractor={(row) => row.picker.uid}
         ListHeaderComponent={listHeader}
         ItemSeparatorComponent={() => <View style={{ height: ORDERS_LIST_CARD_GAP }} />}
         contentContainerStyle={{
           paddingBottom: tabBarHeight + 20,
           flexGrow: 1,
         }}
-        renderItem={({ item }) => {
-          const order = item.activeOrderId
-            ? orders.find((o) => o.id === item.activeOrderId)
-            : undefined;
-          return (
-            <View style={{ paddingHorizontal: 16 }}>
-              <PickerStatusCard
-                picker={item}
-                activeOrderNumber={order?.orderNumber}
-                activeOrderClient={order?.client}
-              />
-            </View>
-          );
-        }}
+        renderItem={({ item }) => (
+          <View style={{ paddingHorizontal: 16 }}>
+            <PickerStatusCard
+              picker={item.picker}
+              activeOrderNumber={item.activeOrder?.orderNumber}
+              activeOrderClient={item.activeOrder?.client}
+            />
+          </View>
+        )}
         ListEmptyComponent={
           <EmptyState
             title={t('supervision.screen.emptyTitle')}

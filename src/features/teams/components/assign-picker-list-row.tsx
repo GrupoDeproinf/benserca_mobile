@@ -2,8 +2,8 @@ import * as Haptics from 'expo-haptics';
 import { Check } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useElapsedSince } from '@/features/supervision/hooks/use-elapsed-since';
-import type { PickerEstado } from '@/features/warehouse/types';
+import { pickerStatusLabelKey } from '@/features/warehouse/utils/picker-status';
+import type { PickerEstado, PickerStatus } from '@/features/warehouse/types';
 import { Text } from '@/shared/components/ui/text';
 
 interface AssignPickerListRowProps {
@@ -12,16 +12,17 @@ interface AssignPickerListRowProps {
   onPress: () => void;
 }
 
-const DISPONIBLE = {
-  accent: '#16A34A',
-  bg: '#F0FDF4',
-  label: '#166534',
+const STATUS_PALETTE: Record<PickerStatus, { accent: string; bg: string; label: string }> = {
+  disponible: { accent: '#16A34A', bg: '#F0FDF4', label: '#166534' },
+  en_proceso: { accent: '#D97706', bg: '#FFFBEB', label: '#92400E' },
+  reservado: { accent: '#7C3AED', bg: '#F5F3FF', label: '#4C1D95' },
+  por_embalar: { accent: '#2563EB', bg: '#EFF6FF', label: '#1E40AF' },
 };
 
 /** Fila de picker — mismo lenguaje que `PickerStatusCard`, con selección sutil. */
 export function AssignPickerListRow({ picker, selected, onPress }: AssignPickerListRowProps) {
   const { t } = useTranslation();
-  const elapsed = useElapsedSince(picker.updatedAt);
+  const palette = STATUS_PALETTE[picker.status];
 
   return (
     <Pressable
@@ -35,7 +36,7 @@ export function AssignPickerListRow({ picker, selected, onPress }: AssignPickerL
       <View
         style={[
           styles.card,
-          { borderLeftColor: selected ? '#111827' : DISPONIBLE.accent },
+          { borderLeftColor: selected ? '#111827' : palette.accent },
           selected && styles.cardSelected,
         ]}
       >
@@ -45,10 +46,10 @@ export function AssignPickerListRow({ picker, selected, onPress }: AssignPickerL
               <View
                 style={[
                   styles.avatar,
-                  { backgroundColor: DISPONIBLE.bg, borderColor: DISPONIBLE.accent },
+                  { backgroundColor: palette.bg, borderColor: palette.accent },
                 ]}
               >
-                <Text style={[styles.avatarText, { color: DISPONIBLE.label }]}>
+                <Text style={[styles.avatarText, { color: palette.label }]}>
                   {picker.nombre.charAt(0).toUpperCase()}
                 </Text>
               </View>
@@ -58,41 +59,25 @@ export function AssignPickerListRow({ picker, selected, onPress }: AssignPickerL
                 </View>
               ) : null}
             </View>
-            <View style={styles.identityText}>
-              <Text style={styles.name} numberOfLines={1}>
-                {picker.nombre}
-              </Text>
-              <Text style={styles.noOrder}>{t('supervision.card.noActiveOrder')}</Text>
-            </View>
+            <Text style={styles.name} numberOfLines={1}>
+              {picker.nombre}
+            </Text>
           </View>
 
           <View
             style={[
               styles.badge,
-              selected
-                ? styles.badgeSelected
-                : { backgroundColor: DISPONIBLE.bg },
+              selected ? styles.badgeSelected : { backgroundColor: palette.bg },
             ]}
           >
             <Text
               style={[
                 styles.badgeText,
-                { color: selected ? '#FFFFFF' : DISPONIBLE.label },
+                { color: selected ? '#FFFFFF' : palette.label },
               ]}
             >
-              {selected ? t('teams.assign.selectedBadge') : t('pickerStatus.disponible')}
+              {selected ? t('teams.assign.selectedBadge') : t(pickerStatusLabelKey(picker.status))}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <View>
-            <Text style={styles.metaLabel}>{t('supervision.card.timeInStatus')}</Text>
-            <Text style={styles.metaValue}>{elapsed}</Text>
-          </View>
-          <View style={styles.footerRight}>
-            <Text style={styles.metaLabel}>{t('supervision.card.bultosToday')}</Text>
-            <Text style={styles.metaValue}>{picker.bultosToday}</Text>
           </View>
         </View>
       </View>
@@ -122,7 +107,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
@@ -162,20 +147,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  identityText: {
+  name: {
     flex: 1,
     minWidth: 0,
-  },
-  name: {
     fontSize: 15,
     fontWeight: '800',
     color: '#111827',
     lineHeight: 20,
-  },
-  noOrder: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 2,
   },
   badge: {
     paddingHorizontal: 10,
@@ -191,29 +169,5 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth * 2,
-    borderTopColor: '#F3F4F6',
-  },
-  footerRight: {
-    alignItems: 'flex-end',
-  },
-  metaLabel: {
-    fontSize: 10,
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    fontWeight: '500',
-  },
-  metaValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 2,
   },
 });

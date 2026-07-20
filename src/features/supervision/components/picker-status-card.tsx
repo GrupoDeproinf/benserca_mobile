@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 import { pickerStatusLabelKey } from '@/features/warehouse/utils/picker-status';
 import type { PickerEstado, PickerStatus } from '@/features/warehouse/types';
 import { Text } from '@/shared/components/ui/text';
-import { useElapsedSince } from '../hooks/use-elapsed-since';
 
 interface PickerStatusCardProps {
   picker: PickerEstado;
@@ -24,7 +23,6 @@ export function PickerStatusCard({
   activeOrderClient,
 }: PickerStatusCardProps) {
   const { t } = useTranslation();
-  const elapsed = useElapsedSince(picker.updatedAt);
   const palette = STATUS_PALETTE[picker.status];
 
   return (
@@ -51,6 +49,8 @@ export function PickerStatusCard({
                   </Text>
                 ) : null}
               </>
+            ) : picker.status !== 'disponible' ? (
+              <Text style={styles.noOrder}>{t('supervision.card.busyOrder')}</Text>
             ) : (
               <Text style={styles.noOrder}>{t('supervision.card.noActiveOrder')}</Text>
             )}
@@ -61,17 +61,6 @@ export function PickerStatusCard({
           <Text style={[styles.badgeText, { color: palette.label }]}>
             {t(pickerStatusLabelKey(picker.status))}
           </Text>
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <View>
-          <Text style={styles.metaLabel}>{t('supervision.card.timeInStatus')}</Text>
-          <Text style={styles.metaValue}>{elapsed}</Text>
-        </View>
-        <View style={styles.footerRight}>
-          <Text style={styles.metaLabel}>{t('supervision.card.bultosToday')}</Text>
-          <Text style={styles.metaValue}>{picker.bultosToday}</Text>
         </View>
       </View>
     </View>
@@ -153,29 +142,5 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth * 2,
-    borderTopColor: '#F3F4F6',
-  },
-  footerRight: {
-    alignItems: 'flex-end',
-  },
-  metaLabel: {
-    fontSize: 10,
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    fontWeight: '500',
-  },
-  metaValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 2,
   },
 });

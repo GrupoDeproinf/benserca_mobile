@@ -18,6 +18,27 @@ function timelineEntry(status: string, user: SessionUser, note?: string) {
   };
 }
 
+/**
+ * Refleja en `u_pickers/{uid}` si el picker está ocupado con un pedido activo.
+ * No crítico: si falla (ej. el doc del picker no existe con ese uid), no debe
+ * bloquear la transición del pedido, que es la fuente de verdad real.
+ */
+async function updatePickerAvailability(
+  pickerUid: string,
+  isAvailable: boolean,
+  currentOrderId: string | null,
+): Promise<void> {
+  try {
+    await firestore().collection('u_pickers').doc(pickerUid).update({
+      is_available: isAvailable,
+      current_order_id: currentOrderId,
+      last_activity_at: now(),
+    });
+  } catch {
+    // no-op
+  }
+}
+
 function finalSkusToFirestore(finalSkus: FinalSku[]) {
   return finalSkus.map((s) => ({
     original_sku: s.originalSku,
@@ -41,6 +62,7 @@ export async function firestoreStartPicking(orderId: string, user: SessionUser):
       updated_at: now(),
       timeline: firestore.FieldValue.arrayUnion(timelineEntry('En proceso', user)),
     });
+  await updatePickerAvailability(user.uid, false, orderId);
 }
 
 export async function firestorePartialSave(
@@ -78,6 +100,7 @@ export async function firestoreFinishPicking(
       final_skus: finalSkusToFirestore(order.finalSkus),
       timeline: firestore.FieldValue.arrayUnion(timelineEntry('Empaquetado', user)),
     });
+  await updatePickerAvailability(user.uid, true, null);
 }
 
 export async function firestoreMarkWrapped(orderId: string, user: SessionUser): Promise<void> {
@@ -89,6 +112,56 @@ export async function firestoreMarkWrapped(orderId: string, user: SessionUser): 
       wrapped_at: now(),
       updated_at: now(),
       timeline: firestore.FieldValue.arrayUnion(timelineEntry('Embalado', user)),
+    });
+}
+
+export interface TeamPickerRef {
+  uid: string;
+  name: string;
+}
+
+/**
+ * Arma el equipo de pickers de un pedido grande. Escribe `team.pickers`
+ * (para mostrar en UI) y `team.picker_uids` (array plano de uids, usado por
+ * el listener del picker vía `array-contains` ya que Firestore no permite
+ * consultar por un campo dentro de objetos en un array).
+ */
+export async function firestoreAssignTeam(
+  orderId: string,
+  chief: SessionUser,
+  pickers: TeamPickerRef[],
+): Promise<void> {
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      'team.chief_uid': chief.uid,
+      'team.chief_name': chief.name,
+      'team.pickers': pickers.map((p) => ({ uid: p.uid, name: p.name, type: 'picker' })),
+      'team.picker_uids': pickers.map((p) => p.uid),
+      updated_at: now(),
+      timeline: firestore.FieldValue.arrayUnion(
+        timelineEntry(
+          'Asignado',
+          chief,
+          `Equipo armado: ${pickers.map((p) => p.name).join(', ')}`,
+        ),
+      ),
+    });
+}
+
+/** Ajusta la lista de pickers del equipo (liberar uno o todo el equipo). */
+export async function firestoreUpdateTeamPickers(
+  orderId: string,
+  pickers: TeamPickerRef[],
+): Promise<void> {
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      'team.pickers': pickers.map((p) => ({ uid: p.uid, name: p.name, type: 'picker' })),
+      'team.picker_uids': pickers.map((p) => p.uid),
+      updated_at: now(),
     });
 }
 
@@ -106,6 +179,7 @@ export async function firestoreReopenForRevision(
         timelineEntry('En proceso', user, 'Reabierto para corrección tras rechazo de auditoría'),
       ),
     });
+  await updatePickerAvailability(user.uid, false, orderId);
 }
 
 export async function firestoreApproveAudit(
@@ -137,7 +211,7 @@ export async function firestoreRejectAudit(
     .collection(ORDERS)
     .doc(orderId)
     .update({
-      status: 'Empaquetado',
+      status: 'Rechazado',
       updated_at: now(),
       'audit.audited_by_uid': user.uid,
       'audit.audited_by_name': user.name,
@@ -145,7 +219,7 @@ export async function firestoreRejectAudit(
       'audit.observation': observation,
       'audit.audited_at': now(),
       timeline: firestore.FieldValue.arrayUnion(
-        timelineEntry('Empaquetado', user, `Rechazado por auditoría: ${observation}`),
+        timelineEntry('Rechazado', user, `Rechazado por auditoría: ${observation}`),
       ),
     });
 }

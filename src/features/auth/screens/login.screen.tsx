@@ -14,7 +14,6 @@ import {
   type ForgotPasswordFormValues,
   forgotPasswordSchema,
 } from '@/features/auth/schemas/forgot-password.schema';
-import { LoginQuickAccess } from '@/features/auth/components/login-quick-access';
 import {
   AuthNotEnabledError,
   FirestorePermissionError,
@@ -23,10 +22,8 @@ import {
   NetworkAuthError,
   ProfileNotFoundError,
   login,
-  loginWithDemoRole,
   requestPasswordReset,
 } from '@/features/auth/services/auth.service';
-import type { UserRole } from '@/shared/types';
 import { loginTheme } from '@/features/auth/constants/login-theme';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { Text } from '@/shared/components/ui/text';
@@ -78,19 +75,6 @@ export function LoginScreen() {
   };
 
   const onLoginSubmit = loginForm.handleSubmit(submitLogin);
-
-  const submitDemoRole = async (role: UserRole) => {
-    setSubmitting(true);
-    setAuthError(null);
-    try {
-      const user = await loginWithDemoRole(role);
-      setUser(user);
-    } catch (err) {
-      setAuthError(resolveAuthErrorMessage(err, t));
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const onForgotSubmit = forgotForm.handleSubmit(async (values) => {
     setSubmitting(true);
@@ -238,8 +222,6 @@ export function LoginScreen() {
               disabled={isSubmitting}
               loading={isSubmitting}
             />
-
-            <LoginQuickAccess onSelectRole={submitDemoRole} disabled={isSubmitting} />
           </Animated.View>
         )}
 

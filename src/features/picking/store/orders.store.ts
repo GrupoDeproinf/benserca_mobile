@@ -131,8 +131,8 @@ interface OrdersState {
   finishPicking: (orderId: string, pickerId: string) => FinishPickingResult;
   markWrapped: (orderId: string) => void;
   reopenForRevision: (orderId: string, pickerId: string) => void;
-  assignTeam: (orderId: string, teamId: string) => void;
-  clearTeam: (orderId: string) => void;
+  /** Actualización optimista de `team.picker_uids` (el listener de Firestore la confirma). */
+  setTeamPickers: (orderId: string, pickerUids: string[]) => void;
   approveAudit: (orderId: string) => void;
   rejectAudit: (orderId: string, auditorId: string, auditorName: string, observation: string) => void;
   openBulto: (orderId: string) => OpenBultoResult;
@@ -279,15 +279,9 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     }
   },
 
-  assignTeam: (orderId, teamId) => {
+  setTeamPickers: (orderId, pickerUids) => {
     set((s) => ({
-      orders: patchOrder(s.orders, orderId, { teamId, status: 'in_progress' }),
-    }));
-  },
-
-  clearTeam: (orderId) => {
-    set((s) => ({
-      orders: patchOrder(s.orders, orderId, { teamId: null, status: 'assigned' }),
+      orders: patchOrder(s.orders, orderId, { teamPickerUids: pickerUids }),
     }));
   },
 

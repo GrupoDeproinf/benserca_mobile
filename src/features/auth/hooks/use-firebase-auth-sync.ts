@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { auth } from '@/services/firebase';
+import { firestore, auth } from '@/services/firebase';
 import { safeFirebaseSignOut } from '@/services/firebase/auth-utils';
 import { fetchSessionUser } from '@/services/firebase/user-profile';
 import {
@@ -27,6 +27,16 @@ export function useFirebaseAuthSync() {
 
         const sessionUser = await fetchSessionUser(firebaseUser);
         setUser(sessionUser);
+
+        if (sessionUser.role === 'picker') {
+          firestore()
+            .collection('u_pickers')
+            .doc(sessionUser.uid)
+            .update({ last_activity_at: new Date().toISOString() })
+            .catch(() => {
+              // No crítico: si falla (ej. doc no existe con ese uid), no bloquea el login.
+            });
+        }
       } catch (error) {
         if (__DEV__) {
           console.warn('[auth] Firebase session sync failed:', error);

@@ -164,6 +164,7 @@ export function AddItemSheet({
           onChange={(v) => setSkuQty(item.sku, v)}
           min={0}
           max={maxAdd}
+          editable
           onAtMax={() => showToast(maxReachedTooltip)}
         />
       </View>

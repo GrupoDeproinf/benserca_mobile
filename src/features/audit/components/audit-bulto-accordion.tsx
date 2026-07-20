@@ -2,6 +2,7 @@ import { CheckCircle2, ChevronDown, ChevronUp, XCircle } from 'lucide-react-nati
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { OrderActionButton } from '@/features/picking/components/order-action-button';
 import type { Bulto } from '@/features/picking/types';
 
 export type BultoAuditStatus = 'approved' | 'rejected' | null;
@@ -25,14 +26,16 @@ export function AuditBultoAccordion({
   const [expanded, setExpanded] = useState(false);
   const isClosed = bulto.status === 'closed';
 
-  const cardBorderStyle =
-    reviewStatus === 'approved'
-      ? styles.cardApproved
-      : reviewStatus === 'rejected'
-        ? styles.cardRejected
-        : isClosed
-          ? styles.cardClosed
-          : styles.cardOpen;
+  const isApproved = reviewStatus === 'approved';
+  const isRejected = reviewStatus === 'rejected';
+
+  const cardBorderStyle = isApproved
+    ? styles.cardApproved
+    : isRejected
+      ? styles.cardRejected
+      : isClosed
+        ? styles.cardClosed
+        : styles.cardOpen;
 
   return (
     <View style={[styles.card, cardBorderStyle]}>
@@ -46,18 +49,16 @@ export function AuditBultoAccordion({
             <View
               style={[
                 styles.reviewPill,
-                reviewStatus === 'approved' ? styles.reviewPillApproved : styles.reviewPillRejected,
+                isApproved ? styles.reviewPillApproved : styles.reviewPillRejected,
               ]}
             >
               <Text
                 style={[
                   styles.reviewPillText,
-                  reviewStatus === 'approved' ? styles.reviewTextApproved : styles.reviewTextRejected,
+                  isApproved ? styles.reviewTextApproved : styles.reviewTextRejected,
                 ]}
               >
-                {reviewStatus === 'approved'
-                  ? t('audit.bulto.reviewApproved')
-                  : t('audit.bulto.reviewRejected')}
+                {isApproved ? t('audit.bulto.reviewApproved') : t('audit.bulto.reviewRejected')}
               </Text>
             </View>
           ) : (
@@ -99,53 +100,30 @@ export function AuditBultoAccordion({
 
           {!readOnly ? (
             <View style={styles.actions}>
-              <Pressable
-                onPress={onReject}
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  styles.actionReject,
-                  reviewStatus === 'rejected' && styles.actionRejectActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <XCircle
-                  size={16}
-                  color={reviewStatus === 'rejected' ? '#FFFFFF' : '#DC2626'}
-                  strokeWidth={2.2}
+              <View style={styles.actionSlot}>
+                <OrderActionButton
+                  label={t('audit.bulto.reject')}
+                  onPress={() => {
+                    if (!isRejected) onReject?.();
+                  }}
+                  variant="secondary"
+                  size="compact"
+                  icon={XCircle}
+                  disabled={isRejected}
                 />
-                <Text
-                  style={[
-                    styles.actionLabel,
-                    reviewStatus === 'rejected' ? styles.actionLabelActive : styles.actionLabelReject,
-                  ]}
-                >
-                  {t('audit.bulto.reject')}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={onApprove}
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  styles.actionApprove,
-                  reviewStatus === 'approved' && styles.actionApproveActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <CheckCircle2
-                  size={16}
-                  color={reviewStatus === 'approved' ? '#FFFFFF' : '#16A34A'}
-                  strokeWidth={2.2}
+              </View>
+              <View style={styles.actionSlot}>
+                <OrderActionButton
+                  label={t('audit.bulto.approve')}
+                  onPress={() => {
+                    if (!isApproved) onApprove?.();
+                  }}
+                  variant="primary"
+                  size="compact"
+                  icon={CheckCircle2}
+                  disabled={isApproved}
                 />
-                <Text
-                  style={[
-                    styles.actionLabel,
-                    reviewStatus === 'approved' ? styles.actionLabelActive : styles.actionLabelApprove,
-                  ]}
-                >
-                  {t('audit.bulto.approve')}
-                </Text>
-              </Pressable>
+              </View>
             </View>
           ) : null}
         </View>
@@ -290,52 +268,13 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-    paddingTop: 14,
+    gap: 12,
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth * 2,
     borderTopColor: '#F3F4F6',
   },
-  actionBtn: {
+  actionSlot: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  actionReject: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FECACA',
-  },
-  actionRejectActive: {
-    backgroundColor: '#DC2626',
-    borderColor: '#DC2626',
-  },
-  actionApprove: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#BBF7D0',
-  },
-  actionApproveActive: {
-    backgroundColor: '#16A34A',
-    borderColor: '#16A34A',
-  },
-  actionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  actionLabelReject: {
-    color: '#DC2626',
-  },
-  actionLabelApprove: {
-    color: '#16A34A',
-  },
-  actionLabelActive: {
-    color: '#FFFFFF',
-  },
-  pressed: {
-    opacity: 0.88,
   },
 });

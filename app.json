@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "benserca_Mobile",
+    "name": "benserca",
     "slug": "benserca_mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icons/icon.png",
     "scheme": "benserca_mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -16,15 +16,14 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icons/icon-adaptive-foreground.png",
+        "monochromeImage": "./assets/icons/icon-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/icons/icon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -32,7 +31,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/icons/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#F5F7FA",

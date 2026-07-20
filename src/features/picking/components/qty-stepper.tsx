@@ -198,6 +198,10 @@ const styles = StyleSheet.create({
     color: '#111827',
     paddingVertical: 4,
     paddingHorizontal: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
   },
   valueInputMedium: {
     minWidth: 60,

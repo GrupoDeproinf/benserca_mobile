@@ -32,7 +32,10 @@
     "packed": "Embalado",
     "rejectedReview": "Rechazado - Revisión",
     "audited": "Auditado",
-    "dispatched": "Despachado"
+    "approved": "Aprobado",
+    "dispatched": "Despachado",
+    "annulled": "Anulado",
+    "recovered": "Recuperado"
   },
   "pickerStatus": {
     "disponible": "Disponible",
@@ -167,6 +170,8 @@
       "emptyBlockTitle": "Bulto vacío abierto",
       "emptyBlockBody": "El bulto {{number}} está abierto y sin artículos. Agrégale ítems o elimínalo antes de finalizar.",
       "emptyBlockBodyGeneric": "Hay un bulto abierto sin artículos. Agrégale ítems o elimínalo antes de finalizar.",
+      "noBultosTitle": "Sin bultos armados",
+      "noBultosBody": "No puedes finalizar el picking sin haber armado al menos un bulto.",
       "missingTitle": "Finalizar con faltantes",
       "missingBody": "Hay cantidades sin asignar:",
       "missingLine": "{{qty}} uds. de {{name}}",
@@ -381,10 +386,10 @@
       "availableSection": "{{count}} pickers disponibles",
       "searchPlaceholder": "Buscar picker...",
       "selectedCount": "{{count}} seleccionado(s)",
-      "availableLabel": "disponibles",
+      "availableLabel": "pickers",
       "confirmBtn": "Confirmar equipo ({{count}})",
-      "emptyTitle": "No hay pickers disponibles",
-      "emptySubtitle": "Todos los pickers están ocupados en este momento."
+      "emptyTitle": "No hay pickers",
+      "emptySubtitle": "No hay pickers registrados."
     },
     "bultosToday": "bulto(s) hoy",
     "create": {
@@ -411,6 +416,7 @@
       "title": "Cola de revisión",
       "count": "{{count}} pedido(s) para revisar",
       "ordersCount": "pedidos",
+      "refresh": "Actualizar lista",
       "searchPlaceholder": "Buscar pedido o cliente...",
       "emptyTitle": "Sin pedidos para chequear",
       "emptySubtitle": "Los pedidos empaquetados aparecerán aquí."
@@ -432,9 +438,11 @@
       "skus": "SKUs",
       "extraBultosFlag": "Bultos adicionales",
       "packedAt": "Empaquetado",
-      "comparisonTitle": "Comparación Profit vs armado",
+      "bundleVariationTitle": "Variación en cantidad de bultos",
+      "bundleVariationBody": "Se armaron {{created}} bultos, pero el pedido define {{defined}}. Revisa antes de aprobar.",
+      "comparisonTitle": "Comparación pedido vs armado",
       "comparisonAlert": "Hay diferencias entre lo pedido y lo armado. Revisa antes de aprobar.",
-      "comparisonOk": "Las cantidades coinciden con el pedido Profit.",
+      "comparisonOk": "Las cantidades coinciden con el pedido original.",
       "legendOk": "Correcto",
       "legendOver": "Exceso",
       "legendUnder": "Faltante",
@@ -448,7 +456,7 @@
       "reviewAllHint": "Aprueba o rechaza cada bulto antes de finalizar.",
       "allApprovedHint": "Todos los bultos aprobados. Puedes aprobar el pedido.",
       "hasRejectedHint": "Hay bultos rechazados. Finaliza con rechazo y escribe el motivo.",
-      "comparisonNote": "Verde = cantidad correcta · Ámbar = exceso · Rojo = faltante (vs. pedido Profit)"
+      "comparisonNote": "Verde = cantidad correcta · Ámbar = exceso · Rojo = faltante (vs. pedido original)"
     },
     "bulto": {
       "title": "Bulto {{number}}",
@@ -498,7 +506,10 @@
     "card": {
       "timeInStatus": "En este estado",
       "bultosToday": "Bultos hoy",
-      "noActiveOrder": "Sin pedido activo"
+      "noActiveOrder": "Sin pedido activo",
+      "busyOrder": "Tiene un pedido en proceso",
+      "availableFlag": "Libre",
+      "busyFlag": "Ocupado"
     }
   },
   "profile": {

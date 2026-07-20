@@ -15,6 +15,14 @@ function mapPickerStatus(raw: string | undefined): PickerStatus {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function hasPickerRole(data: Record<string, any>): boolean {
+  const roles = data.roles;
+  // Documentos legacy sin `roles` son pickers puros (colección históricamente exclusiva).
+  if (!Array.isArray(roles) || roles.length === 0) return true;
+  return roles.some((role) => String(role).trim().toLowerCase() === 'picker');
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
 function docToPicker(id: string, data: Record<string, any>): PickerEstado {
   const nombre =
     (data.full_name as string | undefined) ??
@@ -30,6 +38,7 @@ function docToPicker(id: string, data: Record<string, any>): PickerEstado {
     teamId: (data.team_id as string | null) ?? null,
     bultosToday: (data.bultos_today as number | undefined) ?? 0,
     updatedAt: (data.updated_at as string | undefined) ?? new Date().toISOString(),
+    isAvailable: (data.is_available as boolean | undefined) ?? true,
   };
 }
 
@@ -46,9 +55,9 @@ export function useFirestorePickers() {
       .where('is_active', '==', true)
       .onSnapshot(
         (snapshot) => {
-          const pickers = snapshot.docs.map((doc) =>
-            docToPicker(doc.id, doc.data()),
-          );
+          const pickers = snapshot.docs
+            .filter((doc) => hasPickerRole(doc.data()))
+            .map((doc) => docToPicker(doc.id, doc.data()));
           setPickers(pickers);
         },
         (err) => {

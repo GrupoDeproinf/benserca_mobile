@@ -13,6 +13,7 @@ export const MOCK_PICKERS: PickerEstado[] = [
     teamId: null,
     bultosToday: 3,
     updatedAt: minutesAgo(5),
+    isAvailable: true,
   },
   {
     uid: 'picker-maria',
@@ -22,6 +23,7 @@ export const MOCK_PICKERS: PickerEstado[] = [
     teamId: null,
     bultosToday: 5,
     updatedAt: minutesAgo(12),
+    isAvailable: false,
   },
   {
     uid: 'picker-luis',
@@ -31,6 +33,7 @@ export const MOCK_PICKERS: PickerEstado[] = [
     teamId: 'team-pending-1',
     bultosToday: 2,
     updatedAt: minutesAgo(30),
+    isAvailable: true,
   },
   {
     uid: 'picker-sofia',
@@ -40,6 +43,7 @@ export const MOCK_PICKERS: PickerEstado[] = [
     teamId: null,
     bultosToday: 4,
     updatedAt: minutesAgo(8),
+    isAvailable: true,
   },
   {
     uid: 'picker-diego',
@@ -49,6 +53,7 @@ export const MOCK_PICKERS: PickerEstado[] = [
     teamId: null,
     bultosToday: 1,
     updatedAt: minutesAgo(45),
+    isAvailable: true,
   },
   {
     uid: 'picker-elena',
@@ -58,5 +63,6 @@ export const MOCK_PICKERS: PickerEstado[] = [
     teamId: null,
     bultosToday: 0,
     updatedAt: minutesAgo(90),
+    isAvailable: true,
   },
 ];

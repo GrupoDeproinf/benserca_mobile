@@ -14,6 +14,7 @@ import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-s
 import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
 import { EmptyState } from '@/shared/components/ui/empty-state';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { derivePickerActivity } from '@/features/warehouse/utils/derive-picker-activity';
 import { AssignPickerListRow } from '../components/assign-picker-list-row';
 import { AssignPickersHeader } from '../components/assign-pickers-header';
 import { AssignTeamDraftPanel } from '../components/assign-team-draft-panel';
@@ -39,6 +40,7 @@ export function LeadAssignPickersScreen({ orderId }: LeadAssignPickersScreenProp
 
   const order = useOrdersStore((s) => s.getOrderById(orderId));
   const allPickers = usePickersStore((s) => s.pickers);
+  const orders = useOrdersStore((s) => s.orders);
   const createTeam = useTeamsStore((s) => s.createTeam);
 
   const [search, setSearch] = useState('');
@@ -48,9 +50,12 @@ export function LeadAssignPickersScreen({ orderId }: LeadAssignPickersScreenProp
   const availablePickers = useMemo(
     () =>
       allPickers
-        .filter((p) => p.status === 'disponible')
+        .map((p) => ({
+          ...p,
+          status: derivePickerActivity(p.uid, orders, p.isAvailable).status,
+        }))
         .filter((p) => matchesSearch(p.nombre, search)),
-    [allPickers, search],
+    [allPickers, orders, search],
   );
 
   const selectedPickers = useMemo(

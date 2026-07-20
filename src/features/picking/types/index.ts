@@ -7,7 +7,9 @@ export type OrderStatus =
   | 'packed'
   | 'rejected_review'
   | 'audited'
-  | 'dispatched';
+  | 'dispatched'
+  | 'annulled'
+  | 'recovered';
 
 /** SKU del pedido tal como llega de Profit (referencia, lo que se DEBE pickear). */
 export interface OrderLine {
@@ -95,7 +97,8 @@ export interface Order {
 
   assignedPickerId: string | null;
   assignedLeadId: string | null;
-  teamId: string | null;
+  /** `team.picker_uids` en Firestore: pickers del equipo armado para este pedido. */
+  teamPickerUids: string[];
 
   lines: OrderLine[];
   bultos: Bulto[];
@@ -104,6 +107,8 @@ export interface Order {
   finalSkus: FinalSku[];
 
   auditObservations: AuditObservation[];
+  /** Resultado de la última auditoría (`audit.result` en Firestore). */
+  auditResult: 'approved' | 'rejected' | null;
 
   createdAt: string;
   assignedAt: string | null;
@@ -136,4 +141,5 @@ export type PickerActionError =
   | 'not_queue_head'
   | 'already_active_order'
   | 'empty_open_bulto_exists'
-  | 'cannot_close_empty_bulto';
+  | 'cannot_close_empty_bulto'
+  | 'no_bultos';

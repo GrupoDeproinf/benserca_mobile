@@ -81,6 +81,8 @@ export function countOrdersByStatus(orders: Order[]): Record<OrderStatus, number
     rejected_review: 0,
     audited: 0,
     dispatched: 0,
+    annulled: 0,
+    recovered: 0,
   } satisfies Record<OrderStatus, number>;
 
   for (const order of orders) {

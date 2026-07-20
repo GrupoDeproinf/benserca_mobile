@@ -3,6 +3,7 @@ import { Box, Calendar, ChevronRight, ClipboardList, User } from 'lucide-react-n
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { statusLabelKey } from '@/features/picking/utils/order-status';
 import type { Order } from '@/features/picking/types';
 
 interface AuditOrderCardProps {
@@ -109,7 +110,7 @@ export function AuditOrderCard({ order, pickerName }: AuditOrderCardProps) {
 
           <View style={styles.headerRight}>
             <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>{t('orderStatus.packed')}</Text>
+              <Text style={styles.statusBadgeText}>{t(statusLabelKey(order.status))}</Text>
             </View>
             <ChevronRight size={18} color="#C7C7CC" strokeWidth={2} />
           </View>

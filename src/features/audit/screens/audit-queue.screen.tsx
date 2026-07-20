@@ -1,22 +1,18 @@
 import { ClipboardList } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, View } from 'react-native';
+import { FlatList, RefreshControl, View } from 'react-native';
 import { ORDERS_LIST_CARD_GAP } from '@/features/picking/components/orders-list-page';
 import { OrdersSearchFilter } from '@/features/picking/components/orders-search-filter';
 import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-section';
 import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { resolvePickerName } from '@/features/warehouse/utils/resolve-picker-name';
 import { EmptyState } from '@/shared/components/ui/empty-state';
 import { Text } from '@/shared/components/ui/text';
 import { AuditOrderCard } from '../components/audit-order-card';
-import {
-  applyAuditQueueFilter,
-  AUDIT_QUEUE_FILTERS,
-  auditFilterLabelKey,
-  type AuditQueueFilter,
-} from '../hooks/use-audit-queue-filter';
 import { useAuditQueue } from '../hooks/use-audit-queue';
+import { useAuditQueueRefresh } from '../hooks/use-audit-queue-refresh';
 
 function matchesSearch(order: { orderNumber: string; client: string }, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -30,21 +26,20 @@ export function AuditQueueScreen() {
   const { t } = useTranslation();
   const tabBarHeight = useAppTabBarHeight();
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<AuditQueueFilter>('all');
 
   const queue = useAuditQueue();
   const pickers = usePickersStore((s) => s.pickers);
+  const { refreshing, refresh } = useAuditQueueRefresh();
 
   const filtered = useMemo(() => {
-    const byFilter = applyAuditQueueFilter(queue, filter);
-    return byFilter
+    return queue
       .filter((o) => matchesSearch(o, search))
       .sort((a, b) => {
         const aTime = new Date(a.packedAt ?? a.createdAt).getTime();
         const bTime = new Date(b.packedAt ?? b.createdAt).getTime();
         return bTime - aTime;
       });
-  }, [queue, filter, search]);
+  }, [queue, search]);
 
   const listHeader = (
     <View style={{ paddingBottom: 8 }}>
@@ -55,12 +50,12 @@ export function AuditQueueScreen() {
         <OrdersSearchFilter
           search={search}
           onSearchChange={setSearch}
-          filterValue={filter}
-          onFilterChange={(value) => setFilter(value as AuditQueueFilter)}
-          filterOptions={AUDIT_QUEUE_FILTERS}
-          getFilterLabel={(value, translate) => translate(auditFilterLabelKey(value as AuditQueueFilter))}
+          showFilter={false}
           embedded
           searchPlaceholder={t('audit.screen.searchPlaceholder')}
+          onRefresh={refresh}
+          refreshing={refreshing}
+          refreshLabel={t('audit.screen.refresh')}
         />
       </AppHeroTitleSection>
 
@@ -92,16 +87,14 @@ export function AuditQueueScreen() {
           paddingBottom: tabBarHeight + 20,
           flexGrow: 1,
         }}
-        renderItem={({ item }) => {
-          const picker = item.assignedPickerId
-            ? pickers.find((p) => p.uid === item.assignedPickerId)
-            : undefined;
-          return (
-            <View style={{ paddingHorizontal: 16 }}>
-              <AuditOrderCard order={item} pickerName={picker?.nombre} />
-            </View>
-          );
-        }}
+        renderItem={({ item }) => (
+          <View style={{ paddingHorizontal: 16 }}>
+            <AuditOrderCard
+              order={item}
+              pickerName={resolvePickerName(pickers, item.assignedPickerId)}
+            />
+          </View>
+        )}
         ListEmptyComponent={
           <EmptyState
             title={t('audit.screen.emptyTitle')}
@@ -112,6 +105,7 @@ export function AuditQueueScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       />
     </View>
   );

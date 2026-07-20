@@ -10,6 +10,8 @@ export const ORDER_STATUS_I18N_KEY: Record<OrderStatus, string> = {
   rejected_review: 'orderStatus.rejectedReview',
   audited: 'orderStatus.audited',
   dispatched: 'orderStatus.dispatched',
+  annulled: 'orderStatus.annulled',
+  recovered: 'orderStatus.recovered',
 };
 
 export function statusLabelKey(status: OrderStatus): string {

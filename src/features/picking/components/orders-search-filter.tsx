@@ -1,4 +1,4 @@
-import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react-native';
+import { ChevronDown, RefreshCw, Search, SlidersHorizontal } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -83,6 +83,10 @@ const styles = StyleSheet.create({
   filterBtnActive: {
     borderColor: '#111827',
   },
+  refreshBtn: {
+    width: 40,
+    paddingHorizontal: 0,
+  },
   filterBtnLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -148,6 +152,10 @@ interface OrdersSearchFilterProps {
   /** Dentro de la card del header hero (sin margen inferior extra). */
   embedded?: boolean;
   searchPlaceholder?: string;
+  /** Muestra un botón de refresh manual junto al filtro (misma estética). */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  refreshLabel?: string;
 }
 
 export function OrdersSearchFilter({
@@ -160,6 +168,9 @@ export function OrdersSearchFilter({
   showFilter = true,
   embedded = false,
   searchPlaceholder,
+  onRefresh,
+  refreshing = false,
+  refreshLabel,
 }: OrdersSearchFilterProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -238,6 +249,26 @@ export function OrdersSearchFilter({
                   strokeWidth={2.5}
                   style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}
                 />
+              </View>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {onRefresh ? (
+          <View style={styles.filterAnchor}>
+            <Pressable
+              onPress={onRefresh}
+              disabled={refreshing}
+              accessibilityRole="button"
+              accessibilityLabel={refreshLabel}
+              style={({ pressed }) => [
+                styles.filterPressable,
+                (pressed || refreshing) && { opacity: 0.6 },
+              ]}
+              android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: false }}
+            >
+              <View style={[styles.filterBtn, styles.refreshBtn]} collapsable={false}>
+                <RefreshCw size={16} color="#3C3C43" strokeWidth={2} />
               </View>
             </Pressable>
           </View>

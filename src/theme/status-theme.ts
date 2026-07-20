@@ -19,6 +19,8 @@ const orderLight: Record<OrderStatus, StatusColorPair> = {
   rejected_review: { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' },
   audited: { bg: '#D1FAE5', text: '#047857', border: '#A7F3D0' },
   dispatched: { bg: '#F5F5F5', text: '#525252', border: '#E5E5E5' },
+  annulled: { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' },
+  recovered: { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' },
 };
 
 const orderDark: Record<OrderStatus, StatusColorPair> = {
@@ -30,6 +32,8 @@ const orderDark: Record<OrderStatus, StatusColorPair> = {
   rejected_review: { bg: '#450A0A', text: '#FCA5A5', border: '#7F1D1D' },
   audited: { bg: '#064E3B', text: '#6EE7B7', border: '#047857' },
   dispatched: { bg: '#262626', text: '#A3A3A3', border: '#404040' },
+  annulled: { bg: '#27272A', text: '#A1A1AA', border: '#3F3F46' },
+  recovered: { bg: '#27272A', text: '#A1A1AA', border: '#3F3F46' },
 };
 
 const pickerLight: Record<PickerStatus, StatusColorPair> = {

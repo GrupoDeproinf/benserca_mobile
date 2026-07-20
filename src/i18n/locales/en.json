@@ -31,7 +31,10 @@
     "packed": "Packed",
     "rejectedReview": "Rejected - Review",
     "audited": "Audited",
-    "dispatched": "Dispatched"
+    "approved": "Approved",
+    "dispatched": "Dispatched",
+    "annulled": "Annulled",
+    "recovered": "Recovered"
   },
   "pickerStatus": {
     "disponible": "Available",
@@ -139,6 +142,8 @@
       "emptyBlockTitle": "Empty open package",
       "emptyBlockBody": "Package {{number}} is open and has no items. Add items or delete it before finishing.",
       "emptyBlockBodyGeneric": "There is an open package with no items. Add items or delete it before finishing.",
+      "noBultosTitle": "No packages built",
+      "noBultosBody": "You can't finish picking without building at least one package.",
       "confirmTitle": "Finish picking",
       "confirmBody": "Final state will be calculated. The order will move to 'To pack'.",
       "confirm": "Finish"
@@ -364,6 +369,7 @@
       "title": "Review queue",
       "count": "{{count}} order(s) to review",
       "ordersCount": "orders",
+      "refresh": "Refresh list",
       "searchPlaceholder": "Search order or client...",
       "emptyTitle": "No orders to check",
       "emptySubtitle": "Packed orders will appear here."
@@ -385,9 +391,11 @@
       "skus": "SKUs",
       "extraBultosFlag": "Extra packages",
       "packedAt": "Packed",
-      "comparisonTitle": "Profit vs picked comparison",
+      "bundleVariationTitle": "Package count variation",
+      "bundleVariationBody": "{{created}} packages were built, but the order defines {{defined}}. Review before approving.",
+      "comparisonTitle": "Order vs picked comparison",
       "comparisonAlert": "There are differences between the order and what was picked. Review before approving.",
-      "comparisonOk": "Quantities match the Profit order.",
+      "comparisonOk": "Quantities match the original order.",
       "legendOk": "Correct",
       "legendOver": "Excess",
       "legendUnder": "Missing",
@@ -401,7 +409,7 @@
       "reviewAllHint": "Approve or reject each package before finishing.",
       "allApprovedHint": "All packages approved. You can approve the order.",
       "hasRejectedHint": "Some packages were rejected. Finish with rejection and write the reason.",
-      "comparisonNote": "Green = correct · Amber = excess · Red = missing (vs. Profit order)"
+      "comparisonNote": "Green = correct · Amber = excess · Red = missing (vs. original order)"
     },
     "bulto": {
       "title": "Package {{number}}",
@@ -448,7 +456,11 @@
     },
     "card": {
       "timeInStatus": "In this status",
-      "bultosToday": "Pkgs today"
+      "bultosToday": "Pkgs today",
+      "noActiveOrder": "No active order",
+      "busyOrder": "Has an order in progress",
+      "availableFlag": "Free",
+      "busyFlag": "Busy"
     }
   },
   "profile": {

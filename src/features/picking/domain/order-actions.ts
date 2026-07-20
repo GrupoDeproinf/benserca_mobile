@@ -80,7 +80,7 @@ export function applyReopenForRevision(order: Order, pickerId: string): Partial<
 // ─── Auditoría ────────────────────────────────────────────────────────────────
 
 export function applyApproveAudit(_order: Order): Partial<Order> {
-  return { status: 'audited' };
+  return { status: 'audited', auditResult: 'approved' };
 }
 
 export function applyRejectAudit(
@@ -102,6 +102,7 @@ export function applyRejectAudit(
 
   return {
     status: 'rejected_review',
+    auditResult: 'rejected',
     auditObservations: [...order.auditObservations, observation],
   };
 }
@@ -115,6 +116,7 @@ export function canOpenBulto(order: Order): PickerActionError | null {
 
 export function canFinishPicking(order: Order): PickerActionError | null {
   if (hasEmptyOpenBulto(order.bultos)) return 'empty_open_bulto_exists';
+  if (order.bultos.length === 0) return 'no_bultos';
   return null;
 }
 

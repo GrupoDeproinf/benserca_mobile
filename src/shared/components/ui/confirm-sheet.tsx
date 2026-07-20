@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react-native';
 import { AlertCircle, Info } from 'lucide-react-native';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useConfirmSheetStore } from './confirm-sheet.store';
@@ -87,15 +87,21 @@ export function ConfirmSheet({
 
           {hasItems ? (
             <View style={[styles.itemsBox, { borderLeftColor: iconColor }]}>
-              {messageItems!.map((item, index) => (
-                <View
-                  key={`${item}-${index}`}
-                  style={[styles.itemRow, index === 0 && styles.itemRowFirst]}
-                >
-                  <View style={[styles.itemDot, { backgroundColor: iconColor }]} />
-                  <Text style={styles.itemText}>{item}</Text>
-                </View>
-              ))}
+              <ScrollView
+                style={styles.itemsScroll}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+              >
+                {messageItems!.map((item, index) => (
+                  <View
+                    key={`${item}-${index}`}
+                    style={[styles.itemRow, index === 0 && styles.itemRowFirst]}
+                  >
+                    <View style={[styles.itemDot, { backgroundColor: iconColor }]} />
+                    <Text style={styles.itemText}>{item}</Text>
+                  </View>
+                ))}
+              </ScrollView>
             </View>
           ) : null}
 
@@ -164,6 +170,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
     paddingTop: 12,
+    maxHeight: '86%',
   },
   handle: {
     alignSelf: 'center',
@@ -203,9 +210,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     borderLeftWidth: 3,
-    paddingVertical: 4,
     paddingHorizontal: 14,
     marginBottom: 24,
+  },
+  itemsScroll: {
+    maxHeight: 260,
+    paddingVertical: 4,
   },
   itemRow: {
     flexDirection: 'row',

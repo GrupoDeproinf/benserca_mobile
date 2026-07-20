@@ -27,6 +27,7 @@ import { useOrdersStore } from '@/features/picking/store/orders.store';
 import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
 import { Text } from '@/shared/components/ui/text';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { resolvePickerName } from '@/features/warehouse/utils/resolve-picker-name';
 import {
   AuditBultoAccordion,
   type BultoAuditStatus,
@@ -66,12 +67,12 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   const [rejectSheetVisible, setRejectSheetVisible] = useState(false);
   const [bultoReviews, setBultoReviews] = useState<Record<string, BultoAuditStatus>>({});
 
-  const pickerName = useMemo(() => {
-    if (!order?.assignedPickerId) return '—';
-    return pickers.find((p) => p.uid === order.assignedPickerId)?.nombre ?? order.assignedPickerId;
-  }, [order?.assignedPickerId, pickers]);
+  const pickerName = useMemo(
+    () => resolvePickerName(pickers, order?.assignedPickerId),
+    [order?.assignedPickerId, pickers],
+  );
 
-  const profitLines = order?.snapshotOriginal ?? order?.lines ?? [];
+  const originalLines = order?.snapshotOriginal ?? order?.lines ?? [];
   const comparisonRows = useMemo(() => {
     if (!order?.snapshotOriginal?.length) return [];
     return buildAuditComparison(order.snapshotOriginal, order.bultos);
@@ -105,6 +106,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   }
 
   const alreadyProcessed = order.status === 'audited' || order.status === 'rejected_review';
+  const bundleVariation = order.bundlesCreated !== order.definedBultos;
   const showComparison = comparisonRows.length > 0;
   const comparisonHasIssues = hasComparisonIssues(comparisonRows);
 
@@ -145,6 +147,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
         orderNumber={order.orderNumber}
         client={order.client}
         status={order.status}
+        auditResult={order.auditResult}
         onBack={() => router.back()}
         meta={headerMeta}
         metaInScroll
@@ -165,6 +168,16 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
             style={styles.scrollMetaCard}
           />
 
+          {bundleVariation ? (
+            <OrderDetailAlertBanner
+              title={t('audit.detail.bundleVariationTitle')}
+              body={t('audit.detail.bundleVariationBody', {
+                created: order.bundlesCreated,
+                defined: order.definedBultos,
+              })}
+            />
+          ) : null}
+
           {order.auditObservations.length > 0 ? (
             <OrderDetailSection title={t('audit.detail.observationsTitle')} icon={MessageSquareWarning}>
               {order.auditObservations.map((obs) => (
@@ -180,10 +193,10 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
 
           <OrderDetailSection title={t('picking.detail.linesTitle')} icon={ClipboardList}>
             <OrderDetailCard>
-              {profitLines.map((line, idx) => (
+              {originalLines.map((line, idx) => (
                 <View
                   key={line.sku}
-                  style={[styles.lineRow, idx < profitLines.length - 1 && styles.lineRowBorder]}
+                  style={[styles.lineRow, idx < originalLines.length - 1 && styles.lineRowBorder]}
                 >
                   <View style={styles.lineInfo}>
                     <Text style={styles.lineName} numberOfLines={2}>

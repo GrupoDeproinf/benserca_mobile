@@ -12,6 +12,8 @@ function mapStatus(raw: string): OrderStatus {
     Embalado: 'packed',
     Rechazado: 'rejected_review',
     Despachado: 'dispatched',
+    Anulado: 'annulled',
+    Recuperado: 'recovered',
   };
   return map[raw] ?? 'assigned';
 }
@@ -101,7 +103,7 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
 
     assignedPickerId: data.assigned_to?.uid ?? null,
     assignedLeadId: data.team?.chief_uid ?? null,
-    teamId: null,
+    teamPickerUids: Array.isArray(data.team?.picker_uids) ? data.team.picker_uids : [],
 
     lines,
     bultos,
@@ -109,9 +111,11 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
     snapshotOriginal,
     finalSkus,
     auditObservations: [],
+    auditResult: data.audit?.result ?? null,
 
     createdAt: data.created_at ?? new Date().toISOString(),
     assignedAt: data.assigned_at ?? null,
-    packedAt: data.packed_at ?? null,
+    // "Empaquetado" = picker finalizó el picking; ese es el timestamp que se muestra.
+    packedAt: data.picking_finished_at ?? data.packed_at ?? null,
   };
 }

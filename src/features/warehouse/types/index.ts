@@ -8,4 +8,6 @@ export interface PickerEstado {
   teamId: string | null;
   bultosToday: number;
   updatedAt: string;
+  /** `u_pickers.is_available`: solo informativo, no bloquea la asignación de pedidos. */
+  isAvailable: boolean;
 }

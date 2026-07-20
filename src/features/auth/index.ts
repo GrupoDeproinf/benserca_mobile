@@ -14,10 +14,8 @@ export * from './schemas/login.schema';
 export * from './schemas/forgot-password.schema';
 export {
   login,
-  loginWithDemoRole,
   logout,
   requestPasswordReset,
-  DEMO_CREDENTIALS,
   InvalidCredentialsError,
   ProfileNotFoundError,
   InvalidProfileError,
