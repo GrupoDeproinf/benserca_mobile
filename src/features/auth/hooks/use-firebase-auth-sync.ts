@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { firestore, auth } from '@/services/firebase';
 import { safeFirebaseSignOut } from '@/services/firebase/auth-utils';
+import { isOfflineError } from '@/services/firebase/offline-errors';
 import { fetchSessionUser } from '@/services/firebase/user-profile';
 import {
   FirestorePermissionError,
@@ -41,6 +42,17 @@ export function useFirebaseAuthSync() {
         if (__DEV__) {
           console.warn('[auth] Firebase session sync failed:', error);
         }
+
+        // Sin red no se puede leer el perfil, pero la sesión de Firebase Auth
+        // sigue siendo válida: se conserva el usuario persistido para que el
+        // turno continúe offline. Cerrar sesión acá dejaría a la persona fuera
+        // de la app sin manera de volver a entrar hasta recuperar internet.
+        const offline = isOfflineError(error);
+        const persistedUser = useAuthStore.getState().user;
+        if (offline && persistedUser?.uid === firebaseUser?.uid) {
+          return;
+        }
+
         if (
           error instanceof ProfileNotFoundError ||
           error instanceof InvalidProfileError ||

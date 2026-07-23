@@ -5,13 +5,14 @@ import {
   ArrowLeftRight,
   Box,
   ClipboardList,
+  type LucideIcon,
   Package,
   PackageOpen,
   PackagePlus,
+  PauseCircle,
   Play,
   RotateCcw,
   Trash2,
-  type LucideIcon,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,26 +22,24 @@ import { useCurrentUser } from '@/features/auth/store/auth.store';
 import { ConfirmSheet, type ConfirmSheetTone } from '@/shared/components/ui/confirm-sheet';
 import { Text } from '@/shared/components/ui/text';
 import { Toast, useToast } from '@/shared/components/ui/toast';
-import { AddItemSheet, type AddItemEntry } from '../components/add-item-sheet';
+import { type AddItemEntry, AddItemSheet } from '../components/add-item-sheet';
 import { BultoCard } from '../components/bulto-card';
 import {
   estimateOrderActionsHeight,
-  OrderDetailActions,
   type OrderDetailAction,
+  OrderDetailActions,
 } from '../components/order-detail-action-bar';
 import { OrderDetailAlertBanner, OrderDetailHeader } from '../components/order-detail-header';
-import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
+import { OrderDetailBodyFade } from '../components/order-detail-transition';
+import { PausePickingSheet } from '../components/pause-picking-sheet';
 import { PickingProgressBar } from '../components/picking-progress-bar';
 import { SubstituteItemSheet } from '../components/substitute-item-sheet';
 import { useOrdersStore } from '../store/orders.store';
-import type { OrderLine } from '../types';
+import type { OrderLine, PauseReason } from '../types';
 import { getMaxQtyForBultoItem } from '../utils/bulto-capacity';
-import {
-  getAssignedQtyForLine,
-  getMissingQuantities,
-} from '../utils/order-snapshot';
-import { getEffectiveQueuePosition, isPickerQueueHead } from '../utils/picker-queue';
+import { getAssignedQtyForLine, getMissingQuantities } from '../utils/order-snapshot';
+import { getEffectiveQueuePosition } from '../utils/picker-queue';
 
 interface PickingDetailScreenProps {
   orderId: string;
@@ -99,9 +98,12 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const addBultoItem = useOrdersStore((s) => s.addBultoItem);
   const removeBultoItem = useOrdersStore((s) => s.removeBultoItem);
   const updateBultoItem = useOrdersStore((s) => s.updateBultoItem);
+  const pausePicking = useOrdersStore((s) => s.pausePicking);
+  const resumePicking = useOrdersStore((s) => s.resumePicking);
 
   const [addSheetBultoId, setAddSheetBultoId] = useState<string | null>(null);
   const [substituteLine, setSubstituteLine] = useState<OrderLine | null>(null);
+  const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
   const [confirmSheet, setConfirmSheet] = useState<ConfirmState | null>(null);
   const { message: capacityToast, nudgeToken: capacityToastNudge, show: showCapacityToast } =
     useToast();
@@ -175,13 +177,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const handleStartPicking = () => {
     const result = startPicking(order.id, user.uid);
     if (!result.ok) {
-      const message =
-        result.error === 'already_active_order'
-          ? t('picking.queue.alreadyActive')
-          : t('picking.queue.notHead');
       setConfirmSheet({
         title: t('picking.queue.blockTitle'),
-        message,
+        message: t('picking.queue.alreadyActive'),
         mode: 'info',
         confirmLabel: t('common.understood'),
         icon: AlertCircle,
@@ -286,6 +284,21 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     reopenForRevision(order.id, user.uid);
   };
 
+  const handlePausePicking = () => {
+    Haptics.selectionAsync();
+    setPauseSheetVisible(true);
+  };
+
+  const handleConfirmPause = (reason: PauseReason, missingSkus: string[]) => {
+    pausePicking(order.id, reason, missingSkus);
+    setPauseSheetVisible(false);
+  };
+
+  const handleResumePicking = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    resumePicking(order.id);
+  };
+
   const handleCloseBulto = (bultoId: string) => {
     const result = closeBulto(order.id, bultoId);
     if (!result.ok) {
@@ -339,23 +352,33 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     setAddSheetBultoId(bultoId);
   };
 
-  const canStart =
-    order.status === 'assigned' &&
-    isPickerQueueHead(order, pickerOrders);
+  // Reanudar picking está disponible para cualquier rol que pueda ver el
+  // pedido pausado (incluido supervisor_almacen en modo readOnly): la pausa
+  // es la única acción que un visualizador puede ejecutar.
+  const footerActions: (OrderDetailAction | OrderDetailAction[])[] = (() => {
+    if (order.isPaused) {
+      return [
+        {
+          label: t('picking.detail.resumePicking'),
+          onPress: handleResumePicking,
+          variant: 'primary',
+          icon: Play,
+        },
+      ];
+    }
 
-  const footerActions: OrderDetailAction[] = readOnly ? [] : (() => {
+    if (readOnly) return [];
+
     switch (order.status) {
       case 'assigned':
-        return canStart
-          ? [
-              {
-                label: t('picking.detail.startPicking'),
-                onPress: handleStartPicking,
-                variant: 'primary',
-                icon: Play,
-              },
-            ]
-          : [];
+        return [
+          {
+            label: t('picking.detail.startPicking'),
+            onPress: handleStartPicking,
+            variant: 'primary',
+            icon: Play,
+          },
+        ];
       case 'in_progress':
         return [
           {
@@ -364,12 +387,20 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
             variant: 'secondary',
             icon: PackagePlus,
           },
-          {
-            label: t('picking.detail.finishPicking'),
-            onPress: handleFinishPicking,
-            variant: 'primary',
-            icon: PackageOpen,
-          },
+          [
+            {
+              label: t('picking.detail.pausePicking'),
+              onPress: handlePausePicking,
+              variant: 'secondary',
+              icon: PauseCircle,
+            },
+            {
+              label: t('picking.detail.finishPicking'),
+              onPress: handleFinishPicking,
+              variant: 'primary',
+              icon: PackageOpen,
+            },
+          ],
         ];
       case 'to_pack':
         // Auditoría obligatoria: el picker no puede embalar directamente desde
@@ -407,6 +438,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         client={order.client}
         status={order.status}
         auditResult={order.auditResult}
+        isPaused={order.isPaused}
         onBack={() => router.back()}
         meta={[
           { label: t('picking.detail.definedBultos'), value: String(order.definedBultos) },
@@ -444,18 +476,25 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {order.isPaused && order.pauseInfo ? (
+            <OrderDetailAlertBanner
+              title={t('picking.pause.bannerTitle')}
+              body={
+                order.pauseInfo.reason === 'falta_articulo'
+                  ? t('picking.pause.bannerBodyMissing', {
+                      skus: order.pauseInfo.missingSkus.join(', '),
+                    })
+                  : t('picking.pause.bannerBodyPriority')
+              }
+              author={order.pauseInfo.authorName}
+            />
+          ) : null}
+
           {order.status === 'rejected_review' && lastObservation ? (
             <OrderDetailAlertBanner
               title={t('picking.rejection.title')}
               body={lastObservation.text}
               author={lastObservation.auditorName}
-            />
-          ) : null}
-
-          {order.status === 'assigned' && !canStart && effectiveQueuePosition != null ? (
-            <OrderDetailAlertBanner
-              title={t('picking.queue.waitTitle')}
-              body={t('picking.queue.waitBody', { position: effectiveQueuePosition })}
             />
           ) : null}
 
@@ -595,6 +634,13 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
             },
           );
         }}
+      />
+
+      <PausePickingSheet
+        visible={pauseSheetVisible}
+        lines={order.lines}
+        onClose={() => setPauseSheetVisible(false)}
+        onConfirm={handleConfirmPause}
       />
 
       <Toast

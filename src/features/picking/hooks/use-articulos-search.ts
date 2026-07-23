@@ -4,50 +4,10 @@ import {
   getMockArticulosForSkus,
   searchMockArticulos,
 } from '../data/mock-skus';
+import { getLocalArticulosBySkus, searchLocalCatalog } from '../services/articulos-catalog';
+import { docToArticulo, type Articulo } from '../services/articulos.mapper';
 
-export interface Articulo {
-  sku: string;
-  name: string;
-  /** Talla del artículo. Gate de sustitución (sin talla no es sustituible). */
-  talla?: string;
-  /** Categoría Profit (`co_cat`). Filtro de sustitución. Se conserva sin recortar. */
-  coCat?: string;
-  /** Sublínea Profit (`co_subl`). Filtro de sustitución. Se conserva sin recortar. */
-  coSubl?: string;
-  category?: string;
-  brand?: string;
-  family?: string;
-}
-
-/** Lee un string de Firestore sin recortar (co_cat/co_subl vienen con espacios finales). */
-// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
-function readRawString(value: any): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  return value.length > 0 ? value : undefined;
-}
-
-// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
-export function docToArticulo(id: string, data: Record<string, any>): Articulo {
-  return {
-    sku: (data.co_art as string | undefined)?.trim() ?? id,
-    name: (data.art_des as string | undefined)?.trim() ?? '',
-    talla: (data.talla as string | undefined)?.toString().trim() || undefined,
-    coCat: readRawString(data.co_cat),
-    coSubl: readRawString(data.co_subl),
-    category:
-      (data.category as string | undefined) ??
-      (data.cat_des as string | undefined) ??
-      undefined,
-    brand:
-      (data.brand as string | undefined) ??
-      (data.marca as string | undefined) ??
-      undefined,
-    family:
-      (data.family as string | undefined) ??
-      (data.familia as string | undefined) ??
-      undefined,
-  };
-}
+export { docToArticulo, type Articulo } from '../services/articulos.mapper';
 
 /** Búsqueda libre por prefijo de SKU o descripción (sin filtro de marca/categoría). */
 export async function searchArticulosInFirestore(query: string): Promise<Articulo[]> {
@@ -154,10 +114,17 @@ export async function fetchArticulosBySkus(
       }
     }
 
+    // Sin red la consulta responde solo con lo cacheado: se completa con el
+    // catálogo descargado antes de caer al mock.
+    const missing = unique.filter((sku) => !map[sku]);
+    if (missing.length > 0) {
+      Object.assign(map, getLocalArticulosBySkus(missing));
+    }
+
     return mergeArticulosWithMock(map, unique);
   } catch (err) {
     console.error('[fetchArticulosBySkus]', err);
-    return getMockArticulosForSkus(unique);
+    return mergeArticulosWithMock(getLocalArticulosBySkus(unique), unique);
   }
 }
 
@@ -192,12 +159,16 @@ export function useArticulosSearch(query: string, enabled = true) {
     timerRef.current = setTimeout(async () => {
       try {
         const fromFs = await searchArticulosInFirestore(q);
-        const merged = mergeSearchResultsWithMock(fromFs, q);
+        // Sin red la query a `articulos` responde vacía (la caché de Firestore
+        // solo tiene lo ya consultado): ahí entra el catálogo descargado.
+        const base = fromFs.length > 0 ? fromFs : searchLocalCatalog(q);
+        const merged = mergeSearchResultsWithMock(base, q);
         if (abortRef.current) return;
         setResults(merged);
       } catch (err) {
         console.error('[useArticulosSearch]', err);
-        if (!abortRef.current) setResults(searchMockArticulos(q));
+        if (abortRef.current) return;
+        setResults(mergeSearchResultsWithMock(searchLocalCatalog(q), q));
       } finally {
         if (!abortRef.current) setLoading(false);
       }

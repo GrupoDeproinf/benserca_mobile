@@ -2,18 +2,24 @@
  * Acciones de dominio puro del picking.
  */
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
-import type { AuditObservation, Bulto, BultoItem, Order, PickerActionError } from '../types';
-import { buildPartialSavePatch } from '../utils/partial-save';
-import {
-  computeProgressPercentage,
-  computeBundlesCreated,
-} from '../utils/order-progress';
+import type { SessionUser } from '@/shared/types';
+import type {
+  AuditObservation,
+  Bulto,
+  BultoItem,
+  Order,
+  PauseInfo,
+  PauseReason,
+  PickerActionError,
+} from '../types';
+import { computeBundlesCreated, computeProgressPercentage } from '../utils/order-progress';
 import {
   buildFinalSkus,
   closeOpenBultosWithItems,
   hasEmptyOpenBulto,
   renumberBultos,
 } from '../utils/order-snapshot';
+import { buildPartialSavePatch } from '../utils/partial-save';
 
 function syncPickingMetrics(order: Order, bultos: Bulto[]): Partial<Order> {
   const withBultos = { ...order, bultos };
@@ -75,6 +81,33 @@ export function applyMarkWrapped(order: Order): Partial<Order> {
 export function applyReopenForRevision(order: Order, pickerId: string): Partial<Order> {
   usePickersStore.getState().setPickerStatus(pickerId, 'en_proceso', order.id);
   return { status: 'in_progress' };
+}
+
+/**
+ * Pausar picking: no cambia `status`, solo marca el flag `isPaused`. El
+ * `pauseInfo` es la vista optimista de lo que quedará en el timeline; al
+ * re-hidratar desde Firestore, el mapper lo deriva de la entrada real.
+ */
+export function applyPausePicking(
+  _order: Order,
+  user: SessionUser,
+  reason: PauseReason,
+  missingSkus: string[],
+): Partial<Order> {
+  const pauseInfo: PauseInfo = {
+    reason,
+    missingSkus,
+    authorId: user.uid,
+    authorName: user.name,
+    authorRole: user.role,
+    createdAt: new Date().toISOString(),
+    note: null,
+  };
+  return { isPaused: true, pauseInfo };
+}
+
+export function applyResumePicking(_order: Order): Partial<Order> {
+  return { isPaused: false, pauseInfo: null };
 }
 
 // ─── Auditoría ────────────────────────────────────────────────────────────────
@@ -196,9 +229,7 @@ export function applyAddBultoItem(
     if (b.id !== bultoId) return b;
 
     const matchSku = options?.originalSku ?? sku;
-    const existing = b.items.find(
-      (i) => i.sku === sku && (i.originalSku ?? i.sku) === matchSku,
-    );
+    const existing = b.items.find((i) => i.sku === sku && (i.originalSku ?? i.sku) === matchSku);
 
     const items: BultoItem[] = existing
       ? b.items.map((i) =>

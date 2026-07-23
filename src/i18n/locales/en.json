@@ -32,6 +32,7 @@
     "rejectedReview": "Rejected - Review",
     "audited": "Audited",
     "approved": "Approved",
+    "paused": "Paused",
     "dispatched": "Dispatched",
     "annulled": "Annulled",
     "recovered": "Recovered"
@@ -95,6 +96,8 @@
       "startPicking": "Start picking",
       "reopenPicking": "Reopen picking",
       "openBulto": "Open new package",
+      "pausePicking": "Pause picking",
+      "resumePicking": "Resume picking",
       "finishPicking": "Finish picking",
       "markPacked": "Mark as packed",
       "linesTitle": "Order items",
@@ -156,6 +159,19 @@
     "rejection": {
       "title": "Checker observation"
     },
+    "pause": {
+      "title": "Pause picking",
+      "subtitle": "Indicate the reason for the pause. The order will not change status while paused.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Select a reason",
+      "reasonMissingItem": "Missing item",
+      "reasonPriorityChange": "Priority change",
+      "missingItemsLabel": "Mark the missing items",
+      "confirm": "Pause order",
+      "bannerTitle": "Order paused",
+      "bannerBodyMissing": "Missing item: {{skus}}",
+      "bannerBodyPriority": "Reason: priority change"
+    },
     "substitute": {
       "title": "Substitute item",
       "original": "Original item",
@@ -174,10 +190,7 @@
     },
     "queue": {
       "blockTitle": "Cannot start",
-      "notHead": "You can only start the order at position #1 in your queue.",
-      "alreadyActive": "You already have an order in progress. Finish it before starting another.",
-      "waitTitle": "Waiting",
-      "waitBody": "This order is at position #{{position}} in your queue."
+      "alreadyActive": "You already have an order in progress. Finish it or pause it before starting another."
     }
   },
   "welcome": {
@@ -237,6 +250,7 @@
     "profile": "Profile",
     "notifications": "Notifications",
     "auditQueue": "Queue",
+    "paused": "Paused",
     "team": "Team",
     "warehouse": "Warehouse",
     "settings": "Settings"
@@ -276,6 +290,9 @@
       "unassigned": "Unassigned",
       "apply": "Apply",
       "clear": "Clear"
+    },
+    "paused": {
+      "title": "Paused"
     }
   },
   "notifications": {
@@ -438,6 +455,12 @@
       "required": "Observation is required.",
       "confirm": "Reject order",
       "bultoLine": "Package {{number}}: review contents."
+    },
+    "paused": {
+      "title": "Paused orders",
+      "subtitle": "Orders with picking paused, regardless of status",
+      "emptyTitle": "No paused orders",
+      "emptySubtitle": "Orders paused by a picker will appear here."
     }
   },
   "supervision": {
@@ -575,5 +598,11 @@
     "light": "Light",
     "dark": "Dark",
     "signOut": "Sign out"
+  },
+  "sync": {
+    "offline": "Offline — your work is saved and will be sent when the signal returns",
+    "offlineWithPending": "Offline — there are changes pending to send",
+    "pending": "Sending changes…",
+    "catalogReady": "Catalog ready to work offline"
   }
 }

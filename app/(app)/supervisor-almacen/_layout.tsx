@@ -7,6 +7,18 @@ export default function SupervisorAlmacenStackLayout() {
       <Stack.Screen
         name="status/[status]"
         options={{
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000',
+          contentStyle: { backgroundColor: '#F2F2F7' },
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
+        name="paused"
+        options={{
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000',
           contentStyle: { backgroundColor: '#F2F2F7' },
           animation: 'slide_from_right',
           gestureEnabled: true,

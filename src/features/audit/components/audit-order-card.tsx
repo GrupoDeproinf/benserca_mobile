@@ -3,8 +3,12 @@ import { Box, Calendar, ChevronRight, ClipboardList, User } from 'lucide-react-n
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { statusLabelKey } from '@/features/picking/utils/order-status';
 import type { Order } from '@/features/picking/types';
+import {
+  PAUSED_BADGE_STYLE,
+  PAUSED_STATUS_I18N_KEY,
+  statusLabelKey,
+} from '@/features/picking/utils/order-status';
 
 interface AuditOrderCardProps {
   order: Order;
@@ -109,8 +113,21 @@ export function AuditOrderCard({ order, pickerName }: AuditOrderCardProps) {
           </View>
 
           <View style={styles.headerRight}>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>{t(statusLabelKey(order.status))}</Text>
+            {/* La pausa reemplaza al badge de estatus en la UI (en BD se conserva). */}
+            <View
+              style={[
+                styles.statusBadge,
+                order.isPaused && { backgroundColor: PAUSED_BADGE_STYLE.bg },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusBadgeText,
+                  order.isPaused && { color: PAUSED_BADGE_STYLE.text },
+                ]}
+              >
+                {t(order.isPaused ? PAUSED_STATUS_I18N_KEY : statusLabelKey(order.status))}
+              </Text>
             </View>
             <ChevronRight size={18} color="#C7C7CC" strokeWidth={2} />
           </View>

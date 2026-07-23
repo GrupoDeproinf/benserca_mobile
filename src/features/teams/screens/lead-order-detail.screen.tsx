@@ -11,7 +11,7 @@ import {
   OrderDetailActions,
   type OrderDetailAction,
 } from '@/features/picking/components/order-detail-action-bar';
-import { OrderDetailHeader } from '@/features/picking/components/order-detail-header';
+import { OrderDetailAlertBanner, OrderDetailHeader } from '@/features/picking/components/order-detail-header';
 import { OrderDetailCard, OrderDetailSection } from '@/features/picking/components/order-detail-section';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
 import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
@@ -41,6 +41,7 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
   const pickers = usePickersStore((s) => s.pickers);
   const releasePicker = useTeamsStore((s) => s.releasePicker);
   const releaseTeam = useTeamsStore((s) => s.releaseTeam);
+  const resumePicking = useOrdersStore((s) => s.resumePicking);
 
   const [confirmReleaseTeam, setConfirmReleaseTeam] = useState(false);
   const [releasePickerTarget, setReleasePickerTarget] = useState<ReleasePickerTarget | null>(null);
@@ -80,8 +81,21 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
     setConfirmReleaseTeam(false);
   };
 
-  const footerActions: OrderDetailAction[] =
-    order.status === 'assigned' && !hasActiveTeam
+  const handleResumePicking = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    resumePicking(order.id);
+  };
+
+  const footerActions: OrderDetailAction[] = order.isPaused
+    ? [
+        {
+          label: t('picking.detail.resumePicking'),
+          onPress: handleResumePicking,
+          variant: 'primary',
+          icon: Play,
+        },
+      ]
+    : order.status === 'assigned' && !hasActiveTeam
       ? [
           {
             label: t('picking.detail.startPicking'),
@@ -101,6 +115,7 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
         client={order.client}
         status={order.status}
         auditResult={order.auditResult}
+        isPaused={order.isPaused}
         onBack={() => router.back()}
         meta={[
           { label: t('picking.detail.definedBultos'), value: String(order.definedBultos) },
@@ -120,6 +135,20 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {order.isPaused && order.pauseInfo ? (
+          <OrderDetailAlertBanner
+            title={t('picking.pause.bannerTitle')}
+            body={
+              order.pauseInfo.reason === 'falta_articulo'
+                ? t('picking.pause.bannerBodyMissing', {
+                    skus: order.pauseInfo.missingSkus.join(', '),
+                  })
+                : t('picking.pause.bannerBodyPriority')
+            }
+            author={order.pauseInfo.authorName}
+          />
+        ) : null}
+
         <OrderDetailSection title={t('picking.detail.linesTitle')} icon={ClipboardList}>
           <OrderDetailCard>
             {order.lines.map((line, idx) => (

@@ -1,8 +1,22 @@
 import firestore from '@react-native-firebase/firestore';
 import type { SessionUser } from '@/shared/types';
-import type { FinalSku, Order } from '../types';
+import type { FinalSku, Order, OrderStatus, PauseReason } from '../types';
 
 const ORDERS = 'lo_orders';
+
+/** Mapa inverso de `mapStatus` (orders.mapper): OrderStatus interno → string Firestore. */
+const STATUS_TO_FIRESTORE: Record<OrderStatus, string> = {
+  new: 'Nuevo',
+  assigned: 'Asignado',
+  in_progress: 'En proceso',
+  to_pack: 'Empaquetado',
+  audited: 'Auditado',
+  packed: 'Embalado',
+  rejected_review: 'Rechazado',
+  dispatched: 'Despachado',
+  annulled: 'Anulado',
+  recovered: 'Recuperado',
+};
 
 function now() {
   return new Date().toISOString();
@@ -141,11 +155,7 @@ export async function firestoreAssignTeam(
       'team.picker_uids': pickers.map((p) => p.uid),
       updated_at: now(),
       timeline: firestore.FieldValue.arrayUnion(
-        timelineEntry(
-          'Asignado',
-          chief,
-          `Equipo armado: ${pickers.map((p) => p.name).join(', ')}`,
-        ),
+        timelineEntry('Asignado', chief, `Equipo armado: ${pickers.map((p) => p.name).join(', ')}`),
       ),
     });
 }
@@ -182,10 +192,68 @@ export async function firestoreReopenForRevision(
   await updatePickerAvailability(user.uid, false, orderId);
 }
 
-export async function firestoreApproveAudit(
+/**
+ * Pausa el pedido SIN cambiar `status`. Marca el booleano `is_paused` y hace
+ * push de una entrada al `timeline` con `status: 'Pausa'` + los campos extra
+ * `reason` / `missing_skus` / `user_role`. La app y la web leen `is_paused`
+ * como fuente de verdad; el detalle de la pausa vive en esa entrada de timeline.
+ */
+export async function firestorePausePicking(
   orderId: string,
   user: SessionUser,
+  reason: PauseReason,
+  missingSkus: string[],
+  fromStatus: OrderStatus,
 ): Promise<void> {
+  const fromLabel = STATUS_TO_FIRESTORE[fromStatus] ?? 'En proceso';
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      is_paused: true,
+      updated_at: now(),
+      timeline: firestore.FieldValue.arrayUnion({
+        status: 'Pausa',
+        timestamp: now(),
+        user_uid: user.uid,
+        user_name: user.name,
+        user_role: user.role,
+        note: `Pedido pausado desde estatus «${fromLabel}».`,
+        reason,
+        missing_skus: missingSkus,
+      }),
+    });
+}
+
+/**
+ * Quita la pausa SIN alterar el flujo: restaura `is_paused: false` y hace push
+ * de una entrada al `timeline` con el estatus operativo actual (que la app ya
+ * tiene en memoria, porque la pausa nunca lo cambió).
+ */
+export async function firestoreResumePicking(
+  orderId: string,
+  user: SessionUser,
+  toStatus: OrderStatus,
+): Promise<void> {
+  const toLabel = STATUS_TO_FIRESTORE[toStatus] ?? 'En proceso';
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      is_paused: false,
+      updated_at: now(),
+      timeline: firestore.FieldValue.arrayUnion({
+        status: toLabel,
+        timestamp: now(),
+        user_uid: user.uid,
+        user_name: user.name,
+        user_role: user.role,
+        note: `Pausa quitada. Vuelve a estatus «${toLabel}».`,
+      }),
+    });
+}
+
+export async function firestoreApproveAudit(orderId: string, user: SessionUser): Promise<void> {
   await firestore()
     .collection(ORDERS)
     .doc(orderId)

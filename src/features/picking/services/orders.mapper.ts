@@ -1,5 +1,61 @@
-import type { FinalSku, Order, OrderLine, OrderStatus } from '../types';
+import type { FinalSku, Order, OrderLine, OrderStatus, PauseInfo } from '../types';
 import { reconstructBultosFromFinalSkus } from '../utils/order-snapshot';
+
+/**
+ * Normaliza una fecha de Firestore (Timestamp, epoch en ms o string) a ISO.
+ * Devuelve null si no hay valor o si no es parseable, para que quien consuma
+ * el campo pueda distinguir "sin fecha" de una fecha real.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readTimestampOrNull(value: any): string | null {
+  if (value == null) return null;
+  // Firestore Timestamp
+  if (typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (typeof value.seconds === 'number') return new Date(value.seconds * 1000).toISOString();
+  if (typeof value === 'number') return new Date(value).toISOString();
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+  return null;
+}
+
+/**
+ * Igual que `readTimestampOrNull`, pero siempre devuelve un string. Un valor
+ * ilegible se conserva tal cual en vez de inventarle la fecha de hoy: es
+ * preferible que quede visible como dato raro a que un pedido viejo aparezca
+ * como creado ahora mismo.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readTimestamp(value: any): string {
+  const iso = readTimestampOrNull(value);
+  if (iso) return iso;
+  return typeof value === 'string' && value.length > 0 ? value : new Date().toISOString();
+}
+
+/**
+ * Deriva la pausa activa desde el `timeline`: última entrada con
+ * `status === 'Pausa'`. Se usa solo cuando `is_paused` es true; si el pedido se
+ * despausó, esa entrada queda como histórico y no se muestra.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function derivePauseInfo(timeline: any[]): PauseInfo | null {
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const entry = timeline[i];
+    if (entry?.status === 'Pausa') {
+      return {
+        reason: entry.reason ?? 'cambio_prioridad',
+        missingSkus: Array.isArray(entry.missing_skus) ? entry.missing_skus : [],
+        authorId: entry.user_uid ?? '',
+        authorName: entry.user_name ?? '',
+        authorRole: entry.user_role ?? undefined,
+        createdAt: readTimestamp(entry.timestamp ?? entry.at),
+        note: entry.note ?? null,
+      };
+    }
+  }
+  return null;
+}
 
 /** Mapea el status string de Firestore al OrderStatus interno. */
 function mapStatus(raw: string): OrderStatus {
@@ -77,11 +133,11 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
   );
 
   const status = mapStatus(data.status ?? 'Asignado');
+  const timeline = Array.isArray(data.timeline) ? data.timeline : [];
+  const isPaused = data.is_paused ?? false;
   const finalSkus = readFinalSkus(data);
   const hasPersistedPicking = finalSkus.some((sku) => sku.bundles.length > 0);
-  const bultos = hasPersistedPicking
-    ? reconstructBultosFromFinalSkus(id, finalSkus, lines)
-    : [];
+  const bultos = hasPersistedPicking ? reconstructBultosFromFinalSkus(id, finalSkus, lines) : [];
   const snapshotOriginal =
     hasPersistedPicking || status === 'in_progress' || status === 'rejected_review'
       ? lines.map((line) => ({ ...line }))
@@ -113,9 +169,15 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
     auditObservations: [],
     auditResult: data.audit?.result ?? null,
 
-    createdAt: data.created_at ?? new Date().toISOString(),
-    assignedAt: data.assigned_at ?? null,
+    isPaused,
+    pauseInfo: isPaused ? derivePauseInfo(timeline) : null,
+
+    // Se normalizan a ISO: en Firestore estos campos pueden venir como
+    // Timestamp, y un Timestamp crudo rompe cualquier `new Date(...)` posterior
+    // (orden por fecha, filtros, tiempo en cola).
+    createdAt: readTimestamp(data.created_at),
+    assignedAt: readTimestampOrNull(data.assigned_at),
     // "Empaquetado" = picker finalizó el picking; ese es el timestamp que se muestra.
-    packedAt: data.picking_finished_at ?? data.packed_at ?? null,
+    packedAt: readTimestampOrNull(data.picking_finished_at ?? data.packed_at),
   };
 }

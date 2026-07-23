@@ -1,24 +1,28 @@
 import { useRouter } from 'expo-router';
+import type { TFunction } from 'i18next';
 import {
   Box,
   Calendar,
   ChevronRight,
   Clock,
+  type LucideIcon,
   Package,
   ShoppingCart,
   User,
   Users2,
-  type LucideIcon,
 } from 'lucide-react-native';
-import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/ui/text';
 import type { Order } from '../types';
 import { formatAssignedDate } from '../utils/format-assigned-date';
-import { ORDER_STATUS_I18N_KEY } from '../utils/order-status';
 import { computePickingProgress } from '../utils/order-progress';
+import {
+  ORDER_STATUS_I18N_KEY,
+  PAUSED_BADGE_STYLE,
+  PAUSED_STATUS_I18N_KEY,
+} from '../utils/order-status';
 import { formatTimeInQueue } from '../utils/time-in-queue';
 import { CircularProgress } from './circular-progress';
 
@@ -121,15 +125,16 @@ interface OrdersListCardProps {
   teamMemberCount?: number;
 }
 
-const CARD_BADGE: Partial<Record<Order['status'], { bg: string; text: string; labelKey: string }>> = {
-  assigned: { bg: '#FEF3C7', text: '#B45309', labelKey: 'picking.card.statusPending' },
-  in_progress: { bg: '#D1FAE5', text: '#059669', labelKey: 'picking.card.statusPicking' },
-  to_pack: { bg: '#E0E7FF', text: '#4338CA', labelKey: 'orderStatus.toPack' },
-  rejected_review: { bg: '#FEE2E2', text: '#B91C1C', labelKey: 'orderStatus.rejectedReview' },
-  audited: { bg: '#DCFCE7', text: '#15803D', labelKey: 'orderStatus.approved' },
-  packed: { bg: '#DCFCE7', text: '#15803D', labelKey: 'orderStatus.packed' },
-  dispatched: { bg: '#DBEAFE', text: '#1D4ED8', labelKey: 'orderStatus.dispatched' },
-};
+const CARD_BADGE: Partial<Record<Order['status'], { bg: string; text: string; labelKey: string }>> =
+  {
+    assigned: { bg: '#FEF3C7', text: '#B45309', labelKey: 'orderStatus.assigned' },
+    in_progress: { bg: '#D1FAE5', text: '#059669', labelKey: 'orderStatus.inProgress' },
+    to_pack: { bg: '#E0E7FF', text: '#4338CA', labelKey: 'orderStatus.toPack' },
+    rejected_review: { bg: '#FEE2E2', text: '#B91C1C', labelKey: 'orderStatus.rejectedReview' },
+    audited: { bg: '#DCFCE7', text: '#15803D', labelKey: 'orderStatus.approved' },
+    packed: { bg: '#DCFCE7', text: '#15803D', labelKey: 'orderStatus.packed' },
+    dispatched: { bg: '#DBEAFE', text: '#1D4ED8', labelKey: 'orderStatus.dispatched' },
+  };
 
 function PickerProcessBlock({ order, t }: { order: Order; t: TFunction }) {
   if (order.status !== 'in_progress') {
@@ -152,7 +157,16 @@ function PickerProcessBlock({ order, t }: { order: Order; t: TFunction }) {
 
   const progress = computePickingProgress(order);
   return (
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, minWidth: 0, paddingTop: 1 }}>
+    <View
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        minWidth: 0,
+        paddingTop: 1,
+      }}
+    >
       <CircularProgress progress={progress} size={META_PROGRESS_SIZE} color="#10B981" />
       <Text style={styles.progressLabel} numberOfLines={2}>
         {t('picking.card.progress')}
@@ -166,7 +180,16 @@ function LeadProcessBlock({ order, t }: { order: Order; t: TFunction }) {
 
   if (order.status === 'in_progress') {
     return (
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, minWidth: 0, paddingTop: 1 }}>
+      <View
+        style={{
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: 8,
+          minWidth: 0,
+          paddingTop: 1,
+        }}
+      >
         <CircularProgress progress={progress} size={META_PROGRESS_SIZE} color="#10B981" />
         <Text style={styles.progressLabel} numberOfLines={2}>
           {t('picking.card.progress')}
@@ -251,11 +274,13 @@ export function OrdersListCard({
 }: OrdersListCardProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  // El estatus "audited" solo cubre el resultado aprobado por diseño (un rechazo
-  // pasa a "rejected_review"), pero se apoya en audit.result como fuente de
-  // verdad en vez de asumirlo por el status.
-  const badge =
-    order.status === 'audited' && order.auditResult === 'rejected'
+  // La pausa reemplaza al badge de estatus en la UI (en BD el pedido conserva
+  // el suyo). El estatus "audited" solo cubre el resultado aprobado por diseño
+  // (un rechazo pasa a "rejected_review"), pero se apoya en audit.result como
+  // fuente de verdad en vez de asumirlo por el status.
+  const badge = order.isPaused
+    ? { ...PAUSED_BADGE_STYLE, labelKey: PAUSED_STATUS_I18N_KEY }
+    : order.status === 'audited' && order.auditResult === 'rejected'
       ? CARD_BADGE.rejected_review
       : CARD_BADGE[order.status];
 
@@ -295,7 +320,9 @@ export function OrdersListCard({
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#DC2626', letterSpacing: 0.5 }}>
+                  <Text
+                    style={{ fontSize: 9, fontWeight: '800', color: '#DC2626', letterSpacing: 0.5 }}
+                  >
                     {t('picking.card.critical')}
                   </Text>
                 </View>

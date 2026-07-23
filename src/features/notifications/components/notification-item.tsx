@@ -1,21 +1,22 @@
+import type { TFunction } from 'i18next';
 import {
   AlertTriangle,
   Ban,
   Bell,
   ChevronRight,
+  type LucideIcon,
+  Package,
   PackageCheck,
   PackageSearch,
   PackageX,
-  Package,
   Pause,
+  Play,
   RefreshCw,
   RotateCcw,
   Search,
   Unlock,
   UserCheck,
-  type LucideIcon,
 } from 'lucide-react-native';
-import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AppNotification, NotificationType } from '@/shared/types';
@@ -37,6 +38,8 @@ export const NOTIFICATION_TYPE_META: Record<
   order_ready_to_audit: { icon: Search, iconColor: '#D97706', iconBg: '#FFFBEB' },
   team_member_done: { icon: UserCheck, iconColor: '#059669', iconBg: '#ECFDF5' },
   picker_idle: { icon: Pause, iconColor: '#6B7280', iconBg: '#F3F4F6' },
+  order_paused: { icon: Pause, iconColor: '#B45309', iconBg: '#FFFBEB' },
+  order_unpaused: { icon: Play, iconColor: '#059669', iconBg: '#ECFDF5' },
 };
 
 const styles = StyleSheet.create({
@@ -157,15 +160,10 @@ export function NotificationItem({
 
             <View style={styles.content}>
               <View style={styles.topRow}>
-                <Text
-                  style={[styles.title, !isUnread ? styles.titleRead : null]}
-                  numberOfLines={2}
-                >
+                <Text style={[styles.title, !isUnread ? styles.titleRead : null]} numberOfLines={2}>
                   {notification.title}
                 </Text>
-                <Text style={styles.time}>
-                  {formatTimeAgo(notification.createdAt, t)}
-                </Text>
+                <Text style={styles.time}>{formatTimeAgo(notification.createdAt, t)}</Text>
               </View>
               <Text style={styles.body} numberOfLines={3}>
                 {notification.body}

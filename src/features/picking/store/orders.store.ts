@@ -1,4 +1,8 @@
 import { create } from 'zustand';
+import { useAuthStore } from '@/features/auth/store/auth.store';
+import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { createNotification } from '@/services/firebase/notifications.service';
+import type { SessionUser } from '@/shared/types';
 import {
   applyAddBultoItem,
   applyApproveAudit,
@@ -7,10 +11,12 @@ import {
   applyFinishPicking,
   applyMarkWrapped,
   applyOpenBulto,
+  applyPausePicking,
   applyRejectAudit,
   applyRemoveBultoItem,
   applyReopenBulto,
   applyReopenForRevision,
+  applyResumePicking,
   applyStartPicking,
   applyUpdateBultoItem,
   canCloseBulto,
@@ -22,16 +28,14 @@ import {
   firestoreFinishPicking,
   firestoreMarkWrapped,
   firestorePartialSave,
+  firestorePausePicking,
   firestoreRejectAudit,
   firestoreReopenForRevision,
+  firestoreResumePicking,
   firestoreStartPicking,
 } from '../services/orders.service';
-import type { Order, OrderStatus, PickerActionError } from '../types';
+import type { Order, OrderStatus, PauseReason, PickerActionError } from '../types';
 import { canPickerStartOrder } from '../utils/picker-queue';
-import { useAuthStore } from '@/features/auth/store/auth.store';
-import { usePickersStore } from '@/features/warehouse/store/pickers.store';
-import { createNotification } from '@/services/firebase/notifications.service';
-import type { SessionUser } from '@/shared/types';
 
 /**
  * Notificaciones App→Web (channel `web`, `recipients: []` = broadcast) al
@@ -114,7 +118,7 @@ function patchOrder(orders: Order[], id: string, patch: Partial<Order>): Order[]
 }
 
 type OpenBultoResult = { ok: true; isExtra: boolean } | { ok: false; error: PickerActionError };
-type StartPickingResult = { ok: true } | { ok: false; error: 'not_queue_head' | 'already_active_order' };
+type StartPickingResult = { ok: true } | { ok: false; error: 'already_active_order' };
 type CloseBultoResult = { ok: true } | { ok: false; error: PickerActionError };
 type FinishPickingResult = { ok: true } | { ok: false; error: PickerActionError };
 type RemoveItemResult = { ok: true; bultoEmpty: boolean; bultoId: string; bultoNumber: number };
@@ -123,6 +127,8 @@ interface OrdersState {
   orders: Order[];
   /** Hidrata el store con pedidos desde Firestore, preservando estado local de bultos si el pedido está en progreso. */
   hydrateOrders: (incoming: Order[]) => void;
+  /** Reinyecta el picking en curso guardado en disco (ver orders-local-work). */
+  restoreLocalWork: (saved: Order[]) => void;
   getOrderById: (id: string) => Order | undefined;
   getOrdersByStatus: (status: OrderStatus) => Order[];
   getOrdersByPicker: (pickerId: string) => Order[];
@@ -134,7 +140,14 @@ interface OrdersState {
   /** Actualización optimista de `team.picker_uids` (el listener de Firestore la confirma). */
   setTeamPickers: (orderId: string, pickerUids: string[]) => void;
   approveAudit: (orderId: string) => void;
-  rejectAudit: (orderId: string, auditorId: string, auditorName: string, observation: string) => void;
+  rejectAudit: (
+    orderId: string,
+    auditorId: string,
+    auditorName: string,
+    observation: string,
+  ) => void;
+  pausePicking: (orderId: string, reason: PauseReason, missingSkus: string[]) => void;
+  resumePicking: (orderId: string) => void;
   openBulto: (orderId: string) => OpenBultoResult;
   closeBulto: (orderId: string, bultoId: string) => CloseBultoResult;
   reopenBulto: (orderId: string, bultoId: string) => void;
@@ -202,18 +215,50 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     });
   },
 
+  restoreLocalWork: (saved) => {
+    if (saved.length === 0) return;
+    set((s) => {
+      const savedMap = new Map(saved.map((o) => [o.id, o]));
+      const merged = s.orders.map((current) => {
+        const local = savedMap.get(current.id);
+        savedMap.delete(current.id);
+        if (!local) return current;
+
+        // El pedido ya llegó del servidor (o de su caché): se respeta el estado
+        // remoto salvo que siga en picking, donde lo local es lo más nuevo.
+        if (current.status !== 'in_progress' || local.status !== 'in_progress') return current;
+
+        return {
+          ...current,
+          bultos: local.bultos,
+          progressPercentage: local.progressPercentage,
+          bundlesCreated: local.bundlesCreated,
+          finalSkus: local.finalSkus,
+          hasExtraBultos: local.hasExtraBultos,
+          lastSavedMilestone: local.lastSavedMilestone,
+          snapshotOriginal: local.snapshotOriginal ?? current.snapshotOriginal,
+        };
+      });
+
+      // Lo guardado que aún no llegó del listener se agrega tal cual: sin red y
+      // sin caché es la única copia del trabajo hecho.
+      return { orders: [...merged, ...savedMap.values()] };
+    });
+  },
+
   getOrderById: (id) => get().orders.find((o) => o.id === id),
   getOrdersByStatus: (status) => get().orders.filter((o) => o.status === status),
   getOrdersByPicker: (pickerId) => get().orders.filter((o) => o.assignedPickerId === pickerId),
   hasActiveOrder: (pickerId) =>
-    get().orders.some((o) => o.assignedPickerId === pickerId && o.status === 'in_progress'),
+    get().orders.some(
+      (o) => o.assignedPickerId === pickerId && o.status === 'in_progress' && !o.isPaused,
+    ),
 
   startPicking: (orderId, pickerId) => {
     const order = get().getOrderById(orderId);
-    if (!order) return { ok: false, error: 'not_queue_head' };
+    if (!order) return { ok: false, error: 'already_active_order' };
 
-    const pickerOrders = get().getOrdersByPicker(pickerId);
-    const check = canPickerStartOrder(order, pickerOrders, get().hasActiveOrder(pickerId));
+    const check = canPickerStartOrder(get().hasActiveOrder(pickerId));
     if (!check.ok) return check;
 
     const patch = applyStartPicking(order, pickerId);
@@ -303,7 +348,11 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     const order = get().getOrderById(orderId);
     if (!order) return;
     set((s) => ({
-      orders: patchOrder(s.orders, orderId, applyRejectAudit(order, auditorId, auditorName, observation)),
+      orders: patchOrder(
+        s.orders,
+        orderId,
+        applyRejectAudit(order, auditorId, auditorName, observation),
+      ),
     }));
 
     const user = useAuthStore.getState().user;
@@ -312,6 +361,39 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
         console.error('[orders.store] rejectAudit Firestore error', e),
       );
       notifyAuditOutcome(order, user, 'rejected', observation);
+    }
+  },
+
+  pausePicking: (orderId, reason, missingSkus) => {
+    const order = get().getOrderById(orderId);
+    if (!order) return;
+
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    set((s) => ({
+      orders: patchOrder(s.orders, orderId, applyPausePicking(order, user, reason, missingSkus)),
+    }));
+
+    // `order.status` es el estatus operativo (la pausa nunca lo cambia): se
+    // envía para registrarlo en la nota de la entrada de timeline.
+    firestorePausePicking(orderId, user, reason, missingSkus, order.status).catch((e) =>
+      console.error('[orders.store] pausePicking Firestore error', e),
+    );
+  },
+
+  resumePicking: (orderId) => {
+    const order = get().getOrderById(orderId);
+    if (!order) return;
+
+    set((s) => ({ orders: patchOrder(s.orders, orderId, applyResumePicking(order)) }));
+
+    const user = useAuthStore.getState().user;
+    if (user) {
+      // Restaura el estatus operativo actual (que la app conserva en memoria).
+      firestoreResumePicking(orderId, user, order.status).catch((e) =>
+        console.error('[orders.store] resumePicking Firestore error', e),
+      );
     }
   },
 
@@ -373,7 +455,11 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     const order = get().getOrderById(orderId);
     if (!order) return;
     set((s) => ({
-      orders: patchOrder(s.orders, orderId, applyAddBultoItem(order, bultoId, sku, name, qty, options)),
+      orders: patchOrder(
+        s.orders,
+        orderId,
+        applyAddBultoItem(order, bultoId, sku, name, qty, options),
+      ),
     }));
   },
 

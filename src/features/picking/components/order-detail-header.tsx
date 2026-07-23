@@ -1,4 +1,4 @@
-import { ArrowLeft, AlertCircle } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
@@ -12,8 +12,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { OrderStatus } from '../types';
+import {
+  ORDER_STATUS_I18N_KEY,
+  PAUSED_BADGE_STYLE,
+  PAUSED_STATUS_I18N_KEY,
+} from '../utils/order-status';
 import { OrderDetailTransitionProgressContext } from './order-detail-transition';
-import { ORDER_STATUS_I18N_KEY } from '../utils/order-status';
 
 const SCREEN_BG = '#F2F2F7';
 const ENTER_MS = 300;
@@ -188,6 +192,8 @@ interface OrderDetailHeaderProps {
   status: OrderStatus;
   /** Resultado de auditoría (`order.auditResult`); afecta la etiqueta cuando status es "audited". */
   auditResult?: 'approved' | 'rejected' | null;
+  /** Si el pedido está pausado, el badge "En pausa" reemplaza al del estatus. */
+  isPaused?: boolean;
   meta: { label: string; value: string }[];
   onBack: () => void;
   footer?: React.ReactNode;
@@ -202,6 +208,7 @@ export function OrderDetailHeader({
   client,
   status,
   auditResult,
+  isPaused = false,
   meta,
   onBack,
   footer,
@@ -210,11 +217,12 @@ export function OrderDetailHeader({
 }: OrderDetailHeaderProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const badgeStyle = STATUS_STYLE[status];
+  const badgeStyle = isPaused ? PAUSED_BADGE_STYLE : STATUS_STYLE[status];
   // "audited" solo cubre el resultado aprobado por diseño (un rechazo pasa a
   // "rejected_review"), pero se apoya en audit.result como fuente de verdad.
-  const statusLabel =
-    status === 'audited' && auditResult === 'rejected'
+  const statusLabel = isPaused
+    ? t(PAUSED_STATUS_I18N_KEY)
+    : status === 'audited' && auditResult === 'rejected'
       ? t(ORDER_STATUS_I18N_KEY.rejected_review)
       : status === 'audited'
         ? t('orderStatus.approved')
@@ -296,9 +304,7 @@ export function OrderDetailHeader({
               </View>
               {badgeStyle ? (
                 <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
-                  <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
-                    {statusLabel}
-                  </Text>
+                  <Text style={[styles.badgeText, { color: badgeStyle.text }]}>{statusLabel}</Text>
                 </View>
               ) : null}
             </View>

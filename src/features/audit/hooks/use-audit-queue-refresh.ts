@@ -9,6 +9,7 @@ import {
 } from '@/features/notifications/utils/order-notifications';
 import { firestoreDocToOrder } from '@/features/picking/services/orders.mapper';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
+import { useSyncStore } from '@/features/sync/store/sync.store';
 import { firestore } from '@/services/firebase';
 
 /**
@@ -33,6 +34,12 @@ export function useAuditQueueRefresh() {
         .collection('lo_orders')
         .where('status', '==', 'Empaquetado')
         .get();
+      // Offline el `get()` resuelve desde caché sin fallar: la metadata es lo
+      // único que delata que no se habló con el servidor.
+      useSyncStore.getState().setSyncStatus({
+        fromCache: snapshot.metadata.fromCache,
+        hasPendingWrites: snapshot.metadata.hasPendingWrites,
+      });
       const mapped = snapshot.docs.map((doc) => firestoreDocToOrder(doc.id, doc.data()));
       hydrateOrders(mapped);
 

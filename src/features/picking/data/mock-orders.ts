@@ -432,7 +432,10 @@ export const MOCK_ORDERS: Order[] = [
     assignedAt: hours(3),
     packedAt: null,
   },
-].map((order) => ({
-  ...order,
-  finalSkus: order.finalSkus.length > 0 ? order.finalSkus : withFinalSkus(order as Order),
-})) as Order[];
+].map((order) => {
+  const withPause = { ...order, isPaused: false, pauseInfo: null } as Order;
+  return {
+    ...withPause,
+    finalSkus: withPause.finalSkus.length > 0 ? withPause.finalSkus : withFinalSkus(withPause),
+  };
+}) as Order[];

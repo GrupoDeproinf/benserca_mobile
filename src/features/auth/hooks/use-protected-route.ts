@@ -1,5 +1,4 @@
 import { useRouter, useSegments } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { AUTH_ROUTES, getRoleHomePath } from '@/features/auth/constants/routes';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -16,7 +15,7 @@ export function useProtectedRoute() {
 
   useEffect(() => {
     if (!isHydrated) return;
-    SplashScreen.hideAsync().catch(() => null);
+    // El splash lo oculta `SplashGate`, que además hace el fade de salida.
 
     const rootSegment = segments[0];
     const inAuthGroup = rootSegment === '(auth)';

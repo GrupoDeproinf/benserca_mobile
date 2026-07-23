@@ -1,35 +1,32 @@
 import type { Order } from '../types';
 
-/** Orden de cola: en proceso primero, luego por queuePosition. */
+/**
+ * Orden de cola: en proceso primero, luego por queuePosition. Un pedido
+ * `in_progress` pausado no cuenta como "en proceso" para este orden: no debe
+ * seguir ocupando la cabeza de la cola y bloqueando el arranque de otros
+ * pedidos asignados al mismo picker.
+ */
 export function sortPickerOrders(orders: Order[]): Order[] {
   return [...orders].sort((a, b) => {
-    if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
-    if (b.status === 'in_progress' && a.status !== 'in_progress') return 1;
+    const aActive = a.status === 'in_progress' && !a.isPaused;
+    const bActive = b.status === 'in_progress' && !b.isPaused;
+    if (aActive && !bActive) return -1;
+    if (bActive && !aActive) return 1;
     return a.queuePosition - b.queuePosition;
   });
 }
 
+/**
+ * La cola (`queuePosition`) solo define el orden de aparición en la lista;
+ * nunca bloquea el inicio de un pedido. El único bloqueo real es tener otro
+ * pedido en proceso sin pausar (un picker no puede picar 2 pedidos activos
+ * a la vez).
+ */
 export function canPickerStartOrder(
-  order: Order,
-  pickerOrders: Order[],
   hasActiveOrder: boolean,
-): { ok: true } | { ok: false; error: 'not_queue_head' | 'already_active_order' } {
+): { ok: true } | { ok: false; error: 'already_active_order' } {
   if (hasActiveOrder) return { ok: false, error: 'already_active_order' };
-
-  const sorted = sortPickerOrders(
-    pickerOrders.filter((o) => o.status === 'assigned' || o.status === 'in_progress'),
-  );
-  const head = sorted[0];
-  if (!head || head.id !== order.id) return { ok: false, error: 'not_queue_head' };
-
   return { ok: true };
-}
-
-export function isPickerQueueHead(order: Order, pickerOrders: Order[]): boolean {
-  const sorted = sortPickerOrders(
-    pickerOrders.filter((o) => o.status === 'assigned' || o.status === 'in_progress'),
-  );
-  return sorted[0]?.id === order.id;
 }
 
 /** Posición efectiva en la cola (1 = cabeza), según el orden actual. */

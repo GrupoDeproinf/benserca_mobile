@@ -1,17 +1,11 @@
 import { useRouter } from 'expo-router';
-import {
-  FilePlus2,
-  Package,
-  RefreshCw,
-  type LucideIcon,
-} from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { FilePlus2, Package, PauseCircle, type LucideIcon } from 'lucide-react-native';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Animated,
   Dimensions,
-  Easing,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +14,8 @@ import {
 import { useOrdersStore } from '@/features/picking/store/orders.store';
 import type { OrderStatus } from '@/features/picking/types';
 import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height';
+import { RefreshIconButton } from '@/shared/components/ui/refresh-icon-button';
+import { useSupervisorOrdersRefresh } from '../hooks/use-supervisor-orders-refresh';
 import {
   countOrdersByStatus,
   SECTION_ICON,
@@ -110,58 +106,6 @@ function StatusTile({ label, count, icon: Icon, tone, onPress }: StatusTileProps
   );
 }
 
-function RefreshButton({ onPress, label }: { onPress: () => void; label: string }) {
-  const spin = useRef(new Animated.Value(0)).current;
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!busy) {
-      spin.setValue(0);
-      return;
-    }
-    const anim = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: 700,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    anim.start();
-    const timer = setTimeout(() => {
-      anim.stop();
-      setBusy(false);
-      spin.setValue(0);
-    }, 900);
-    return () => {
-      anim.stop();
-      clearTimeout(timer);
-    };
-  }, [busy, spin]);
-
-  const rotate = spin.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  return (
-    <Pressable
-      onPress={() => {
-        if (busy) return;
-        setBusy(true);
-        onPress();
-      }}
-      accessibilityLabel={label}
-      style={({ pressed }) => [styles.refreshBtn, pressed && styles.refreshBtnPressed]}
-    >
-      <Animated.View style={{ transform: [{ rotate }] }}>
-        <RefreshCw size={16} color="#FFFFFF" strokeWidth={2.4} />
-      </Animated.View>
-      <Text style={styles.refreshLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
 export function SupervisorDashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -170,9 +114,16 @@ export function SupervisorDashboardScreen() {
 
   const counts = useMemo(() => countOrdersByStatus(orders), [orders]);
   const total = orders.length;
+  const pausedCount = useMemo(() => orders.filter((o) => o.isPaused).length, [orders]);
+
+  const { refreshing, refresh } = useSupervisorOrdersRefresh();
 
   const goToStatus = (status: OrderStatus) => {
     router.push(`/(app)/supervisor-almacen/status/${status}` as never);
+  };
+
+  const goToPaused = () => {
+    router.push('/(app)/supervisor-almacen/paused' as never);
   };
 
   return (
@@ -180,33 +131,42 @@ export function SupervisorDashboardScreen() {
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#111827" />
+      }
     >
       <View style={styles.header}>
         <Text style={styles.title}>{t('supervisorAlmacen.dashboard.title')}</Text>
-        <RefreshButton
-          label={t('supervisorAlmacen.dashboard.refresh')}
-          onPress={() => {
-            /* Los pedidos ya llegan en vivo por el listener; esto da feedback visual. */
-          }}
+        <RefreshIconButton
+          onPress={refresh}
+          refreshing={refreshing}
+          accessibilityLabel={t('supervisorAlmacen.dashboard.refresh')}
         />
       </View>
 
-      <View style={styles.kpiCard}>
-        <View style={styles.kpiCell}>
-          <View style={[styles.kpiIconBadge, { backgroundColor: '#F3F4F6' }]}>
-            <Package size={18} color="#374151" strokeWidth={2.2} />
-          </View>
-          <Text style={styles.kpiLabel}>{t('supervisorAlmacen.dashboard.totalOrders')}</Text>
-          <Text style={styles.kpiValue}>{total}</Text>
+      <View style={styles.totalCard}>
+        <View style={[styles.kpiIconBadge, { backgroundColor: '#F3F4F6' }]}>
+          <Package size={18} color="#374151" strokeWidth={2.2} />
         </View>
-        <View style={styles.kpiDivider} />
-        <Pressable style={styles.kpiCell} onPress={() => goToStatus('new')}>
-          <View style={[styles.kpiIconBadge, { backgroundColor: '#F3F4F6' }]}>
-            <FilePlus2 size={18} color="#374151" strokeWidth={2.2} />
-          </View>
-          <Text style={styles.kpiLabel}>{t('supervisorAlmacen.dashboard.newUnassigned')}</Text>
-          <Text style={styles.kpiValue}>{counts.new}</Text>
-        </Pressable>
+        <Text style={styles.totalLabel}>{t('supervisorAlmacen.dashboard.totalOrders')}</Text>
+        <Text style={styles.totalValue}>{total}</Text>
+      </View>
+
+      <View style={styles.topTilesRow}>
+        <StatusTile
+          label={t('supervisorAlmacen.paused.title')}
+          count={pausedCount}
+          icon={PauseCircle}
+          tone="neutral"
+          onPress={goToPaused}
+        />
+        <StatusTile
+          label={t('supervisorAlmacen.dashboard.newUnassigned')}
+          count={counts.new}
+          icon={FilePlus2}
+          tone="neutral"
+          onPress={() => goToStatus('new')}
+        />
       </View>
 
       {STATUS_SECTION_ORDER.map((section) => {
@@ -261,31 +221,9 @@ const styles = StyleSheet.create({
     color: '#111827',
     lineHeight: 34,
   },
-  refreshBtn: {
+  totalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#111827',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  refreshBtnPressed: {
-    backgroundColor: '#374151',
-  },
-  refreshLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  kpiCard: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1,
@@ -297,11 +235,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  kpiCell: { flex: 1 },
-  kpiDivider: {
-    width: 1,
-    backgroundColor: '#E5E5EA',
-    marginHorizontal: 14,
+  topTilesRow: {
+    flexDirection: 'row',
+    gap: GRID_GAP,
+    marginTop: GRID_GAP,
   },
   kpiIconBadge: {
     width: 36,
@@ -310,20 +247,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kpiLabel: {
+  totalLabel: {
+    flex: 1,
     fontSize: 11,
     fontWeight: '600',
     color: '#6B7280',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
-    marginTop: 8,
+    marginLeft: 12,
   },
-  kpiValue: {
+  totalValue: {
     fontSize: 30,
     fontWeight: '800',
     color: '#111827',
     lineHeight: 34,
-    marginTop: 2,
+    marginLeft: 12,
   },
   sectionBlock: { marginTop: 22 },
   sectionHeader: {

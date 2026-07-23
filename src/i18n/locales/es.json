@@ -33,6 +33,7 @@
     "rejectedReview": "Rechazado - Revisión",
     "audited": "Auditado",
     "approved": "Aprobado",
+    "paused": "En pausa",
     "dispatched": "Despachado",
     "annulled": "Anulado",
     "recovered": "Recuperado"
@@ -100,6 +101,8 @@
       "startPicking": "Iniciar picking",
       "reopenPicking": "Reabrir picking",
       "openBulto": "Abrir nuevo bulto",
+      "pausePicking": "Pausar picking",
+      "resumePicking": "Reanudar picking",
       "finishPicking": "Finalizar picking",
       "markWrapped": "Marcar como embalado",
       "markPacked": "Marcar como empaquetado",
@@ -122,10 +125,7 @@
     },
     "queue": {
       "blockTitle": "No puedes iniciar",
-      "notHead": "Solo puedes iniciar el pedido en posición #1 de tu cola.",
-      "alreadyActive": "Ya tienes un pedido en proceso. Finalízalo antes de iniciar otro.",
-      "waitTitle": "En espera",
-      "waitBody": "Este pedido está en posición #{{position}} de tu cola."
+      "alreadyActive": "Ya tienes un pedido en proceso. Finalízalo o pon en pausa antes de iniciar otro."
     },
     "bulto": {
       "title": "Bulto {{number}}",
@@ -200,6 +200,19 @@
     },
     "rejection": {
       "title": "Observación del chequeador"
+    },
+    "pause": {
+      "title": "Pausar picking",
+      "subtitle": "Indica el motivo de la pausa. El pedido no cambiará de estatus mientras esté pausado.",
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "Selecciona un motivo",
+      "reasonMissingItem": "Falta de artículo",
+      "reasonPriorityChange": "Cambio de prioridad",
+      "missingItemsLabel": "Marca los artículos faltantes",
+      "confirm": "Pausar pedido",
+      "bannerTitle": "Pedido pausado",
+      "bannerBodyMissing": "Falta de artículo: {{skus}}",
+      "bannerBodyPriority": "Motivo: cambio de prioridad"
     }
   },
   "welcome": {
@@ -259,6 +272,7 @@
     "profile": "Perfil",
     "notifications": "Notificaciones",
     "auditQueue": "Cola",
+    "paused": "Pausados",
     "team": "Equipo",
     "pickers": "Pickers",
     "warehouse": "Almacén",
@@ -299,6 +313,9 @@
       "unassigned": "Sin asignar",
       "apply": "Aplicar",
       "clear": "Limpiar"
+    },
+    "paused": {
+      "title": "Pausados"
     }
   },
   "notifications": {
@@ -485,6 +502,12 @@
       "required": "La observación es obligatoria.",
       "confirm": "Rechazar pedido",
       "bultoLine": "Bulto {{number}}: revisar contenido."
+    },
+    "paused": {
+      "title": "Pedidos pausados",
+      "subtitle": "Pedidos con picking pausado, sin importar su estatus",
+      "emptyTitle": "Sin pedidos pausados",
+      "emptySubtitle": "Los pedidos que un picker pause aparecerán aquí."
     }
   },
   "supervision": {
@@ -627,5 +650,11 @@
     "light": "Claro",
     "dark": "Oscuro",
     "signOut": "Cerrar sesión"
+  },
+  "sync": {
+    "offline": "Sin conexión — tu trabajo se guarda y se enviará al volver la señal",
+    "offlineWithPending": "Sin conexión — hay cambios pendientes de enviar",
+    "pending": "Enviando cambios…",
+    "catalogReady": "Catálogo listo para trabajar sin conexión"
   }
 }

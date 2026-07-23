@@ -18,6 +18,15 @@ export function statusLabelKey(status: OrderStatus): string {
   return ORDER_STATUS_I18N_KEY[status];
 }
 
+/**
+ * La pausa NO es un estatus en base de datos (el pedido conserva el suyo), pero
+ * en la UI el badge de "En pausa" reemplaza al del estatus, tanto en las listas
+ * como en el detalle. Estas dos constantes mantienen ese badge consistente.
+ */
+export const PAUSED_STATUS_I18N_KEY = 'orderStatus.paused';
+
+export const PAUSED_BADGE_STYLE = { bg: '#FEF3C7', text: '#B45309' };
+
 const MOBILE_TRANSITIONS: Partial<
   Record<OrderStatus, Partial<Record<UserRole, readonly OrderStatus[]>>>
 > = {
@@ -30,11 +39,7 @@ const MOBILE_TRANSITIONS: Partial<
   rejected_review: { picker: ['in_progress'] },
 };
 
-export function canTransition(
-  from: OrderStatus,
-  to: OrderStatus,
-  role: UserRole,
-): boolean {
+export function canTransition(from: OrderStatus, to: OrderStatus, role: UserRole): boolean {
   const allowed = MOBILE_TRANSITIONS[from]?.[role];
   return allowed?.includes(to) ?? false;
 }

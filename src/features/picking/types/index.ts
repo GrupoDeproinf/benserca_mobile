@@ -1,3 +1,5 @@
+import type { UserRole } from '@/shared/types';
+
 // ───────── Pedido ─────────
 export type OrderStatus =
   | 'new'
@@ -77,6 +79,45 @@ export interface AuditObservation {
   createdAt: string;
 }
 
+/** Motivo de la pausa de picking. */
+export type PauseReason = 'falta_articulo' | 'cambio_prioridad';
+
+/**
+ * Entrada del historial de eventos del pedido (`timeline` en Firestore). Es
+ * append-only: cada transición (incl. pausa/despausa) hace push de una entrada.
+ * Para la pausa se aprovechan los campos extra `reason` / `missingSkus`.
+ */
+export interface TimelineEntry {
+  /** Estatus asociado al evento. La pausa usa `'Pausa'`; la despausa el operativo. */
+  status: string;
+  timestamp: string;
+  userUid: string;
+  userName: string;
+  userRole?: UserRole;
+  note?: string | null;
+  /** Solo en la entrada de pausa. */
+  reason?: PauseReason;
+  /** Solo en la entrada de pausa con `reason === 'falta_articulo'`. */
+  missingSkus?: string[];
+}
+
+/**
+ * Vista derivada de la pausa activa. NO se persiste como objeto propio: se
+ * calcula en el mapper a partir de la última entrada de `timeline` con
+ * `status === 'Pausa'` (mientras `isPaused` sea true). La pausa no cambia el
+ * `status` del pedido.
+ */
+export interface PauseInfo {
+  reason: PauseReason;
+  /** SKUs marcados como faltantes; solo aplica si `reason === 'falta_articulo'`. */
+  missingSkus: string[];
+  authorId: string;
+  authorName: string;
+  authorRole?: UserRole;
+  createdAt: string;
+  note?: string | null;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -110,6 +151,10 @@ export interface Order {
   /** Resultado de la última auditoría (`audit.result` en Firestore). */
   auditResult: 'approved' | 'rejected' | null;
 
+  /** Pausa activa del picking. No cambia `status`; es un flag ortogonal. */
+  isPaused: boolean;
+  pauseInfo: PauseInfo | null;
+
   createdAt: string;
   assignedAt: string | null;
   packedAt: string | null;
@@ -135,10 +180,11 @@ export type OrderDomainAction =
   | 'mark_wrapped'
   | 'approve_audit'
   | 'reject_audit'
-  | 'reopen_for_revision';
+  | 'reopen_for_revision'
+  | 'pause_picking'
+  | 'resume_picking';
 
 export type PickerActionError =
-  | 'not_queue_head'
   | 'already_active_order'
   | 'empty_open_bulto_exists'
   | 'cannot_close_empty_bulto'

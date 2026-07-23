@@ -1,3 +1,4 @@
+import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
@@ -7,6 +8,7 @@ import {
   toSnapshotMap,
   type OrderSnapshotSig,
 } from '@/features/notifications/utils/order-notifications';
+import { useSyncStore } from '@/features/sync/store/sync.store';
 import { firestore } from '@/services/firebase';
 import { firestoreDocToOrder } from '../services/orders.mapper';
 import type { Order } from '../types';
@@ -46,6 +48,21 @@ export function useSessionOrdersListener() {
 
     const col = firestore().collection('lo_orders');
 
+    const trackSyncStatus = (snapshot: FirebaseFirestoreTypes.QuerySnapshot) => {
+      useSyncStore.getState().setSyncStatus({
+        fromCache: snapshot.metadata.fromCache,
+        hasPendingWrites: snapshot.metadata.hasPendingWrites,
+      });
+    };
+
+    /**
+     * Con `includeMetadataChanges` llegan snapshots que solo confirman lo que ya
+     * teníamos. Remapearlos no cambia nada y sí genera trabajo (merge del store,
+     * re-render, guardado en disco), así que se descartan.
+     */
+    const isMetadataOnly = (snapshot: FirebaseFirestoreTypes.QuerySnapshot) =>
+      prevSnapshotRef.current !== null && snapshot.docChanges().length === 0;
+
     const emit = (mapped: Order[]) => {
       hydrateOrders(mapped);
 
@@ -68,7 +85,10 @@ export function useSessionOrdersListener() {
       };
 
       const unsubSelf = col.where('assigned_to.uid', '==', user.uid).onSnapshot(
+        { includeMetadataChanges: true },
         (snapshot) => {
+          trackSyncStatus(snapshot);
+          if (isMetadataOnly(snapshot)) return;
           bySelf.clear();
           for (const doc of snapshot.docs) {
             bySelf.set(doc.id, firestoreDocToOrder(doc.id, doc.data()));
@@ -81,7 +101,10 @@ export function useSessionOrdersListener() {
       const unsubTeam = col
         .where('team.picker_uids', 'array-contains', user.uid)
         .onSnapshot(
+          { includeMetadataChanges: true },
           (snapshot) => {
+            trackSyncStatus(snapshot);
+            if (isMetadataOnly(snapshot)) return;
             byTeam.clear();
             for (const doc of snapshot.docs) {
               byTeam.set(doc.id, firestoreDocToOrder(doc.id, doc.data()));
@@ -112,8 +135,15 @@ export function useSessionOrdersListener() {
     const query = buildQuery();
     if (!query) return;
 
+    // `includeMetadataChanges` habilita el estado de sincronización: Firestore
+    // avisa si el snapshot vino de caché (sin servidor) y si quedan escrituras
+    // sin confirmar. Ver sync.store.
     const unsub = query.onSnapshot(
+      { includeMetadataChanges: true },
       (snapshot) => {
+        trackSyncStatus(snapshot);
+        if (isMetadataOnly(snapshot)) return;
+
         const mapped = snapshot.docs.map((doc) => firestoreDocToOrder(doc.id, doc.data()));
         emit(mapped);
       },

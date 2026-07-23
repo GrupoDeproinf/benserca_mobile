@@ -15,16 +15,19 @@ export interface OrderDetailAction {
   icon?: LucideIcon;
 }
 
+/** Un elemento full-width, o un array anidado para renderizar esas acciones en una misma fila. */
+type OrderDetailActionItem = OrderDetailAction | OrderDetailAction[];
+
 interface OrderDetailActionsProps {
-  actions: OrderDetailAction[];
+  actions: OrderDetailActionItem[];
 }
 
-export function estimateOrderActionsHeight(actionCount: number, bottomInset: number): number {
-  if (actionCount === 0) return 0;
-  const gaps = Math.max(0, actionCount - 1) * BUTTON_GAP;
+export function estimateOrderActionsHeight(rowCount: number, bottomInset: number): number {
+  if (rowCount === 0) return 0;
+  const gaps = Math.max(0, rowCount - 1) * BUTTON_GAP;
   return (
     DOCK_PADDING_TOP +
-    actionCount * BUTTON_HEIGHT +
+    rowCount * BUTTON_HEIGHT +
     gaps +
     Math.max(bottomInset, 16) +
     8
@@ -46,15 +49,30 @@ export function OrderDetailActions({ actions }: OrderDetailActionsProps) {
         },
       ]}
     >
-      {actions.map((action) => (
-        <OrderActionButton
-          key={action.label}
-          label={action.label}
-          onPress={action.onPress}
-          variant={action.variant}
-          icon={action.icon}
-        />
-      ))}
+      {actions.map((item) =>
+        Array.isArray(item) ? (
+          <View key={item.map((a) => a.label).join('|')} style={styles.row}>
+            {item.map((action) => (
+              <View key={action.label} style={styles.rowItem}>
+                <OrderActionButton
+                  label={action.label}
+                  onPress={action.onPress}
+                  variant={action.variant}
+                  icon={action.icon}
+                />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <OrderActionButton
+            key={item.label}
+            label={item.label}
+            onPress={item.onPress}
+            variant={item.variant}
+            icon={item.icon}
+          />
+        ),
+      )}
     </View>
   );
 }
@@ -69,5 +87,12 @@ const styles = StyleSheet.create({
     paddingTop: DOCK_PADDING_TOP,
     gap: BUTTON_GAP,
     backgroundColor: DOCK_BG,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: BUTTON_GAP,
+  },
+  rowItem: {
+    flex: 1,
   },
 });

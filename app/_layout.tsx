@@ -6,9 +6,12 @@ import { StatusBar } from 'expo-status-bar';
 import { useProtectedRoute } from '@/features/auth/hooks/use-protected-route';
 import { useFirebaseAuthSync } from '@/features/auth/hooks/use-firebase-auth-sync';
 import { AppProviders } from '@/providers/app-providers';
+import { SplashGate } from '@/shared/components/splash-gate';
 import { useResolvedColorScheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => null);
+// `fade` solo aplica en iOS; en Android el fade lo hace `SplashGate`.
+SplashScreen.setOptions({ duration: 320, fade: true });
 
 function ProtectedRouter() {
   useFirebaseAuthSync();
@@ -27,7 +30,9 @@ export default function RootLayout() {
   return (
     <AppProviders>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <ProtectedRouter />
+      <SplashGate>
+        <ProtectedRouter />
+      </SplashGate>
     </AppProviders>
   );
 }

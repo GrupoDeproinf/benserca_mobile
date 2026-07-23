@@ -1,9 +1,5 @@
 // ───────── Roles & sesión ─────────
-export type UserRole =
-  | 'picker'
-  | 'warehouse_lead'
-  | 'auditor'
-  | 'supervisor_almacen';
+export type UserRole = 'picker' | 'warehouse_lead' | 'auditor' | 'supervisor_almacen';
 
 export interface SessionUser {
   uid: string;
@@ -33,6 +29,9 @@ export type NotificationType =
   | 'picking_continued_with_mismatch'
   | 'order_audit_approved'
   | 'order_audit_rejected'
+  // Pausa de pedidos (App↔Web). Ver order_pause.md
+  | 'order_paused'
+  | 'order_unpaused'
   // Locales, solo dentro de la app móvil
   | 'team_released'
   | 'order_ready_to_audit'

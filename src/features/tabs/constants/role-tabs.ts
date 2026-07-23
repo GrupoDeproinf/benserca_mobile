@@ -37,9 +37,10 @@ export const ROLE_TABS_CONFIG: Record<UserRole, RoleTabsConfig> = {
   warehouse_lead: WAREHOUSE_MANAGER_TABS,
   auditor: {
     initialRoute: 'queue',
-    order: ['queue', 'profile'],
+    order: ['queue', 'paused', 'profile'],
     icons: {
       queue: { outline: 'clipboard-outline', filled: 'clipboard' },
+      paused: { outline: 'pause-circle-outline', filled: 'pause-circle' },
       profile: { outline: 'person-outline', filled: 'person' },
     },
   },

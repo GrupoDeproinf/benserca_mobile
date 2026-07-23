@@ -8,6 +8,7 @@ import { TAB_BAR_COLORS } from '@/features/tabs/constants/tab-bar';
 
 const TAB_TITLES = {
   queue: 'tabs.auditQueue',
+  paused: 'tabs.paused',
   profile: 'tabs.profile',
 } as const;
 

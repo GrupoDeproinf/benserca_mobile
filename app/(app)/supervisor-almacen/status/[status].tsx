@@ -19,5 +19,5 @@ export default function SupervisorStatusRoute() {
     ? (status as OrderStatus)
     : 'assigned';
 
-  return <SupervisorOrdersListScreen status={safeStatus} />;
+  return <SupervisorOrdersListScreen mode={{ type: 'status', status: safeStatus }} />;
 }

@@ -1,19 +1,19 @@
-import { ChevronDown, RefreshCw, Search, SlidersHorizontal } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react-native';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Dimensions,
+  type LayoutRectangle,
   Modal,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
-  type LayoutRectangle,
 } from 'react-native';
-import { ORDER_STATUS_I18N_KEY } from '../utils/order-status';
-import type { PickerOrderFilter } from '../hooks/use-picker-orders';
+import { RefreshIconButton } from '@/shared/components/ui/refresh-icon-button';
 import { PICKER_FILTER_STATUSES } from '../hooks/use-picker-orders';
+import { ORDER_STATUS_I18N_KEY } from '../utils/order-status';
 
 const FILTER_BG = '#FFFFFF';
 const DROPDOWN_GAP = 6;
@@ -83,10 +83,6 @@ const styles = StyleSheet.create({
   filterBtnActive: {
     borderColor: '#111827',
   },
-  refreshBtn: {
-    width: 40,
-    paddingHorizontal: 0,
-  },
   filterBtnLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -112,6 +108,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 10,
+  },
+  /** Red de seguridad si `measureInWindow` no devuelve la posición del botón. */
+  dropdownFallback: {
+    top: '30%',
+    right: SCREEN_EDGE,
+    width: DROPDOWN_WIDTH,
   },
   dropdownItem: {
     paddingHorizontal: 14,
@@ -184,19 +186,25 @@ export function OrdersSearchFilter({
     : t('picking.filter.btn');
 
   const measureAnchor = useCallback(() => {
-    filterBtnRef.current?.measureInWindow((x, y, width, height) => {
+    const node = filterBtnRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') return;
+    node.measureInWindow((x, y, width, height) => {
+      // En Android la medición puede devolver valores vacíos si la vista no
+      // está en la ventana activa; en ese caso se conserva el anchor previo.
+      if (!Number.isFinite(y) || !Number.isFinite(height) || height === 0) return;
       setAnchor({ x, y, width, height });
     });
   }, []);
 
-  const toggle = () => setOpen((v) => !v);
-
-  useEffect(() => {
-    if (!open) return;
+  /**
+   * Se mide ANTES de abrir: una vez montado el Modal, en Android la vista del
+   * botón queda en la ventana de fondo y `measureInWindow` no responde, con lo
+   * que el menú se quedaría sin posición (backdrop visible, dropdown vacío).
+   */
+  const toggle = () => {
     measureAnchor();
-    const timer = setTimeout(measureAnchor, 50);
-    return () => clearTimeout(timer);
-  }, [open, measureAnchor]);
+    setOpen((v) => !v);
+  };
 
   const select = (status: string) => {
     onFilterChange?.(status);
@@ -233,6 +241,7 @@ export function OrdersSearchFilter({
             >
               <View
                 ref={filterBtnRef}
+                onLayout={measureAnchor}
                 style={[styles.filterBtn, (filterActive || open) && styles.filterBtnActive]}
                 collapsable={false}
               >
@@ -256,21 +265,11 @@ export function OrdersSearchFilter({
 
         {onRefresh ? (
           <View style={styles.filterAnchor}>
-            <Pressable
+            <RefreshIconButton
               onPress={onRefresh}
-              disabled={refreshing}
-              accessibilityRole="button"
+              refreshing={refreshing}
               accessibilityLabel={refreshLabel}
-              style={({ pressed }) => [
-                styles.filterPressable,
-                (pressed || refreshing) && { opacity: 0.6 },
-              ]}
-              android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: false }}
-            >
-              <View style={[styles.filterBtn, styles.refreshBtn]} collapsable={false}>
-                <RefreshCw size={16} color="#3C3C43" strokeWidth={2} />
-              </View>
-            </Pressable>
+            />
           </View>
         ) : null}
       </View>
@@ -278,39 +277,34 @@ export function OrdersSearchFilter({
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <Pressable style={styles.backdrop} onPress={close} />
-          {menu ? (
-            <View
-              style={[
-                styles.dropdown,
-                {
-                  top: menu.top,
-                  right: menu.right,
-                  width: menu.width,
-                },
-              ]}
-            >
-              {options.map((status) => {
-                const selected = filterValue === status;
-                return (
-                  <Pressable
-                    key={status}
-                    onPress={() => select(status)}
-                    style={[styles.dropdownItem, selected && styles.dropdownItemSelected]}
+          {/* Si la medición falló, se cae a una posición por defecto: abrir el
+              menú mal ubicado es preferible a abrir un modal vacío. */}
+          <View
+            style={[
+              styles.dropdown,
+              menu
+                ? { top: menu.top, right: menu.right, width: menu.width }
+                : styles.dropdownFallback,
+            ]}
+          >
+            {options.map((status) => {
+              const selected = filterValue === status;
+              return (
+                <Pressable
+                  key={status}
+                  onPress={() => select(status)}
+                  style={[styles.dropdownItem, selected && styles.dropdownItemSelected]}
+                >
+                  <Text
+                    style={[styles.dropdownItemText, selected && styles.dropdownItemTextSelected]}
+                    numberOfLines={1}
                   >
-                    <Text
-                      style={[
-                        styles.dropdownItemText,
-                        selected && styles.dropdownItemTextSelected,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {filterLabel(status, t, getFilterLabel)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
+                    {filterLabel(status, t, getFilterLabel)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </Modal>
     </View>

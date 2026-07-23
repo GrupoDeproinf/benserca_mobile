@@ -7,6 +7,7 @@ import {
   GitCompare,
   MessageSquareWarning,
   Package,
+  Play,
   XCircle,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
@@ -62,6 +63,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   const pickers = usePickersStore((s) => s.pickers);
   const approveAudit = useOrdersStore((s) => s.approveAudit);
   const rejectAudit = useOrdersStore((s) => s.rejectAudit);
+  const resumePicking = useOrdersStore((s) => s.resumePicking);
 
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [rejectSheetVisible, setRejectSheetVisible] = useState(false);
@@ -106,6 +108,10 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   }
 
   const alreadyProcessed = order.status === 'audited' || order.status === 'rejected_review';
+  // El dock de aprobar/rechazar solo aplica cuando el pedido ya está empaquetado
+  // (antes se asumía con !alreadyProcessed, pero ahora esta pantalla también se
+  // abre para pedidos in_progress pausados, que no deben mostrar ese dock).
+  const canReviewAudit = order.status === 'to_pack';
   const bundleVariation = order.bundlesCreated !== order.definedBultos;
   const showComparison = comparisonRows.length > 0;
   const comparisonHasIssues = hasComparisonIssues(comparisonRows);
@@ -123,7 +129,17 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
     router.back();
   };
 
-  const dualActionsHeight = alreadyProcessed ? 0 : estimateOrderActionsHeight(1, insets.bottom);
+  const handleResumePicking = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    resumePicking(order.id);
+    router.back();
+  };
+
+  const dualActionsHeight = canReviewAudit
+    ? estimateOrderActionsHeight(1, insets.bottom)
+    : order.isPaused
+      ? estimateOrderActionsHeight(1, insets.bottom)
+      : 0;
 
   const headerMeta = [
     { label: t('audit.detail.picker'), value: pickerName },
@@ -148,6 +164,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
         client={order.client}
         status={order.status}
         auditResult={order.auditResult}
+        isPaused={order.isPaused}
         onBack={() => router.back()}
         meta={headerMeta}
         metaInScroll
@@ -167,6 +184,20 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
             footer={extraBultosFooter}
             style={styles.scrollMetaCard}
           />
+
+          {order.isPaused && order.pauseInfo ? (
+            <OrderDetailAlertBanner
+              title={t('picking.pause.bannerTitle')}
+              body={
+                order.pauseInfo.reason === 'falta_articulo'
+                  ? t('picking.pause.bannerBodyMissing', {
+                      skus: order.pauseInfo.missingSkus.join(', '),
+                    })
+                  : t('picking.pause.bannerBodyPriority')
+              }
+              author={order.pauseInfo.authorName}
+            />
+          ) : null}
 
           {bundleVariation ? (
             <OrderDetailAlertBanner
@@ -248,7 +279,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
         </ScrollView>
       </OrderDetailBodyFade>
 
-      {!alreadyProcessed ? (
+      {canReviewAudit ? (
         <View style={[styles.dualDock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={[styles.dualBtn, !allReviewed && styles.dualBtnDisabled]}>
             <OrderActionButton
@@ -275,6 +306,15 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
               disabled={!allReviewed || !allApproved}
             />
           </View>
+        </View>
+      ) : order.isPaused ? (
+        <View style={[styles.dualDock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <OrderActionButton
+            label={t('picking.detail.resumePicking')}
+            onPress={handleResumePicking}
+            variant="primary"
+            icon={Play}
+          />
         </View>
       ) : null}
 
