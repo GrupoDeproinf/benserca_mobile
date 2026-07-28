@@ -34,8 +34,11 @@ function timelineEntry(status: string, user: SessionUser, note?: string) {
 
 /**
  * Refleja en `u_pickers/{uid}` si el picker está ocupado con un pedido activo.
- * No crítico: si falla (ej. el doc del picker no existe con ese uid), no debe
- * bloquear la transición del pedido, que es la fuente de verdad real.
+ * No crítico: si falla no debe bloquear la transición del pedido, que es la
+ * fuente de verdad real. Pero SÍ se loguea: un fallo aquí (típicamente porque
+ * el doc de `u_pickers` no tiene como id el `uid` de Auth, ver user-profile)
+ * deja `is_available` desincronizado y hace que el picker aparezca disponible
+ * aunque esté ocupado. Debe ser visible en logs, no tragado en silencio.
  */
 async function updatePickerAvailability(
   pickerUid: string,
@@ -48,8 +51,12 @@ async function updatePickerAvailability(
       current_order_id: currentOrderId,
       last_activity_at: now(),
     });
-  } catch {
-    // no-op
+  } catch (e) {
+    console.error(
+      `[orders.service] updatePickerAvailability falló para ${pickerUid} ` +
+        `(is_available=${isAvailable}). El flag quedará desincronizado.`,
+      e,
+    );
   }
 }
 
@@ -236,6 +243,8 @@ export async function firestorePausePicking(
         missing_skus: missingSkus,
       }),
     });
+  // Al pausar, el picker queda libre para tomar otro pedido.
+  await updatePickerAvailability(user.uid, true, null);
 }
 
 /**
@@ -264,6 +273,8 @@ export async function firestoreResumePicking(
         note: `Pausa quitada. Vuelve a estatus «${toLabel}».`,
       }),
     });
+  // Al reanudar, el picker vuelve a estar ocupado con este pedido.
+  await updatePickerAvailability(user.uid, false, orderId);
 }
 
 export async function firestoreApproveAudit(orderId: string, user: SessionUser): Promise<void> {

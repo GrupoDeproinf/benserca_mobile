@@ -52,8 +52,14 @@ export function derivePickerActivity(
   orders: Order[],
   isAvailable: boolean = true,
 ): PickerActivity {
+  // Un pedido pausado NO ocupa al picker: al pausar queda libre para tomar otro
+  // (ver firestorePausePicking, que además pone `is_available: true`). Se excluye
+  // para que la derivación sea coherente con ese flag.
   const mine = orders.filter(
-    (o) => o.assignedPickerId === pickerUid && ACTIVE_ORDER_STATUSES.includes(o.status),
+    (o) =>
+      o.assignedPickerId === pickerUid &&
+      !o.isPaused &&
+      ACTIVE_ORDER_STATUSES.includes(o.status),
   );
   if (mine.length === 0) {
     return isAvailable
