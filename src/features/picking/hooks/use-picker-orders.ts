@@ -14,12 +14,14 @@ export function usePickerOrders(filter: PickerOrderFilter = 'all'): Order[] {
   return useMemo(() => {
     if (!user) return [];
     // El pedido debería desasignarse al anular/recuperar; este filtro es una red
-    // de seguridad por si esa desasignación falla.
+    // de seguridad por si esa desasignación falla. Despachado tampoco se muestra:
+    // al marcar despachado el picker deja de verlo en su lista.
     const mine = orders.filter(
       (o) =>
         (o.assignedPickerId === user.uid || o.teamPickerUids.includes(user.uid)) &&
         o.status !== 'annulled' &&
-        o.status !== 'recovered',
+        o.status !== 'recovered' &&
+        o.status !== 'dispatched',
     );
     if (filter === 'all') return mine;
     return mine.filter((o) => o.status === filter);

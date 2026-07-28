@@ -36,6 +36,10 @@ const MOBILE_TRANSITIONS: Partial<
   // El picker ya no puede marcar como embalado directamente.
   to_pack: { auditor: ['audited', 'rejected_review'] },
   audited: { picker: ['packed'] },
+  packed: {
+    picker: ['dispatched'],
+    warehouse_lead: ['dispatched'],
+  },
   rejected_review: { picker: ['in_progress'] },
 };
 
@@ -55,6 +59,8 @@ export function nextActionsFor(order: Order, role: UserRole): OrderDomainAction[
       return role === 'auditor' ? ['approve_audit', 'reject_audit'] : [];
     case 'audited':
       return role === 'picker' ? ['mark_wrapped'] : [];
+    case 'packed':
+      return role === 'picker' || role === 'warehouse_lead' ? ['mark_dispatched'] : [];
     case 'rejected_review':
       return role === 'picker' ? ['reopen_for_revision'] : [];
     default:

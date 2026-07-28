@@ -13,6 +13,7 @@ import {
   Play,
   RotateCcw,
   Trash2,
+  Truck,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -90,6 +91,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const startPicking = useOrdersStore((s) => s.startPicking);
   const finishPicking = useOrdersStore((s) => s.finishPicking);
   const markWrapped = useOrdersStore((s) => s.markWrapped);
+  const markDispatched = useOrdersStore((s) => s.markDispatched);
   const reopenForRevision = useOrdersStore((s) => s.reopenForRevision);
   const openBulto = useOrdersStore((s) => s.openBulto);
   const closeBulto = useOrdersStore((s) => s.closeBulto);
@@ -279,6 +281,20 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     });
   };
 
+  const handleMarkDispatched = () => {
+    setConfirmSheet({
+      title: t('picking.dispatch.confirmTitle'),
+      message: t('picking.dispatch.confirmBody'),
+      mode: 'confirm',
+      confirmLabel: t('picking.dispatch.confirm'),
+      icon: Truck,
+      onConfirm: () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        markDispatched(order.id);
+      },
+    });
+  };
+
   const handleReopenForRevision = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     reopenForRevision(order.id, user.uid);
@@ -413,6 +429,15 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
             onPress: handleMarkWrapped,
             variant: 'primary',
             icon: Box,
+          },
+        ];
+      case 'packed':
+        return [
+          {
+            label: t('picking.detail.markDispatched'),
+            onPress: handleMarkDispatched,
+            variant: 'primary',
+            icon: Truck,
           },
         ];
       case 'rejected_review':

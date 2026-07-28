@@ -78,6 +78,11 @@ export function applyMarkWrapped(order: Order): Partial<Order> {
   };
 }
 
+/** Marcar como despachado (desde Embalado). Solo cambia el status. */
+export function applyMarkDispatched(_order: Order): Partial<Order> {
+  return { status: 'dispatched' };
+}
+
 export function applyReopenForRevision(order: Order, pickerId: string): Partial<Order> {
   usePickersStore.getState().setPickerStatus(pickerId, 'en_proceso', order.id);
   return { status: 'in_progress' };

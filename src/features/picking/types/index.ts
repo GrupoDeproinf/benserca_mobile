@@ -178,6 +178,7 @@ export type OrderDomainAction =
   | 'open_bulto'
   | 'finish_picking'
   | 'mark_wrapped'
+  | 'mark_dispatched'
   | 'approve_audit'
   | 'reject_audit'
   | 'reopen_for_revision'

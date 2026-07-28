@@ -99,6 +99,8 @@
       "pausePicking": "Pause picking",
       "resumePicking": "Resume picking",
       "finishPicking": "Finish picking",
+      "markWrapped": "Mark as wrapped",
+      "markDispatched": "Mark as dispatched",
       "markPacked": "Mark as packed",
       "linesTitle": "Order items",
       "bultosTitle": "Built packages",
@@ -155,6 +157,16 @@
       "confirmTitle": "Mark as packed",
       "confirmBody": "The order will enter the audit queue.",
       "confirm": "Pack"
+    },
+    "wrap": {
+      "confirmTitle": "Mark as wrapped",
+      "confirmBody": "Confirm that physical wrapping is ready.",
+      "confirm": "Wrap"
+    },
+    "dispatch": {
+      "confirmTitle": "Mark as dispatched",
+      "confirmBody": "The order status will change to Dispatched.",
+      "confirm": "Dispatch"
     },
     "rejection": {
       "title": "Checker observation"

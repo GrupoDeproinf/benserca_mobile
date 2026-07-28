@@ -105,6 +105,7 @@
       "resumePicking": "Reanudar picking",
       "finishPicking": "Finalizar picking",
       "markWrapped": "Marcar como embalado",
+      "markDispatched": "Marcar como despachado",
       "markPacked": "Marcar como empaquetado",
       "linesTitle": "Artículos del pedido",
       "bultosTitle": "Bultos armados",
@@ -181,6 +182,11 @@
       "confirmTitle": "Marcar como embalado",
       "confirmBody": "Confirmas que el embalaje físico está listo.",
       "confirm": "Embalar"
+    },
+    "dispatch": {
+      "confirmTitle": "Marcar como despachado",
+      "confirmBody": "El pedido pasará a estatus Despachado.",
+      "confirm": "Despachar"
     },
     "substitute": {
       "title": "Sustituir artículo",

@@ -33,6 +33,7 @@ const STATUS_STYLE: Partial<Record<OrderStatus, { bg: string; text: string }>> =
   packed: { bg: '#DCFCE7', text: '#15803D' },
   rejected_review: { bg: '#FEE2E2', text: '#B91C1C' },
   audited: { bg: '#D1FAE5', text: '#047857' },
+  dispatched: { bg: '#DBEAFE', text: '#1D4ED8' },
 };
 
 const bannerStyles = StyleSheet.create({

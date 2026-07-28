@@ -129,6 +129,19 @@ export async function firestoreMarkWrapped(orderId: string, user: SessionUser): 
     });
 }
 
+/** Pasa de Embalado → Despachado: solo status + timeline (+ dispatched_at). */
+export async function firestoreMarkDispatched(orderId: string, user: SessionUser): Promise<void> {
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      status: 'Despachado',
+      dispatched_at: now(),
+      updated_at: now(),
+      timeline: firestore.FieldValue.arrayUnion(timelineEntry('Despachado', user)),
+    });
+}
+
 export interface TeamPickerRef {
   uid: string;
   name: string;

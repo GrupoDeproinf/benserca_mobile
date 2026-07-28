@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { ClipboardList, Play, UserCheck, UserMinus, Users2 } from 'lucide-react-native';
+import { ClipboardList, Play, Truck, UserCheck, UserMinus, Users2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
@@ -42,8 +42,10 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
   const releasePicker = useTeamsStore((s) => s.releasePicker);
   const releaseTeam = useTeamsStore((s) => s.releaseTeam);
   const resumePicking = useOrdersStore((s) => s.resumePicking);
+  const markDispatched = useOrdersStore((s) => s.markDispatched);
 
   const [confirmReleaseTeam, setConfirmReleaseTeam] = useState(false);
+  const [confirmDispatch, setConfirmDispatch] = useState(false);
   const [releasePickerTarget, setReleasePickerTarget] = useState<ReleasePickerTarget | null>(null);
 
   const teamMembers = useMemo(() => {
@@ -86,6 +88,12 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
     resumePicking(order.id);
   };
 
+  const handleConfirmDispatch = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    markDispatched(order.id);
+    setConfirmDispatch(false);
+  };
+
   const footerActions: OrderDetailAction[] = order.isPaused
     ? [
         {
@@ -104,7 +112,16 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
             icon: Play,
           },
         ]
-      : [];
+      : order.status === 'packed'
+        ? [
+            {
+              label: t('picking.detail.markDispatched'),
+              onPress: () => setConfirmDispatch(true),
+              variant: 'primary',
+              icon: Truck,
+            },
+          ]
+        : [];
 
   const actionsDockHeight = estimateOrderActionsHeight(footerActions.length, insets.bottom);
 
@@ -230,6 +247,17 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
         confirmLabel={t('teams.releaseTeam.confirm')}
         onConfirm={handleConfirmReleaseTeam}
         onClose={() => setConfirmReleaseTeam(false)}
+      />
+
+      <ConfirmSheet
+        visible={confirmDispatch}
+        title={t('picking.dispatch.confirmTitle')}
+        message={t('picking.dispatch.confirmBody')}
+        mode="confirm"
+        confirmLabel={t('picking.dispatch.confirm')}
+        icon={Truck}
+        onConfirm={handleConfirmDispatch}
+        onClose={() => setConfirmDispatch(false)}
       />
     </View>
   );

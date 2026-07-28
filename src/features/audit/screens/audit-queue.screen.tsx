@@ -35,8 +35,14 @@ export function AuditQueueScreen() {
     return queue
       .filter((o) => matchesSearch(o, search))
       .sort((a, b) => {
-        const aTime = new Date(a.packedAt ?? a.createdAt).getTime();
-        const bTime = new Date(b.packedAt ?? b.createdAt).getTime();
+        // Pausados primero para que el chequeador los vea al entrar.
+        if (a.isPaused !== b.isPaused) return a.isPaused ? -1 : 1;
+        const aTime = new Date(
+          a.isPaused ? (a.pauseInfo?.createdAt ?? a.createdAt) : (a.packedAt ?? a.createdAt),
+        ).getTime();
+        const bTime = new Date(
+          b.isPaused ? (b.pauseInfo?.createdAt ?? b.createdAt) : (b.packedAt ?? b.createdAt),
+        ).getTime();
         return bTime - aTime;
       });
   }, [queue, search]);

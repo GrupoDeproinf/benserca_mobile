@@ -8,7 +8,6 @@ import { TAB_BAR_COLORS } from '@/features/tabs/constants/tab-bar';
 
 const TAB_TITLES = {
   queue: 'tabs.auditQueue',
-  paused: 'tabs.paused',
   profile: 'tabs.profile',
 } as const;
 
@@ -28,7 +27,6 @@ export default function AuditorTabsLayout() {
         screenOptions={{
           headerShown: false,
           animation: 'none',
-          lazy: false,
           tabBarActiveTintColor: TAB_BAR_COLORS.active,
           tabBarInactiveTintColor: TAB_BAR_COLORS.inactive,
           tabBarActiveBackgroundColor: 'transparent',

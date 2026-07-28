@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { firestore } from '@/services/firebase';
 import { firestoreDocToOrder } from '../services/orders.mapper';
 import { useOrdersStore } from '../store/orders.store';
@@ -9,28 +9,36 @@ import { useOrdersStore } from '../store/orders.store';
  * respetando el estado local de bultos si está en progreso.
  */
 export function useFirestoreOrder(orderId: string | null) {
-  const hydrateOrders = useOrdersStore((s) => s.hydrateOrders);
+  const upsertOrders = useOrdersStore((s) => s.upsertOrders);
   const order = useOrdersStore((s) => (orderId ? s.orders.find((o) => o.id === orderId) : undefined));
+  const [resolved, setResolved] = useState(false);
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId) {
+      setResolved(true);
+      return;
+    }
 
+    setResolved(false);
     const unsub = firestore()
       .collection('lo_orders')
       .doc(orderId)
       .onSnapshot(
         (snap) => {
-          if (!snap.exists()) return;
-          const mapped = firestoreDocToOrder(snap.id, snap.data() ?? {});
-          hydrateOrders([mapped]);
+          if (snap.exists()) {
+            const mapped = firestoreDocToOrder(snap.id, snap.data() ?? {});
+            upsertOrders([mapped]);
+          }
+          setResolved(true);
         },
         (err) => {
           console.error('[useFirestoreOrder]', err);
+          setResolved(true);
         },
       );
 
     return unsub;
-  }, [orderId, hydrateOrders]);
+  }, [orderId, upsertOrders]);
 
-  return order ?? null;
+  return { order: order ?? null, loading: !resolved && !order };
 }

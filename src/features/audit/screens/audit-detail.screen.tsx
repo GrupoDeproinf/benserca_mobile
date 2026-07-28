@@ -12,7 +12,7 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import { estimateOrderActionsHeight } from '@/features/picking/components/order-detail-action-bar';
@@ -24,6 +24,7 @@ import {
 } from '@/features/picking/components/order-detail-header';
 import { OrderDetailBodyFade } from '@/features/picking/components/order-detail-transition';
 import { OrderDetailCard, OrderDetailSection } from '@/features/picking/components/order-detail-section';
+import { useFirestoreOrder } from '@/features/picking/hooks/use-firestore-order';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
 import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
 import { Text } from '@/shared/components/ui/text';
@@ -59,7 +60,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   const insets = useSafeAreaInsets();
   const user = useCurrentUser();
 
-  const order = useOrdersStore((s) => s.orders.find((o) => o.id === orderId));
+  const { order, loading } = useFirestoreOrder(orderId || null);
   const pickers = usePickersStore((s) => s.pickers);
   const approveAudit = useOrdersStore((s) => s.approveAudit);
   const rejectAudit = useOrdersStore((s) => s.rejectAudit);
@@ -99,10 +100,22 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
     setBultoReviews((prev) => ({ ...prev, [bultoId]: status }));
   }, []);
 
-  if (!order || !user) {
+  if (!user) {
     return (
       <View style={[styles.centered, { backgroundColor: SCREEN_BG }]}>
         <Text>{t('audit.detail.notFound')}</Text>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={[styles.centered, { backgroundColor: SCREEN_BG }]}>
+        {loading ? (
+          <ActivityIndicator size="large" color="#111827" />
+        ) : (
+          <Text>{t('audit.detail.notFound')}</Text>
+        )}
       </View>
     );
   }
@@ -309,12 +322,14 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
         </View>
       ) : order.isPaused ? (
         <View style={[styles.dualDock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <OrderActionButton
-            label={t('picking.detail.resumePicking')}
-            onPress={handleResumePicking}
-            variant="primary"
-            icon={Play}
-          />
+          <View style={styles.dualBtn}>
+            <OrderActionButton
+              label={t('picking.detail.resumePicking')}
+              onPress={handleResumePicking}
+              variant="primary"
+              icon={Play}
+            />
+          </View>
         </View>
       ) : null}
 

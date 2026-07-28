@@ -9,6 +9,7 @@ import {
   applyCloseBulto,
   applyDeleteBulto,
   applyFinishPicking,
+  applyMarkDispatched,
   applyMarkWrapped,
   applyOpenBulto,
   applyPausePicking,
@@ -26,6 +27,7 @@ import {
 import {
   firestoreApproveAudit,
   firestoreFinishPicking,
+  firestoreMarkDispatched,
   firestoreMarkWrapped,
   firestorePartialSave,
   firestorePausePicking,
@@ -117,6 +119,50 @@ function patchOrder(orders: Order[], id: string, patch: Partial<Order>): Order[]
   return orders.map((o) => (o.id === id ? { ...o, ...patch } : o));
 }
 
+/**
+ * Fusiona un pedido remoto con el local: en picking activo o si Firestore aún
+ * no trae bultos, prevalece el estado local de bultos / progreso.
+ */
+function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Order {
+  if (!local) return firestoreOrder;
+
+  // Preserve local bulto state if the order is actively being picked
+  if (local.status === 'in_progress' && firestoreOrder.status === 'in_progress') {
+    // Firestore may lag behind local state during active picking.
+    // Keep all locally-computed picking fields authoritative.
+    return {
+      ...firestoreOrder,
+      bultos: local.bultos,
+      progressPercentage: local.progressPercentage,
+      bundlesCreated: local.bundlesCreated,
+      finalSkus: local.finalSkus,
+      hasExtraBultos: local.hasExtraBultos,
+      lastSavedMilestone: local.lastSavedMilestone,
+      snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
+    };
+  }
+
+  // Tras finalizar, Firestore puede llegar antes de tener final_skus mapeados.
+  // Conservar bultos locales si el remoto aún no los trae.
+  if (local.bultos.length > 0 && firestoreOrder.bultos.length === 0) {
+    return {
+      ...firestoreOrder,
+      bultos: local.bultos,
+      finalSkus: local.finalSkus.length > 0 ? local.finalSkus : firestoreOrder.finalSkus,
+      progressPercentage:
+        local.progressPercentage > 0
+          ? local.progressPercentage
+          : firestoreOrder.progressPercentage,
+      bundlesCreated:
+        local.bundlesCreated > 0 ? local.bundlesCreated : firestoreOrder.bundlesCreated,
+      hasExtraBultos: local.hasExtraBultos || firestoreOrder.hasExtraBultos,
+      snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
+    };
+  }
+
+  return firestoreOrder;
+}
+
 type OpenBultoResult = { ok: true; isExtra: boolean } | { ok: false; error: PickerActionError };
 type StartPickingResult = { ok: true } | { ok: false; error: 'already_active_order' };
 type CloseBultoResult = { ok: true } | { ok: false; error: PickerActionError };
@@ -125,8 +171,16 @@ type RemoveItemResult = { ok: true; bultoEmpty: boolean; bultoId: string; bultoN
 
 interface OrdersState {
   orders: Order[];
-  /** Hidrata el store con pedidos desde Firestore, preservando estado local de bultos si el pedido está en progreso. */
+  /** Reemplaza el store con pedidos desde Firestore, preservando estado local de bultos si el pedido está en progreso. */
   hydrateOrders: (incoming: Order[]) => void;
+  /**
+   * Inserta/actualiza pedidos sin borrar el resto del store.
+   * Usar cuando varias fuentes parciales (cola auditoría + pausados, detalle
+   * por id) coexisten; `hydrateOrders` es para sincronizaciones de lista completa.
+   */
+  upsertOrders: (incoming: Order[]) => void;
+  /** Elimina pedidos que cumplan el predicado (p. ej. stale de una cola parcial). */
+  removeOrdersWhere: (predicate: (order: Order) => boolean) => void;
   /** Reinyecta el picking en curso guardado en disco (ver orders-local-work). */
   restoreLocalWork: (saved: Order[]) => void;
   getOrderById: (id: string) => Order | undefined;
@@ -136,6 +190,7 @@ interface OrdersState {
   startPicking: (orderId: string, pickerId: string) => StartPickingResult;
   finishPicking: (orderId: string, pickerId: string) => FinishPickingResult;
   markWrapped: (orderId: string) => void;
+  markDispatched: (orderId: string) => void;
   reopenForRevision: (orderId: string, pickerId: string) => void;
   /** Actualización optimista de `team.picker_uids` (el listener de Firestore la confirma). */
   setTeamPickers: (orderId: string, pickerUids: string[]) => void;
@@ -171,47 +226,32 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
   hydrateOrders: (incoming) => {
     set((s) => {
       const localMap = new Map(s.orders.map((o) => [o.id, o]));
-      const merged = incoming.map((firestoreOrder) => {
-        const local = localMap.get(firestoreOrder.id);
-        if (!local) return firestoreOrder;
+      return {
+        orders: incoming.map((firestoreOrder) =>
+          mergeIncomingOrder(firestoreOrder, localMap.get(firestoreOrder.id)),
+        ),
+      };
+    });
+  },
 
-        // Preserve local bulto state if the order is actively being picked
-        if (local.status === 'in_progress' && firestoreOrder.status === 'in_progress') {
-          // Firestore may lag behind local state during active picking.
-          // Keep all locally-computed picking fields authoritative.
-          return {
-            ...firestoreOrder,
-            bultos: local.bultos,
-            progressPercentage: local.progressPercentage,
-            bundlesCreated: local.bundlesCreated,
-            finalSkus: local.finalSkus,
-            hasExtraBultos: local.hasExtraBultos,
-            lastSavedMilestone: local.lastSavedMilestone,
-            snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
-          };
-        }
+  upsertOrders: (incoming) => {
+    if (incoming.length === 0) return;
+    set((s) => {
+      const byId = new Map(s.orders.map((o) => [o.id, o]));
+      for (const firestoreOrder of incoming) {
+        byId.set(
+          firestoreOrder.id,
+          mergeIncomingOrder(firestoreOrder, byId.get(firestoreOrder.id)),
+        );
+      }
+      return { orders: Array.from(byId.values()) };
+    });
+  },
 
-        // Tras finalizar, Firestore puede llegar antes de tener final_skus mapeados.
-        // Conservar bultos locales si el remoto aún no los trae.
-        if (local.bultos.length > 0 && firestoreOrder.bultos.length === 0) {
-          return {
-            ...firestoreOrder,
-            bultos: local.bultos,
-            finalSkus: local.finalSkus.length > 0 ? local.finalSkus : firestoreOrder.finalSkus,
-            progressPercentage:
-              local.progressPercentage > 0
-                ? local.progressPercentage
-                : firestoreOrder.progressPercentage,
-            bundlesCreated:
-              local.bundlesCreated > 0 ? local.bundlesCreated : firestoreOrder.bundlesCreated,
-            hasExtraBultos: local.hasExtraBultos || firestoreOrder.hasExtraBultos,
-            snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
-          };
-        }
-
-        return firestoreOrder;
-      });
-      return { orders: merged };
+  removeOrdersWhere: (predicate) => {
+    set((s) => {
+      const next = s.orders.filter((o) => !predicate(o));
+      return next.length === s.orders.length ? s : { orders: next };
     });
   },
 
@@ -305,6 +345,19 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     if (user) {
       firestoreMarkWrapped(orderId, user).catch((e) =>
         console.error('[orders.store] markWrapped Firestore error', e),
+      );
+    }
+  },
+
+  markDispatched: (orderId) => {
+    const order = get().getOrderById(orderId);
+    if (!order || order.status !== 'packed') return;
+    set((s) => ({ orders: patchOrder(s.orders, orderId, applyMarkDispatched(order)) }));
+
+    const user = useAuthStore.getState().user;
+    if (user) {
+      firestoreMarkDispatched(orderId, user).catch((e) =>
+        console.error('[orders.store] markDispatched Firestore error', e),
       );
     }
   },
