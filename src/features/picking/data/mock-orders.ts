@@ -77,12 +77,13 @@ const linesPed530 = [
 
 function withFinalSkus(order: Order): FinalSku[] {
   if (order.bultos.length === 0) return [];
-  return buildFinalSkus(order, order.bultos.filter((b) => b.status === 'closed'));
+  return buildFinalSkus(
+    order,
+    order.bultos.filter((b) => b.status === 'closed'),
+  );
 }
 
-const linesPedTestPlacas = [
-  line('PLACA-MOTO-FORZA', 'Placa Moto Forza', 9, 9),
-];
+const linesPedTestPlacas = [line('PLACA-MOTO-FORZA', 'Placa Moto Forza', 9, 9)];
 
 export const MOCK_ORDERS: Order[] = [
   {
@@ -178,9 +179,7 @@ export const MOCK_ORDERS: Order[] = [
         id: 'bulto-508-1',
         number: 1,
         status: 'closed',
-        items: [
-          { id: 'bi-1', sku: 'MON-LED-24', name: 'Monitor LED 24" Full HD', qty: 6 },
-        ],
+        items: [{ id: 'bi-1', sku: 'MON-LED-24', name: 'Monitor LED 24" Full HD', qty: 6 }],
       },
       {
         id: 'bulto-508-2',
@@ -433,7 +432,13 @@ export const MOCK_ORDERS: Order[] = [
     packedAt: null,
   },
 ].map((order) => {
-  const withPause = { ...order, isPaused: false, pauseInfo: null } as Order;
+  const withPause = {
+    ...order,
+    isPaused: false,
+    pauseInfo: null,
+    rejectedBundles: [],
+    approvedBundles: [],
+  } as Order;
   return {
     ...withPause,
     finalSkus: withPause.finalSkus.length > 0 ? withPause.finalSkus : withFinalSkus(withPause),

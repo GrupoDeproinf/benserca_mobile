@@ -118,7 +118,12 @@ export function applyResumePicking(_order: Order): Partial<Order> {
 // ─── Auditoría ────────────────────────────────────────────────────────────────
 
 export function applyApproveAudit(_order: Order): Partial<Order> {
-  return { status: 'audited', auditResult: 'approved' };
+  return {
+    status: 'audited',
+    auditResult: 'approved',
+    rejectedBundles: [],
+    approvedBundles: [],
+  };
 }
 
 export function applyRejectAudit(
@@ -126,6 +131,8 @@ export function applyRejectAudit(
   auditorId: string,
   auditorName: string,
   observationText: string,
+  rejectedBundles: number[],
+  approvedBundles: number[],
 ): Partial<Order> {
   const observation: AuditObservation = {
     id: `obs-${Date.now()}`,
@@ -142,6 +149,8 @@ export function applyRejectAudit(
     status: 'rejected_review',
     auditResult: 'rejected',
     auditObservations: [...order.auditObservations, observation],
+    rejectedBundles,
+    approvedBundles,
   };
 }
 
@@ -217,9 +226,29 @@ export function applyReopenBulto(order: Order, bultoId: string): Partial<Order> 
 }
 
 export function applyDeleteBulto(order: Order, bultoId: string): Partial<Order> {
+  const eliminado = order.bultos.find((b) => b.id === bultoId);
   const filtered = order.bultos.filter((b) => b.id !== bultoId);
   const bultos = renumberBultos(filtered);
-  return syncPickingMetrics(order, bultos);
+
+  return {
+    ...syncPickingMetrics(order, bultos),
+    ...(eliminado
+      ? {
+          rejectedBundles: shiftBundleNumbers(order.rejectedBundles, eliminado.number),
+          approvedBundles: shiftBundleNumbers(order.approvedBundles, eliminado.number),
+        }
+      : {}),
+  };
+}
+
+/**
+ * Los bultos se renumeran al borrar uno, pero las listas de la auditoría se
+ * guardan por número: sin reajustarlas, "aprobado el 3" pasaría a señalar al
+ * bulto que estaba rechazado. Se descarta el número borrado y se baja en uno a
+ * los posteriores, igual que hace `renumberBultos` con los bultos.
+ */
+function shiftBundleNumbers(numbers: number[], deletedNumber: number): number[] {
+  return numbers.filter((n) => n !== deletedNumber).map((n) => (n > deletedNumber ? n - 1 : n));
 }
 
 export function applyAddBultoItem(

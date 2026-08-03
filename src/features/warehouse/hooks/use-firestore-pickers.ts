@@ -14,12 +14,19 @@ function mapPickerStatus(raw: string | undefined): PickerStatus {
   return map[raw ?? ''] ?? 'disponible';
 }
 
+/**
+ * Quién aparece en el tablero de operación. Incluye al jefe de almacén porque
+ * también puede trabajar pedidos él solo: si no, estaría pickeando sin figurar
+ * como ocupado en ningún lado.
+ */
+const OPERATIONAL_ROLES = new Set(['picker', 'warehouse_lead']);
+
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
 function hasPickerRole(data: Record<string, any>): boolean {
   const roles = data.roles;
   // Documentos legacy sin `roles` son pickers puros (colección históricamente exclusiva).
   if (!Array.isArray(roles) || roles.length === 0) return true;
-  return roles.some((role) => String(role).trim().toLowerCase() === 'picker');
+  return roles.some((role) => OPERATIONAL_ROLES.has(String(role).trim().toLowerCase()));
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped

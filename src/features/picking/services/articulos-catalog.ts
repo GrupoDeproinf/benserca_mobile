@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firestore } from '@/services/firebase';
-import { docToArticulo, type Articulo } from './articulos.mapper';
+import { type Articulo, docToArticulo } from './articulos.mapper';
 
 const META_KEY = 'articulos.catalog.meta.v1';
 const CHUNK_KEY = (index: number) => `articulos.catalog.chunk.${index}.v1`;
@@ -59,7 +59,10 @@ export async function loadCatalogFromDisk(): Promise<number> {
 async function writeCatalog(articulos: Articulo[]): Promise<void> {
   const chunks: [string, string][] = [];
   for (let i = 0; i * CHUNK_SIZE < articulos.length; i++) {
-    chunks.push([CHUNK_KEY(i), JSON.stringify(articulos.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE))]);
+    chunks.push([
+      CHUNK_KEY(i),
+      JSON.stringify(articulos.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)),
+    ]);
   }
 
   const previous = await readMeta();
@@ -132,8 +135,7 @@ export async function syncArticulosCatalog(): Promise<number> {
 
 function matches(articulo: Articulo, query: string): boolean {
   return (
-    articulo.sku.toUpperCase().startsWith(query) ||
-    articulo.name.toUpperCase().includes(query)
+    articulo.sku.toUpperCase().startsWith(query) || articulo.name.toUpperCase().includes(query)
   );
 }
 

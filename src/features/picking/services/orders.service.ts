@@ -160,6 +160,29 @@ export interface TeamPickerRef {
  * el listener del picker vía `array-contains` ya que Firestore no permite
  * consultar por un campo dentro de objetos en un array).
  */
+/**
+ * El jefe de almacén se pone a sí mismo como picker del pedido para trabajarlo
+ * sin armar equipo. Deja `team` vacío a propósito: no hay equipo que liberar
+ * después, y así el pedido se distingue de uno trabajado en grupo.
+ */
+export async function firestoreAssignSelfAsPicker(
+  orderId: string,
+  user: SessionUser,
+): Promise<void> {
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      assigned_to: { type: 'picker', uid: user.uid, name: user.name },
+      'team.chief_uid': user.uid,
+      'team.chief_name': user.name,
+      updated_at: now(),
+      timeline: firestore.FieldValue.arrayUnion(
+        timelineEntry('Asignado', user, 'El jefe de almacén trabaja el pedido sin equipo'),
+      ),
+    });
+}
+
 export async function firestoreAssignTeam(
   orderId: string,
   chief: SessionUser,
@@ -289,6 +312,8 @@ export async function firestoreApproveAudit(orderId: string, user: SessionUser):
       'audit.audited_by_name': user.name,
       'audit.result': 'approved',
       'audit.observation': null,
+      'audit.rejected_bundles': [],
+      'audit.approved_bundles': [],
       'audit.audited_at': now(),
       timeline: firestore.FieldValue.arrayUnion(timelineEntry('Auditado', user)),
     });
@@ -298,6 +323,8 @@ export async function firestoreRejectAudit(
   orderId: string,
   user: SessionUser,
   observation: string,
+  rejectedBundles: number[],
+  approvedBundles: number[],
 ): Promise<void> {
   await firestore()
     .collection(ORDERS)
@@ -309,6 +336,10 @@ export async function firestoreRejectAudit(
       'audit.audited_by_name': user.name,
       'audit.result': 'rejected',
       'audit.observation': observation,
+      // Sin esto el picker no tiene cómo saber qué bultos debe corregir: la
+      // observación es texto libre y no es interpretable por la app.
+      'audit.rejected_bundles': rejectedBundles,
+      'audit.approved_bundles': approvedBundles,
       'audit.audited_at': now(),
       timeline: firestore.FieldValue.arrayUnion(
         timelineEntry('Rechazado', user, `Rechazado por auditoría: ${observation}`),

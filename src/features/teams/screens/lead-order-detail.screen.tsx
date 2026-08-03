@@ -1,22 +1,37 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { ClipboardList, Play, Truck, UserCheck, UserMinus, Users2 } from 'lucide-react-native';
+import {
+  Box,
+  ClipboardList,
+  PackageOpen,
+  Play,
+  UserCheck,
+  UserMinus,
+  Users2,
+} from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import {
   estimateOrderActionsHeight,
-  OrderDetailActions,
   type OrderDetailAction,
+  OrderDetailActions,
 } from '@/features/picking/components/order-detail-action-bar';
-import { OrderDetailAlertBanner, OrderDetailHeader } from '@/features/picking/components/order-detail-header';
-import { OrderDetailCard, OrderDetailSection } from '@/features/picking/components/order-detail-section';
+import {
+  OrderDetailAlertBanner,
+  OrderDetailHeader,
+} from '@/features/picking/components/order-detail-header';
+import {
+  OrderDetailCard,
+  OrderDetailSection,
+} from '@/features/picking/components/order-detail-section';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
-import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
-import { Text } from '@/shared/components/ui/text';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
+import { ExpandableText } from '@/shared/components/ui/expandable-text';
+import { Text } from '@/shared/components/ui/text';
 import { LeadTeamMemberCard } from '../components/lead-team-member-card';
 import { useTeamsStore } from '../store/teams.store';
 
@@ -42,17 +57,18 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
   const releasePicker = useTeamsStore((s) => s.releasePicker);
   const releaseTeam = useTeamsStore((s) => s.releaseTeam);
   const resumePicking = useOrdersStore((s) => s.resumePicking);
-  const markDispatched = useOrdersStore((s) => s.markDispatched);
+  const markWrapped = useOrdersStore((s) => s.markWrapped);
+  const assignSelfAsPicker = useOrdersStore((s) => s.assignSelfAsPicker);
+  const startPicking = useOrdersStore((s) => s.startPicking);
 
   const [confirmReleaseTeam, setConfirmReleaseTeam] = useState(false);
-  const [confirmDispatch, setConfirmDispatch] = useState(false);
+  const [confirmWrap, setConfirmWrap] = useState(false);
+  const [howToWorkVisible, setHowToWorkVisible] = useState(false);
   const [releasePickerTarget, setReleasePickerTarget] = useState<ReleasePickerTarget | null>(null);
 
   const teamMembers = useMemo(() => {
     if (!order) return [];
-    return order.teamPickerUids
-      .map((uid) => pickers.find((p) => p.uid === uid))
-      .filter(Boolean);
+    return order.teamPickerUids.map((uid) => pickers.find((p) => p.uid === uid)).filter(Boolean);
   }, [order, pickers]);
 
   if (!order || !user) {
@@ -66,8 +82,28 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
   const hasActiveTeam = order.teamPickerUids.length > 0;
 
   const handleStartPicking = () => {
+    Haptics.selectionAsync();
+    setHowToWorkVisible(true);
+  };
+
+  const handleBuildTeam = () => {
+    setHowToWorkVisible(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(`/(app)/lead/team/assign/${order.id}` as never);
+  };
+
+  /**
+   * El jefe trabaja el pedido él solo: primero se pone como picker asignado y
+   * después arranca el picking, para que el pedido quede a su nombre en la cola
+   * y en el tablero. No tiene el límite de un pedido activo a la vez.
+   */
+  const handleWorkAlone = () => {
+    setHowToWorkVisible(false);
+    assignSelfAsPicker(order.id);
+    const result = startPicking(order.id, user.uid);
+    if (!result.ok) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/(app)/lead/order/${order.id}` as never);
   };
 
   const handleConfirmReleasePicker = () => {
@@ -88,11 +124,16 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
     resumePicking(order.id);
   };
 
-  const handleConfirmDispatch = () => {
+  const handleConfirmWrap = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    markDispatched(order.id);
-    setConfirmDispatch(false);
+    markWrapped(order.id);
+    setConfirmWrap(false);
   };
+
+  /** El jefe está trabajando este pedido él mismo (sin equipo). */
+  const isWorkingItAlone =
+    order.assignedPickerId === user.uid &&
+    (order.status === 'in_progress' || order.status === 'rejected_review');
 
   const footerActions: OrderDetailAction[] = order.isPaused
     ? [
@@ -103,25 +144,36 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
           icon: Play,
         },
       ]
-    : order.status === 'assigned' && !hasActiveTeam
+    : isWorkingItAlone
       ? [
           {
-            label: t('picking.detail.startPicking'),
-            onPress: handleStartPicking,
+            label: t('teams.workAlone.continue'),
+            onPress: () => router.push(`/(app)/lead/order/${order.id}` as never),
             variant: 'primary',
-            icon: Play,
+            icon: PackageOpen,
           },
         ]
-      : order.status === 'packed'
+      : order.status === 'assigned' && !hasActiveTeam
         ? [
             {
-              label: t('picking.detail.markDispatched'),
-              onPress: () => setConfirmDispatch(true),
+              label: t('picking.detail.startPicking'),
+              onPress: handleStartPicking,
               variant: 'primary',
-              icon: Truck,
+              icon: Play,
             },
           ]
-        : [];
+        : order.status === 'audited'
+          ? [
+              // Embalar cierra el recorrido del jefe: el pedido cambia de
+              // estatus y sale de su lista. Despachar ya no es cosa suya.
+              {
+                label: t('picking.detail.markWrapped'),
+                onPress: () => setConfirmWrap(true),
+                variant: 'primary',
+                icon: Box,
+              },
+            ]
+          : [];
 
   const actionsDockHeight = estimateOrderActionsHeight(footerActions.length, insets.bottom);
 
@@ -174,9 +226,9 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
                 style={[styles.lineRow, idx < order.lines.length - 1 && styles.lineRowBorder]}
               >
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.lineName} numberOfLines={2}>
+                  <ExpandableText style={styles.lineName} numberOfLines={2}>
                     {line.name}
-                  </Text>
+                  </ExpandableText>
                   <Text style={styles.lineSku}>{line.sku}</Text>
                 </View>
                 <Text style={styles.lineQty}>×{line.requiredQty}</Text>
@@ -201,18 +253,13 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
                     <LeadTeamMemberCard
                       key={p.uid}
                       picker={p}
-                      onRelease={() =>
-                        setReleasePickerTarget({ uid: p.uid, name: p.nombre })
-                      }
+                      onRelease={() => setReleasePickerTarget({ uid: p.uid, name: p.nombre })}
                     />
                   ),
               )
             )}
 
-            <Pressable
-              onPress={() => setConfirmReleaseTeam(true)}
-              style={styles.releaseTeamWrap}
-            >
+            <Pressable onPress={() => setConfirmReleaseTeam(true)} style={styles.releaseTeamWrap}>
               <Text style={styles.releaseTeamBtn}>{t('teams.releaseTeam.btn')}</Text>
             </Pressable>
           </OrderDetailSection>
@@ -238,6 +285,19 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
       />
 
       <ConfirmSheet
+        visible={howToWorkVisible}
+        title={t('teams.workAlone.title')}
+        message={t('teams.workAlone.body')}
+        mode="confirm"
+        icon={Users2}
+        confirmLabel={t('teams.workAlone.alone')}
+        cancelLabel={t('teams.workAlone.team')}
+        onConfirm={handleWorkAlone}
+        onCancel={handleBuildTeam}
+        onClose={() => setHowToWorkVisible(false)}
+      />
+
+      <ConfirmSheet
         visible={confirmReleaseTeam}
         title={t('teams.releaseTeam.title')}
         message={t('teams.releaseTeam.body')}
@@ -250,14 +310,14 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
       />
 
       <ConfirmSheet
-        visible={confirmDispatch}
-        title={t('picking.dispatch.confirmTitle')}
-        message={t('picking.dispatch.confirmBody')}
+        visible={confirmWrap}
+        title={t('picking.wrap.confirmTitle')}
+        message={t('picking.wrap.confirmBody')}
         mode="confirm"
-        confirmLabel={t('picking.dispatch.confirm')}
-        icon={Truck}
-        onConfirm={handleConfirmDispatch}
-        onClose={() => setConfirmDispatch(false)}
+        confirmLabel={t('picking.wrap.confirm')}
+        icon={Box}
+        onConfirm={handleConfirmWrap}
+        onClose={() => setConfirmWrap(false)}
       />
     </View>
   );

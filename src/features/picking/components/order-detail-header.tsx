@@ -17,6 +17,7 @@ import {
   PAUSED_BADGE_STYLE,
   PAUSED_STATUS_I18N_KEY,
 } from '../utils/order-status';
+import { CircularProgress } from './circular-progress';
 import { OrderDetailTransitionProgressContext } from './order-detail-transition';
 
 const SCREEN_BG = '#F2F2F7';
@@ -61,6 +62,9 @@ const bannerStyles = StyleSheet.create({
     color: '#9CA3AF',
   },
 });
+
+/** Se declara antes de los estilos: `metaValueSlotWithProgress` lo usa. */
+const META_PROGRESS_SIZE = 34;
 
 const styles = StyleSheet.create({
   wrap: {
@@ -142,17 +146,38 @@ const styles = StyleSheet.create({
     borderRightWidth: StyleSheet.hairlineWidth * 2,
     borderRightColor: '#E5E5EA',
   },
+  /**
+   * El círculo ocupa solo su ancho; los chips de texto se reparten el resto.
+   * Sin `justifyContent`: el contenido arranca arriba igual que en los demás
+   * chips, para que la etiqueta quede a la misma altura que "Definidos" o "Cola".
+   */
+  metaChipProgress: {
+    flex: 0,
+    paddingHorizontal: 12,
+    borderLeftWidth: StyleSheet.hairlineWidth * 2,
+    borderLeftColor: '#E5E5EA',
+  },
   metaLabel: {
     fontSize: 10,
     color: '#8E8E93',
     fontWeight: '500',
     textAlign: 'center',
   },
+  metaValueSlot: {
+    marginTop: 2,
+  },
+  /**
+   * Con círculo en la fila, el valor ocupa su misma altura y se centra: si no,
+   * el número quedaría pegado arriba y el círculo se vería "hundido" al lado.
+   */
+  metaValueSlotWithProgress: {
+    minHeight: META_PROGRESS_SIZE,
+    justifyContent: 'center',
+  },
   metaValue: {
     fontSize: 16,
     fontWeight: '800',
     color: '#111827',
-    marginTop: 2,
     textAlign: 'center',
   },
   footer: {
@@ -162,11 +187,21 @@ const styles = StyleSheet.create({
 
 interface OrderDetailMetaCardProps {
   meta: { label: string; value: string }[];
+  /** Progreso 0-1. Si se pasa, se dibuja un círculo al final de la fila. */
+  progress?: number;
+  /** Etiqueta del círculo; obligatoria si se pasa `progress`. */
+  progressLabel?: string;
   footer?: React.ReactNode;
   style?: ViewStyle;
 }
 
-export function OrderDetailMetaCard({ meta, footer, style }: OrderDetailMetaCardProps) {
+export function OrderDetailMetaCard({
+  meta,
+  progress,
+  progressLabel,
+  footer,
+  style,
+}: OrderDetailMetaCardProps) {
   return (
     <View style={[styles.card, style]}>
       <View style={styles.metaRow}>
@@ -176,11 +211,23 @@ export function OrderDetailMetaCard({ meta, footer, style }: OrderDetailMetaCard
             style={[styles.metaChip, idx < meta.length - 1 && styles.metaChipBorder]}
           >
             <Text style={styles.metaLabel}>{item.label}</Text>
-            <Text style={styles.metaValue} numberOfLines={2}>
-              {item.value}
-            </Text>
+            <View
+              style={[styles.metaValueSlot, progress != null && styles.metaValueSlotWithProgress]}
+            >
+              <Text style={styles.metaValue} numberOfLines={2}>
+                {item.value}
+              </Text>
+            </View>
           </View>
         ))}
+        {progress != null ? (
+          <View style={[styles.metaChip, styles.metaChipProgress]}>
+            <Text style={styles.metaLabel}>{progressLabel}</Text>
+            <View style={styles.metaValueSlot}>
+              <CircularProgress progress={progress} size={META_PROGRESS_SIZE} color="#10B981" />
+            </View>
+          </View>
+        ) : null}
       </View>
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
@@ -196,6 +243,10 @@ interface OrderDetailHeaderProps {
   /** Si el pedido está pausado, el badge "En pausa" reemplaza al del estatus. */
   isPaused?: boolean;
   meta: { label: string; value: string }[];
+  /** Progreso 0-1; dibuja el círculo al final de la fila de la meta card. */
+  progress?: number;
+  /** Etiqueta del círculo; obligatoria si se pasa `progress`. */
+  progressLabel?: string;
   onBack: () => void;
   footer?: React.ReactNode;
   animateEnter?: boolean;
@@ -211,6 +262,8 @@ export function OrderDetailHeader({
   auditResult,
   isPaused = false,
   meta,
+  progress: metaProgress,
+  progressLabel,
   onBack,
   footer,
   animateEnter = true,
@@ -314,7 +367,12 @@ export function OrderDetailHeader({
 
         {!metaInScroll ? (
           <Animated.View style={metaCardStyle}>
-            <OrderDetailMetaCard meta={meta} footer={footer} />
+            <OrderDetailMetaCard
+              meta={meta}
+              progress={metaProgress}
+              progressLabel={progressLabel}
+              footer={footer}
+            />
           </Animated.View>
         ) : null}
       </View>

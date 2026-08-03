@@ -11,10 +11,10 @@ import { ORDERS_LIST_CARD_GAP } from '@/features/picking/components/orders-list-
 import { OrdersSearchFilter } from '@/features/picking/components/orders-search-filter';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
 import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-section';
-import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
-import { EmptyState } from '@/shared/components/ui/empty-state';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import { derivePickerActivity } from '@/features/warehouse/utils/derive-picker-activity';
+import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
+import { EmptyState } from '@/shared/components/ui/empty-state';
 import { AssignPickerListRow } from '../components/assign-picker-list-row';
 import { AssignPickersHeader } from '../components/assign-pickers-header';
 import { AssignTeamDraftPanel } from '../components/assign-team-draft-panel';
@@ -50,12 +50,15 @@ export function LeadAssignPickersScreen({ orderId }: LeadAssignPickersScreenProp
   const availablePickers = useMemo(
     () =>
       allPickers
+        // El propio jefe está en la lista de operación (puede pickear solo),
+        // pero no se arma un equipo consigo mismo: para eso está "Trabajar yo solo".
+        .filter((p) => p.uid !== user?.uid)
         .map((p) => ({
           ...p,
           status: derivePickerActivity(p.uid, orders, p.isAvailable).status,
         }))
         .filter((p) => matchesSearch(p.nombre, search)),
-    [allPickers, orders, search],
+    [allPickers, orders, search, user?.uid],
   );
 
   const selectedPickers = useMemo(

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { OrderActionButton } from '@/features/picking/components/order-action-button';
 import type { Bulto } from '@/features/picking/types';
+import { ExpandableText } from '@/shared/components/ui/expandable-text';
 
 export type BultoAuditStatus = 'approved' | 'rejected' | null;
 
@@ -11,6 +12,8 @@ interface AuditBultoAccordionProps {
   bulto: Bulto;
   reviewStatus: BultoAuditStatus;
   readOnly?: boolean;
+  /** En una re-revisión, los bultos corregidos llegan abiertos. */
+  defaultExpanded?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
 }
@@ -19,11 +22,12 @@ export function AuditBultoAccordion({
   bulto,
   reviewStatus,
   readOnly = false,
+  defaultExpanded = false,
   onApprove,
   onReject,
 }: AuditBultoAccordionProps) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const isClosed = bulto.status === 'closed';
 
   const isApproved = reviewStatus === 'approved';
@@ -68,7 +72,9 @@ export function AuditBultoAccordion({
           )}
         </View>
         <View style={styles.headerRight}>
-          <Text style={styles.itemCount}>{t('audit.bulto.itemCount', { count: bulto.items.length })}</Text>
+          <Text style={styles.itemCount}>
+            {t('audit.bulto.itemCount', { count: bulto.items.length })}
+          </Text>
           {expanded ? (
             <ChevronUp size={18} color="#8E8E93" strokeWidth={2.2} />
           ) : (
@@ -88,9 +94,9 @@ export function AuditBultoAccordion({
                 style={[styles.itemRow, idx < bulto.items.length - 1 && styles.itemRowBorder]}
               >
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemName} numberOfLines={2}>
+                  <ExpandableText style={styles.itemName} numberOfLines={2}>
                     {item.name}
-                  </Text>
+                  </ExpandableText>
                   <Text style={styles.itemSku}>{item.sku}</Text>
                 </View>
                 <Text style={styles.itemQty}>×{item.qty}</Text>

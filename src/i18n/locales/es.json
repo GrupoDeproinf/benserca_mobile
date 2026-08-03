@@ -155,7 +155,9 @@
       "maxPerArticle": "Máx. {{max}} uds.",
       "noSpace": "Sin pendiente",
       "capacityExceededTooltip": "No puedes agregar más de lo pedido",
-      "searchHint": "Escribe al menos 2 caracteres para buscar"
+      "searchHint": "Escribe al menos 2 caracteres para buscar",
+      "categoryFilter": "Filtro",
+      "categoryAll": "Todas las categorías"
     },
     "extraBultos": {
       "title": "Bultos adicionales",
@@ -205,7 +207,8 @@
       "needBultoBody": "Abre un bulto antes de registrar una sustitución."
     },
     "rejection": {
-      "title": "Observación del chequeador"
+      "title": "Observación del chequeador",
+      "onlyRejected": "Mostrando {{shown}} de {{total}} bultos — solo los rechazados"
     },
     "pause": {
       "title": "Pausar picking",
@@ -431,6 +434,13 @@
       "title": "Disolver equipo",
       "body": "Todos los pickers serán liberados y recibirán una notificación.",
       "confirm": "Disolver"
+    },
+    "workAlone": {
+      "title": "¿Cómo trabajas este pedido?",
+      "body": "Puedes armar un equipo de pickers o trabajarlo tú mismo.",
+      "alone": "Trabajar yo solo",
+      "team": "Armar equipo",
+      "continue": "Continuar picking"
     }
   },
   "audit": {
@@ -466,6 +476,8 @@
       "comparisonTitle": "Comparación pedido vs armado",
       "comparisonAlert": "Hay diferencias entre lo pedido y lo armado. Revisa antes de aprobar.",
       "comparisonOk": "Las cantidades coinciden con el pedido original.",
+      "comparisonBadgeIssues": "Diferencias",
+      "comparisonBadgeOk": "OK",
       "legendOk": "Correcto",
       "legendOver": "Exceso",
       "legendUnder": "Faltante",

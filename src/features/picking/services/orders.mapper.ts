@@ -74,6 +74,17 @@ function mapStatus(raw: string): OrderStatus {
   return map[raw] ?? 'assigned';
 }
 
+/**
+ * Cantidad pedida. Profit la manda como string decimal ("1.00000"), y sin
+ * convertirla se vería "×1.00000" en pantalla y cualquier suma la concatenaría
+ * en vez de sumarla.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readQuantity(value: any): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
 function readTalla(data: Record<string, any>): string | undefined {
   const raw = data.talla;
@@ -89,6 +100,13 @@ function readTalla(data: Record<string, any>): string | undefined {
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
 function readRawString(value: any): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+/** Lista de números de bulto de la auditoría, ignorando valores no numéricos. */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readBundleNumbers(value: any): number[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((n): n is number => typeof n === 'number');
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
@@ -121,8 +139,11 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
     // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
     (s: any): OrderLine => ({
       sku: s.sku ?? '',
-      name: s.description ?? '',
-      requiredQty: s.quantity ?? 0,
+      // Los pedidos reales traen `descriptions` (plural) aunque el schema
+      // documenta `description`: se aceptan las dos para no dejar el nombre
+      // en blanco según de qué importación venga el pedido.
+      name: s.description ?? s.descriptions ?? '',
+      requiredQty: readQuantity(s.quantity),
       talla: readTalla(s),
       coCat: readRawString(s.co_cat),
       coSubl: readRawString(s.co_subl),
@@ -168,6 +189,8 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
     finalSkus,
     auditObservations: [],
     auditResult: data.audit?.result ?? null,
+    rejectedBundles: readBundleNumbers(data.audit?.rejected_bundles),
+    approvedBundles: readBundleNumbers(data.audit?.approved_bundles),
 
     isPaused,
     pauseInfo: isPaused ? derivePauseInfo(timeline) : null,

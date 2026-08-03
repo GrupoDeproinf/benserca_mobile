@@ -1,21 +1,13 @@
 import * as Haptics from 'expo-haptics';
-import { Plus, Search, X } from 'lucide-react-native';
+import { Plus, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ExpandableText } from '@/shared/components/ui/expandable-text';
+import { FilterDropdown, type FilterDropdownOption } from '@/shared/components/ui/filter-dropdown';
 import { Toast, useToast } from '@/shared/components/ui/toast';
-import type { Articulo } from '../hooks/use-articulos-search';
-import { useArticulosSearch } from '../hooks/use-articulos-search';
+import type { Articulo } from '../services/articulos.mapper';
 import type { Bulto, Order, OrderLine } from '../types';
 import {
   getActiveOrderLines,
@@ -39,22 +31,51 @@ interface AddItemSheetProps {
   onAddItems: (items: AddItemEntry[]) => void;
 }
 
+const ALL_CATEGORIES = 'all';
+
 /** Converts an order line to the Articulo shape used by the list. */
 function orderLineToArticulo(line: OrderLine): Articulo {
   return {
     sku: line.sku,
     name: line.name,
     talla: line.talla,
+    // La taxonomía viaja con la línea: sin ella el artículo no se puede
+    // clasificar ni filtrar por categoría.
+    coCat: line.coCat,
+    coSubl: line.coSubl,
+    category: line.category,
   };
 }
 
-export function AddItemSheet({
-  visible,
-  order,
-  bulto,
-  onClose,
-  onAddItems,
-}: AddItemSheetProps) {
+/**
+ * Categoría de la línea, que es a la vez clave y etiqueta del filtro.
+ *
+ * Las líneas del pedido traen el nombre legible en `category` ("ACCESORIOS").
+ * `coCat` queda como respaldo por si algún pedido llegara solo con el código
+ * de Profit; los pedidos actuales no lo traen.
+ */
+function categoriaDeArticulo(articulo: Articulo): string | null {
+  const nombre = articulo.category?.trim();
+  if (nombre) return nombre;
+  const codigo = articulo.coCat?.trim();
+  return codigo ? codigo : null;
+}
+
+/** Categorías presentes en la lista, sin repetir y ordenadas alfabéticamente. */
+function buildCategoriaOptions(articulos: Articulo[]): FilterDropdownOption[] {
+  const categorias = new Set<string>();
+
+  for (const articulo of articulos) {
+    const categoria = categoriaDeArticulo(articulo);
+    if (categoria) categorias.add(categoria);
+  }
+
+  return [...categorias]
+    .sort((a, b) => a.localeCompare(b))
+    .map((categoria) => ({ key: categoria, label: categoria }));
+}
+
+export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: AddItemSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { message: toastMessage, nudgeToken: toastNudge, show: showToast } = useToast();
@@ -62,19 +83,40 @@ export function AddItemSheet({
   const activeLines = getActiveOrderLines(order);
 
   const [search, setSearch] = useState('');
+  const [categoria, setCategoria] = useState(ALL_CATEGORIES);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const { results: firestoreResults, loading: searchLoading } = useArticulosSearch(
-    search,
-    visible,
+  /**
+   * La lista son los artículos que pide el pedido. No se consulta la colección
+   * `articulos`: búsqueda y filtro se resuelven en memoria sobre estas líneas.
+   */
+  const lineArticulos: Articulo[] = useMemo(
+    () => activeLines.map(orderLineToArticulo),
+    [activeLines],
   );
 
-  // When no search: show the order's active lines.
-  // When searching: show Firestore results.
+  /** Las categorías del filtro son las de los artículos del propio pedido. */
+  const categoriaOptions: FilterDropdownOption[] = useMemo(
+    () => [
+      { key: ALL_CATEGORIES, label: t('picking.addItem.categoryAll') },
+      ...buildCategoriaOptions(lineArticulos),
+    ],
+    [lineArticulos, t],
+  );
+
   const displayList: Articulo[] = useMemo(() => {
-    if (search.trim().length >= 2) return firestoreResults;
-    return activeLines.map(orderLineToArticulo);
-  }, [search, firestoreResults, activeLines]);
+    const query = search.trim().toUpperCase();
+
+    return lineArticulos.filter((articulo) => {
+      if (categoria !== ALL_CATEGORIES && categoriaDeArticulo(articulo) !== categoria) {
+        return false;
+      }
+      if (!query) return true;
+      return (
+        articulo.sku.toUpperCase().includes(query) || articulo.name.toUpperCase().includes(query)
+      );
+    });
+  }, [lineArticulos, categoria, search]);
 
   const pendingAdds: PendingAdd[] = useMemo(
     () =>
@@ -91,6 +133,7 @@ export function AddItemSheet({
 
   const reset = () => {
     setSearch('');
+    setCategoria(ALL_CATEGORIES);
     setQuantities({});
   };
 
@@ -149,9 +192,9 @@ export function AddItemSheet({
     const row = (
       <View style={[styles.row, !canAdd && styles.rowDisabled]}>
         <View style={styles.rowInfo}>
-          <Text style={styles.rowName} numberOfLines={2}>
+          <ExpandableText style={styles.rowName} numberOfLines={2}>
             {item.name}
-          </Text>
+          </ExpandableText>
           <Text style={styles.rowSku}>{item.sku}</Text>
           <Text style={[styles.maxHint, !canAdd && styles.maxHintMuted]}>
             {canAdd
@@ -196,24 +239,30 @@ export function AddItemSheet({
         </View>
 
         <View style={styles.searchWrap}>
-          <View style={styles.searchRow}>
-            <Search size={16} color="#8E8E93" style={styles.searchIcon} />
-            <TextInput
-              placeholder={t('picking.addItem.searchPlaceholder')}
-              placeholderTextColor="#8E8E93"
-              value={search}
-              onChangeText={setSearch}
-              style={styles.searchInput}
-              autoCorrect={false}
-              autoCapitalize="characters"
+          <View style={styles.searchFilterRow}>
+            <View style={styles.searchRow}>
+              <Search size={16} color="#8E8E93" style={styles.searchIcon} />
+              <TextInput
+                placeholder={t('picking.addItem.searchPlaceholder')}
+                placeholderTextColor="#8E8E93"
+                value={search}
+                onChangeText={setSearch}
+                style={styles.searchInput}
+                autoCorrect={false}
+                autoCapitalize="characters"
+              />
+            </View>
+
+            <FilterDropdown
+              placeholder={t('picking.addItem.categoryFilter')}
+              value={categoria}
+              options={categoriaOptions}
+              onChange={setCategoria}
+              icon={SlidersHorizontal}
+              defaultKey={ALL_CATEGORIES}
+              style={styles.filterAnchor}
             />
-            {searchLoading ? (
-              <ActivityIndicator size="small" color="#8E8E93" style={{ marginRight: 10 }} />
-            ) : null}
           </View>
-          {search.trim().length > 0 && search.trim().length < 2 ? (
-            <Text style={styles.searchHint}>{t('picking.addItem.searchHint')}</Text>
-          ) : null}
         </View>
 
         <FlatList
@@ -224,11 +273,7 @@ export function AddItemSheet({
           renderItem={renderRow}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              {searchLoading ? '' : t('picking.addItem.noResults')}
-            </Text>
-          }
+          ListEmptyComponent={<Text style={styles.empty}>{t('picking.addItem.noResults')}</Text>}
         />
 
         <Toast message={toastMessage} nudgeToken={toastNudge} topInset={insets.top + 12} />
@@ -277,7 +322,16 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 8,
   },
+  searchFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  filterAnchor: {
+    flexShrink: 0,
+  },
   searchRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     height: 48,
@@ -295,12 +349,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#111827',
-  },
-  searchHint: {
-    fontSize: 11,
-    color: '#8E8E93',
-    marginTop: 6,
-    marginLeft: 4,
   },
   list: {
     flex: 1,

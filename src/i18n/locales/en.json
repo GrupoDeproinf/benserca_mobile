@@ -135,7 +135,9 @@
       "maxPerArticle": "Max {{max}} units",
       "noSpace": "No space",
       "capacityExceededTooltip": "Bundle capacity exceeded",
-      "searchHint": "Type at least 2 characters to search"
+      "searchHint": "Type at least 2 characters to search",
+      "categoryFilter": "Filter",
+      "categoryAll": "All categories"
     },
     "extraBultos": {
       "title": "Extra packages",
@@ -169,7 +171,8 @@
       "confirm": "Dispatch"
     },
     "rejection": {
-      "title": "Checker observation"
+      "title": "Checker observation",
+      "onlyRejected": "Showing {{shown}} of {{total}} bundles — rejected only"
     },
     "pause": {
       "title": "Pause picking",
@@ -390,6 +393,13 @@
       "title": "Dissolve team",
       "body": "All pickers will be released and notified.",
       "confirm": "Dissolve"
+    },
+    "workAlone": {
+      "title": "How will you work this order?",
+      "body": "You can build a picker team or work it yourself.",
+      "alone": "Work it myself",
+      "team": "Build team",
+      "continue": "Continue picking"
     }
   },
   "audit": {
@@ -425,6 +435,8 @@
       "comparisonTitle": "Order vs picked comparison",
       "comparisonAlert": "There are differences between the order and what was picked. Review before approving.",
       "comparisonOk": "Quantities match the original order.",
+      "comparisonBadgeIssues": "Differences",
+      "comparisonBadgeOk": "OK",
       "legendOk": "Correct",
       "legendOver": "Excess",
       "legendUnder": "Missing",

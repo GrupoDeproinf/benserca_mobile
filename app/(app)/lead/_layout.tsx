@@ -24,6 +24,16 @@ export default function LeadStackLayout() {
         }}
       />
       <Stack.Screen
+        name="order/[orderId]"
+        options={{
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000',
+          contentStyle: { backgroundColor: '#F2F2F7' },
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+        }}
+      />
+      <Stack.Screen
         name="team/assign/[orderId]"
         options={{
           statusBarStyle: 'light',

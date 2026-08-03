@@ -150,6 +150,19 @@ export interface Order {
   auditObservations: AuditObservation[];
   /** Resultado de la última auditoría (`audit.result` en Firestore). */
   auditResult: 'approved' | 'rejected' | null;
+  /**
+   * Números de bulto que el chequeador rechazó (`audit.rejected_bundles`).
+   * Se vacía al aprobar el pedido.
+   */
+  rejectedBundles: number[];
+  /**
+   * Números de bulto que el chequeador aprobó (`audit.approved_bundles`). Es lo
+   * que se le OCULTA al picker al corregir, para que no dañe lo ya aprobado.
+   * Se guarda esta lista y no solo la de rechazados porque un bulto que el
+   * picker abra durante la corrección no está en ninguna de las dos: al no
+   * estar aprobado, sigue visible aunque lo cierre.
+   */
+  approvedBundles: number[];
 
   /** Pausa activa del picking. No cambia `status`; es un flag ortogonal. */
   isPaused: boolean;

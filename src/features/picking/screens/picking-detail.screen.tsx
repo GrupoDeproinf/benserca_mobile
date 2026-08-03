@@ -13,7 +13,6 @@ import {
   Play,
   RotateCcw,
   Trash2,
-  Truck,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +20,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import { ConfirmSheet, type ConfirmSheetTone } from '@/shared/components/ui/confirm-sheet';
+import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import { Text } from '@/shared/components/ui/text';
 import { Toast, useToast } from '@/shared/components/ui/toast';
 import { type AddItemEntry, AddItemSheet } from '../components/add-item-sheet';
@@ -34,7 +34,6 @@ import { OrderDetailAlertBanner, OrderDetailHeader } from '../components/order-d
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
 import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { PausePickingSheet } from '../components/pause-picking-sheet';
-import { PickingProgressBar } from '../components/picking-progress-bar';
 import { SubstituteItemSheet } from '../components/substitute-item-sheet';
 import { useOrdersStore } from '../store/orders.store';
 import type { OrderLine, PauseReason } from '../types';
@@ -74,10 +73,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const user = useCurrentUser();
 
   const allOrders = useOrdersStore((s) => s.orders);
-  const order = useMemo(
-    () => allOrders.find((o) => o.id === orderId),
-    [allOrders, orderId],
-  );
+  const order = useMemo(() => allOrders.find((o) => o.id === orderId), [allOrders, orderId]);
   const pickerOrders = useMemo(() => {
     if (!user) return EMPTY_PICKER_ORDERS;
     return allOrders.filter(
@@ -91,7 +87,6 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const startPicking = useOrdersStore((s) => s.startPicking);
   const finishPicking = useOrdersStore((s) => s.finishPicking);
   const markWrapped = useOrdersStore((s) => s.markWrapped);
-  const markDispatched = useOrdersStore((s) => s.markDispatched);
   const reopenForRevision = useOrdersStore((s) => s.reopenForRevision);
   const openBulto = useOrdersStore((s) => s.openBulto);
   const closeBulto = useOrdersStore((s) => s.closeBulto);
@@ -107,8 +102,11 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const [substituteLine, setSubstituteLine] = useState<OrderLine | null>(null);
   const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
   const [confirmSheet, setConfirmSheet] = useState<ConfirmState | null>(null);
-  const { message: capacityToast, nudgeToken: capacityToastNudge, show: showCapacityToast } =
-    useToast();
+  const {
+    message: capacityToast,
+    nudgeToken: capacityToastNudge,
+    show: showCapacityToast,
+  } = useToast();
   const maxReachedTooltip = t('picking.addItem.capacityExceededTooltip');
 
   if (!order) {
@@ -130,8 +128,27 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     order.status === 'packed' ||
     order.status === 'audited';
 
+  /**
+   * Al corregir un rechazo el picker solo ve lo que NO fue aprobado: así no
+   * puede dañar un bulto que el chequeador ya dio por bueno. Se filtra por lo
+   * aprobado (y no por lo rechazado) para que un bulto que abra durante la
+   * corrección siga visible aunque lo cierre.
+   *
+   * Incluye `in_progress` porque al reabrir el picking el pedido pasa a ese
+   * estatus. `approvedBundles` solo trae datos tras un rechazo y se vacía al
+   * aprobar el pedido, así que en un picking normal la lista queda intacta.
+   */
+  const inRejectionFix = order.status === 'rejected_review' || order.status === 'in_progress';
+  const hiddenApprovedBultos = inRejectionFix ? order.approvedBundles.length : 0;
+  const visibleBultos =
+    hiddenApprovedBultos > 0
+      ? order.bultos.filter((b) => !order.approvedBundles.includes(b.number))
+      : order.bultos;
+
   const lastObservation = order.auditObservations[order.auditObservations.length - 1];
-  const closedBultos = order.bultos.filter((b) => b.status === 'closed' && b.items.length > 0).length;
+  const closedBultos = order.bultos.filter(
+    (b) => b.status === 'closed' && b.items.length > 0,
+  ).length;
 
   const performOpenBulto = () => {
     const result = openBulto(order.id);
@@ -281,20 +298,6 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     });
   };
 
-  const handleMarkDispatched = () => {
-    setConfirmSheet({
-      title: t('picking.dispatch.confirmTitle'),
-      message: t('picking.dispatch.confirmBody'),
-      mode: 'confirm',
-      confirmLabel: t('picking.dispatch.confirm'),
-      icon: Truck,
-      onConfirm: () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        markDispatched(order.id);
-      },
-    });
-  };
-
   const handleReopenForRevision = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     reopenForRevision(order.id, user.uid);
@@ -423,21 +426,14 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         // Empaquetado; debe esperar la aprobación del chequeador.
         return [];
       case 'audited':
+        // Embalar es el último paso del picker: el pedido cambia de estatus y
+        // sale de su lista. Despachar ya no es cosa suya.
         return [
           {
             label: t('picking.detail.markWrapped'),
             onPress: handleMarkWrapped,
             variant: 'primary',
             icon: Box,
-          },
-        ];
-      case 'packed':
-        return [
-          {
-            label: t('picking.detail.markDispatched'),
-            onPress: handleMarkDispatched,
-            variant: 'primary',
-            icon: Truck,
           },
         ];
       case 'rejected_review':
@@ -473,6 +469,8 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
             value: effectiveQueuePosition != null ? String(effectiveQueuePosition) : '—',
           },
         ]}
+        progress={order.progressPercentage / 100}
+        progressLabel={t('picking.detail.progressLabel')}
         footer={
           order.hasExtraBultos ? (
             <View style={styles.extraFlag}>
@@ -484,15 +482,6 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
       />
 
       <OrderDetailBodyFade style={{ flex: 1 }}>
-        {order.status === 'in_progress' ? (
-          <PickingProgressBar
-            percentage={order.progressPercentage}
-            closedBultos={closedBultos}
-            definedBultos={order.definedBultos}
-            label={t('picking.detail.progressLabel')}
-          />
-        ) : null}
-
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[
@@ -550,9 +539,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                     style={[styles.lineRow, idx < order.lines.length - 1 && styles.lineRowBorder]}
                   >
                     <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={styles.lineName} numberOfLines={2}>
+                      <ExpandableText style={styles.lineName} numberOfLines={2}>
                         {line.name}
-                      </Text>
+                      </ExpandableText>
                       <Text style={styles.lineSku}>{line.sku}</Text>
                       <Text style={styles.lineMeta}>
                         {t('picking.detail.lineMeta', {
@@ -560,7 +549,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                           assigned,
                           pending,
                         })}
-                        {line.talla ? ` · ${t('picking.detail.tallaMeta', { talla: line.talla })}` : ''}
+                        {line.talla
+                          ? ` · ${t('picking.detail.tallaMeta', { talla: line.talla })}`
+                          : ''}
                       </Text>
                     </View>
                     <View style={styles.lineActions}>
@@ -595,12 +586,20 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
 
           {showBultos ? (
             <OrderDetailSection title={t('picking.detail.bultosTitle')} icon={Package}>
-              {order.bultos.length === 0 ? (
+              {hiddenApprovedBultos > 0 ? (
+                <Text style={styles.onlyRejectedNote}>
+                  {t('picking.rejection.onlyRejected', {
+                    shown: visibleBultos.length,
+                    total: order.bultos.length,
+                  })}
+                </Text>
+              ) : null}
+              {visibleBultos.length === 0 ? (
                 <OrderDetailCard>
                   <Text style={styles.emptyBultosTitle}>{t('picking.detail.noBultos')}</Text>
                 </OrderDetailCard>
               ) : (
-                order.bultos.map((bulto) => (
+                visibleBultos.map((bulto) => (
                   <BultoCard
                     key={bulto.id}
                     bulto={bulto}
@@ -620,6 +619,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                       updateBultoItem(order.id, bid, iid, Math.min(qty, maxQty));
                     }}
                     onRemoveItem={(bid, iid) => handleRemoveItem(bid, iid)}
+                    onDelete={(bid) => deleteBulto(order.id, bid)}
                   />
                 ))
               )}
@@ -668,11 +668,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         onConfirm={handleConfirmPause}
       />
 
-      <Toast
-        message={capacityToast}
-        nudgeToken={capacityToastNudge}
-        topInset={insets.top + 64}
-      />
+      <Toast message={capacityToast} nudgeToken={capacityToastNudge} topInset={insets.top + 64} />
 
       <ConfirmSheet
         visible={confirmSheet !== null}
@@ -735,6 +731,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF2FF',
   },
   substituteText: { fontSize: 10, fontWeight: '700', color: '#4338CA' },
+  onlyRejectedNote: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B45309',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
   emptyBultosTitle: {
     fontSize: 13,
     color: '#8E8E93',

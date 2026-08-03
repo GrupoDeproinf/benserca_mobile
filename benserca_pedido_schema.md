@@ -66,6 +66,8 @@
     "audited_by_name": null,
     "result": null,
     "observation": null,
+    "rejected_bundles": [],
+    "approved_bundles": [],
     "audited_at": null
   },
 
@@ -96,6 +98,23 @@ Un registro por `original_sku`. Si el mismo SKU está en varios bultos, usa el a
   ]
 }
 ```
+
+## Auditoría por bulto (`audit.rejected_bundles` / `audit.approved_bundles`)
+
+Al rechazar, el chequeador guarda qué bultos rechazó y cuáles aprobó, por
+**número de bulto**. La observación es texto libre y la app no puede interpretarla.
+
+| Campo | Para qué se usa |
+|---|---|
+| `rejected_bundles` | Premarcar y abrir los bultos corregidos en la re-revisión |
+| `approved_bundles` | Ocultárselos al picker mientras corrige, para que no dañe lo aprobado |
+
+Se guardan **las dos** listas y no solo la de rechazados porque un bulto que el
+picker abra durante la corrección no está en ninguna: al no figurar como
+aprobado sigue visible aunque lo cierre. Ambas se vacían al aprobar el pedido.
+
+> Los bultos se renumeran al eliminar uno, así que ambas listas se reajustan en
+> `applyDeleteBulto` para no quedar apuntando al bulto equivocado.
 
 ### Reglas de `difference`
 
@@ -264,6 +283,8 @@ Ejemplo sustitución: pidieron 10 cascos rojos, enviaron 10 cascos azules → `s
     "audited_by_name": null,
     "result": null,
     "observation": null,
+    "rejected_bundles": [],
+    "approved_bundles": [],
     "audited_at": null
   },
 

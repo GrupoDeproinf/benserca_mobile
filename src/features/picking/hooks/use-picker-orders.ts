@@ -14,13 +14,15 @@ export function usePickerOrders(filter: PickerOrderFilter = 'all'): Order[] {
   return useMemo(() => {
     if (!user) return [];
     // El pedido debería desasignarse al anular/recuperar; este filtro es una red
-    // de seguridad por si esa desasignación falla. Despachado tampoco se muestra:
-    // al marcar despachado el picker deja de verlo en su lista.
+    // de seguridad por si esa desasignación falla. Embalado es el último paso del
+    // picker: al marcarlo el pedido sale de su lista (y despachado, que viene
+    // después, tampoco se muestra).
     const mine = orders.filter(
       (o) =>
         (o.assignedPickerId === user.uid || o.teamPickerUids.includes(user.uid)) &&
         o.status !== 'annulled' &&
         o.status !== 'recovered' &&
+        o.status !== 'packed' &&
         o.status !== 'dispatched',
     );
     if (filter === 'all') return mine;
@@ -34,6 +36,5 @@ export const PICKER_FILTER_STATUSES: PickerOrderFilter[] = [
   'assigned',
   'in_progress',
   'to_pack',
-  'packed',
   'rejected_review',
 ];

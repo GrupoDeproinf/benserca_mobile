@@ -26,6 +26,7 @@ import {
 } from '../domain/order-actions';
 import {
   firestoreApproveAudit,
+  firestoreAssignSelfAsPicker,
   firestoreFinishPicking,
   firestoreMarkDispatched,
   firestoreMarkWrapped,
@@ -139,6 +140,10 @@ function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Or
       hasExtraBultos: local.hasExtraBultos,
       lastSavedMilestone: local.lastSavedMilestone,
       snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
+      // Se renumeran junto con los bultos al borrar uno (ver applyDeleteBulto),
+      // así que mientras se pickea manda lo local igual que el resto.
+      rejectedBundles: local.rejectedBundles,
+      approvedBundles: local.approvedBundles,
     };
   }
 
@@ -150,9 +155,7 @@ function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Or
       bultos: local.bultos,
       finalSkus: local.finalSkus.length > 0 ? local.finalSkus : firestoreOrder.finalSkus,
       progressPercentage:
-        local.progressPercentage > 0
-          ? local.progressPercentage
-          : firestoreOrder.progressPercentage,
+        local.progressPercentage > 0 ? local.progressPercentage : firestoreOrder.progressPercentage,
       bundlesCreated:
         local.bundlesCreated > 0 ? local.bundlesCreated : firestoreOrder.bundlesCreated,
       hasExtraBultos: local.hasExtraBultos || firestoreOrder.hasExtraBultos,
@@ -194,12 +197,16 @@ interface OrdersState {
   reopenForRevision: (orderId: string, pickerId: string) => void;
   /** Actualización optimista de `team.picker_uids` (el listener de Firestore la confirma). */
   setTeamPickers: (orderId: string, pickerUids: string[]) => void;
+  /** El jefe de almacén se asigna el pedido a sí mismo para trabajarlo sin equipo. */
+  assignSelfAsPicker: (orderId: string) => void;
   approveAudit: (orderId: string) => void;
   rejectAudit: (
     orderId: string,
     auditorId: string,
     auditorName: string,
     observation: string,
+    rejectedBundles: number[],
+    approvedBundles: number[],
   ) => void;
   pausePicking: (orderId: string, reason: PauseReason, missingSkus: string[]) => void;
   resumePicking: (orderId: string) => void;
@@ -298,13 +305,17 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     const order = get().getOrderById(orderId);
     if (!order) return { ok: false, error: 'already_active_order' };
 
-    const check = canPickerStartOrder(get().hasActiveOrder(pickerId));
-    if (!check.ok) return check;
+    const user = useAuthStore.getState().user;
+    // El jefe de almacén puede llevar varios pedidos suyos a la vez: el límite
+    // de un pedido activo es una regla del picker, no suya.
+    if (user?.role !== 'warehouse_lead') {
+      const check = canPickerStartOrder(get().hasActiveOrder(pickerId));
+      if (!check.ok) return check;
+    }
 
     const patch = applyStartPicking(order, pickerId);
     set((s) => ({ orders: patchOrder(s.orders, orderId, patch) }));
 
-    const user = useAuthStore.getState().user;
     if (user) {
       firestoreStartPicking(orderId, user).catch((e) =>
         console.error('[orders.store] startPicking Firestore error', e),
@@ -383,6 +394,22 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     }));
   },
 
+  assignSelfAsPicker: (orderId) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    set((s) => ({
+      orders: patchOrder(s.orders, orderId, {
+        assignedPickerId: user.uid,
+        assignedLeadId: user.uid,
+      }),
+    }));
+
+    firestoreAssignSelfAsPicker(orderId, user).catch((e) =>
+      console.error('[orders.store] assignSelfAsPicker Firestore error', e),
+    );
+  },
+
   approveAudit: (orderId) => {
     const order = get().getOrderById(orderId);
     if (!order) return;
@@ -397,21 +424,28 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     }
   },
 
-  rejectAudit: (orderId, auditorId, auditorName, observation) => {
+  rejectAudit: (orderId, auditorId, auditorName, observation, rejectedBundles, approvedBundles) => {
     const order = get().getOrderById(orderId);
     if (!order) return;
     set((s) => ({
       orders: patchOrder(
         s.orders,
         orderId,
-        applyRejectAudit(order, auditorId, auditorName, observation),
+        applyRejectAudit(
+          order,
+          auditorId,
+          auditorName,
+          observation,
+          rejectedBundles,
+          approvedBundles,
+        ),
       ),
     }));
 
     const user = useAuthStore.getState().user;
     if (user) {
-      firestoreRejectAudit(orderId, user, observation).catch((e) =>
-        console.error('[orders.store] rejectAudit Firestore error', e),
+      firestoreRejectAudit(orderId, user, observation, rejectedBundles, approvedBundles).catch(
+        (e) => console.error('[orders.store] rejectAudit Firestore error', e),
       );
       notifyAuditOutcome(order, user, 'rejected', observation);
     }

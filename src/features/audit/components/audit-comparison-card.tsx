@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { OrderDetailCard } from '@/features/picking/components/order-detail-section';
+import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import type { AuditComparisonRow } from '../utils/audit-comparison';
 
 const STATUS_COLOR = {
@@ -52,14 +53,11 @@ export function AuditComparisonCard({ rows }: AuditComparisonCardProps) {
       </View>
 
       {rows.map((row, idx) => (
-        <View
-          key={row.sku}
-          style={[styles.row, idx < rows.length - 1 && styles.rowBorder]}
-        >
+        <View key={row.sku} style={[styles.row, idx < rows.length - 1 && styles.rowBorder]}>
           <View style={styles.colProduct}>
-            <Text style={styles.productName} numberOfLines={2}>
+            <ExpandableText style={styles.productName} numberOfLines={2}>
               {row.name}
-            </Text>
+            </ExpandableText>
             <Text style={styles.productSku}>{row.sku}</Text>
           </View>
           <Text style={styles.qtyCell}>{row.required}</Text>

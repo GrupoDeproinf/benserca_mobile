@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { firestore } from '@/services/firebase';
-import {
-  getMockArticulosForSkus,
-  searchMockArticulos,
-} from '../data/mock-skus';
+import { getMockArticulosForSkus, searchMockArticulos } from '../data/mock-skus';
+import { type Articulo, docToArticulo } from '../services/articulos.mapper';
 import { getLocalArticulosBySkus, searchLocalCatalog } from '../services/articulos-catalog';
-import { docToArticulo, type Articulo } from '../services/articulos.mapper';
 
-export { docToArticulo, type Articulo } from '../services/articulos.mapper';
+export { type Articulo, docToArticulo } from '../services/articulos.mapper';
 
 /** Búsqueda libre por prefijo de SKU o descripción (sin filtro de marca/categoría). */
 export async function searchArticulosInFirestore(query: string): Promise<Articulo[]> {
@@ -93,9 +90,7 @@ export function mergeSearchResultsWithMock(
 }
 
 /** Carga artículos del catálogo por lista de SKUs (líneas del pedido). */
-export async function fetchArticulosBySkus(
-  skus: string[],
-): Promise<Record<string, Articulo>> {
+export async function fetchArticulosBySkus(skus: string[]): Promise<Record<string, Articulo>> {
   const unique = [...new Set(skus.map((s) => s.trim()).filter(Boolean))];
   if (unique.length === 0) return {};
 

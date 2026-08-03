@@ -10,30 +10,31 @@ import {
   Play,
   XCircle,
 } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
-import { estimateOrderActionsHeight } from '@/features/picking/components/order-detail-action-bar';
 import { OrderActionButton } from '@/features/picking/components/order-action-button';
+import { estimateOrderActionsHeight } from '@/features/picking/components/order-detail-action-bar';
 import {
   OrderDetailAlertBanner,
   OrderDetailHeader,
   OrderDetailMetaCard,
 } from '@/features/picking/components/order-detail-header';
+import {
+  OrderDetailCard,
+  OrderDetailSection,
+} from '@/features/picking/components/order-detail-section';
 import { OrderDetailBodyFade } from '@/features/picking/components/order-detail-transition';
-import { OrderDetailCard, OrderDetailSection } from '@/features/picking/components/order-detail-section';
 import { useFirestoreOrder } from '@/features/picking/hooks/use-firestore-order';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
-import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
-import { Text } from '@/shared/components/ui/text';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import { resolvePickerName } from '@/features/warehouse/utils/resolve-picker-name';
-import {
-  AuditBultoAccordion,
-  type BultoAuditStatus,
-} from '../components/audit-bulto-accordion';
+import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
+import { ExpandableText } from '@/shared/components/ui/expandable-text';
+import { Text } from '@/shared/components/ui/text';
+import { AuditBultoAccordion, type BultoAuditStatus } from '../components/audit-bulto-accordion';
 import { AuditComparisonCard } from '../components/audit-comparison-card';
 import { RejectObservationSheet } from '../components/reject-observation-sheet';
 import { buildAuditComparison, hasComparisonIssues } from '../utils/audit-comparison';
@@ -82,23 +83,47 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   }, [order?.snapshotOriginal, order?.bultos]);
 
   const allReviewed = order ? order.bultos.every((b) => bultoReviews[b.id]) : false;
-  const allApproved = order
-    ? order.bultos.every((b) => bultoReviews[b.id] === 'approved')
-    : false;
+  const allApproved = order ? order.bultos.every((b) => bultoReviews[b.id] === 'approved') : false;
 
   const rejectPrefill = useMemo(() => {
     if (!order) return '';
     const rejected = order.bultos.filter((b) => bultoReviews[b.id] === 'rejected');
     if (rejected.length === 0) return '';
-    return rejected
-      .map((b) => t('audit.reject.bultoLine', { number: b.number }))
-      .join('\n');
+    return rejected.map((b) => t('audit.reject.bultoLine', { number: b.number })).join('\n');
   }, [order, bultoReviews, t]);
 
   const setBultoReview = useCallback((bultoId: string, status: BultoAuditStatus) => {
     Haptics.selectionAsync();
     setBultoReviews((prev) => ({ ...prev, [bultoId]: status }));
   }, []);
+
+  /**
+   * Re-revisión: el pedido vuelve a la cola tras un rechazo previo. Los bultos
+   * que ya se habían aprobado no se revisan de cero; llegan premarcados como
+   * aprobados (y colapsados) y solo los corregidos quedan pendientes.
+   */
+  const isReReview = Boolean(
+    order && order.status === 'to_pack' && order.approvedBundles.length > 0,
+  );
+
+  const seededOrderRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!order || seededOrderRef.current === order.id) return;
+    seededOrderRef.current = order.id;
+
+    if (!isReReview) {
+      setBultoReviews({});
+      return;
+    }
+
+    // Solo se premarca lo que se aprobó antes. Un bulto que el picker haya
+    // abierto durante la corrección no está en esa lista y queda pendiente.
+    const seeded: Record<string, BultoAuditStatus> = {};
+    for (const bulto of order.bultos) {
+      if (order.approvedBundles.includes(bulto.number)) seeded[bulto.id] = 'approved';
+    }
+    setBultoReviews(seeded);
+  }, [order, isReReview]);
 
   if (!user) {
     return (
@@ -137,7 +162,13 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   };
 
   const handleReject = (observation: string) => {
-    rejectAudit(order.id, user.uid, user.name, observation);
+    const rejectedBundles = order.bultos
+      .filter((b) => bultoReviews[b.id] === 'rejected')
+      .map((b) => b.number);
+    const approvedBundles = order.bultos
+      .filter((b) => bultoReviews[b.id] === 'approved')
+      .map((b) => b.number);
+    rejectAudit(order.id, user.uid, user.name, observation, rejectedBundles, approvedBundles);
     setRejectSheetVisible(false);
     router.back();
   };
@@ -223,7 +254,10 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
           ) : null}
 
           {order.auditObservations.length > 0 ? (
-            <OrderDetailSection title={t('audit.detail.observationsTitle')} icon={MessageSquareWarning}>
+            <OrderDetailSection
+              title={t('audit.detail.observationsTitle')}
+              icon={MessageSquareWarning}
+            >
               {order.auditObservations.map((obs) => (
                 <OrderDetailAlertBanner
                   key={obs.id}
@@ -235,7 +269,13 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
             </OrderDetailSection>
           ) : null}
 
-          <OrderDetailSection title={t('picking.detail.linesTitle')} icon={ClipboardList}>
+          <OrderDetailSection
+            title={t('picking.detail.linesTitle')}
+            icon={ClipboardList}
+            collapsible
+            defaultExpanded={false}
+            badge={String(originalLines.length)}
+          >
             <OrderDetailCard>
               {originalLines.map((line, idx) => (
                 <View
@@ -243,9 +283,9 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
                   style={[styles.lineRow, idx < originalLines.length - 1 && styles.lineRowBorder]}
                 >
                   <View style={styles.lineInfo}>
-                    <Text style={styles.lineName} numberOfLines={2}>
+                    <ExpandableText style={styles.lineName} numberOfLines={2}>
                       {line.name}
-                    </Text>
+                    </ExpandableText>
                     <Text style={styles.lineSku}>{line.sku}</Text>
                   </View>
                   <Text style={styles.lineQty}>×{line.requiredQty}</Text>
@@ -255,11 +295,24 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
           </OrderDetailSection>
 
           {showComparison ? (
-            <OrderDetailSection title={t('audit.detail.comparisonTitle')} icon={GitCompare}>
+            <OrderDetailSection
+              title={t('audit.detail.comparisonTitle')}
+              icon={GitCompare}
+              collapsible
+              defaultExpanded={false}
+              badge={
+                comparisonHasIssues
+                  ? t('audit.detail.comparisonBadgeIssues')
+                  : t('audit.detail.comparisonBadgeOk')
+              }
+              badgeTone={comparisonHasIssues ? 'warning' : 'success'}
+            >
               {comparisonHasIssues ? (
                 <View style={styles.comparisonAlert}>
                   <AlertCircle size={14} color="#B45309" strokeWidth={2.2} />
-                  <Text style={styles.comparisonAlertText}>{t('audit.detail.comparisonAlert')}</Text>
+                  <Text style={styles.comparisonAlertText}>
+                    {t('audit.detail.comparisonAlert')}
+                  </Text>
                 </View>
               ) : (
                 <View style={styles.comparisonOk}>
@@ -271,7 +324,12 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
             </OrderDetailSection>
           ) : null}
 
-          <OrderDetailSection title={t('audit.detail.bultosTitle')} icon={Package}>
+          <OrderDetailSection
+            title={t('audit.detail.bultosTitle')}
+            icon={Package}
+            collapsible
+            badge={String(order.bultos.length)}
+          >
             {order.bultos.length === 0 ? (
               <OrderDetailCard>
                 <Text style={styles.emptyBultos}>{t('audit.bulto.empty')}</Text>
@@ -283,6 +341,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
                   bulto={bulto}
                   reviewStatus={bultoReviews[bulto.id] ?? null}
                   readOnly={alreadyProcessed}
+                  defaultExpanded={isReReview && !order.approvedBundles.includes(bulto.number)}
                   onApprove={() => setBultoReview(bulto.id, 'approved')}
                   onReject={() => setBultoReview(bulto.id, 'rejected')}
                 />

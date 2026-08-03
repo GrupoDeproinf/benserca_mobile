@@ -1,8 +1,9 @@
 import * as Haptics from 'expo-haptics';
-import { ChevronDown, ChevronUp, Lock, Plus, Unlock } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Lock, Plus, Trash2, Unlock } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import { Text } from '@/shared/components/ui/text';
 import type { Bulto } from '../types';
 import { BultoActionButton } from './bulto-action-button';
@@ -18,6 +19,8 @@ interface BultoCardProps {
   onAddItem: (bultoId: string) => void;
   onUpdateItemQty: (bultoId: string, itemId: string, qty: number) => void;
   onRemoveItem: (bultoId: string, itemId: string) => void;
+  /** Solo se ofrece con el bulto vacío; sin él no se muestra el botón. */
+  onDelete?: (bultoId: string) => void;
 }
 
 export function BultoCard({
@@ -30,10 +33,14 @@ export function BultoCard({
   onAddItem,
   onUpdateItemQty,
   onRemoveItem,
+  onDelete,
 }: BultoCardProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const isClosed = bulto.status === 'closed';
+  // Un bulto con contenido no se borra de un toque: primero hay que vaciarlo.
+  // Cerrar un bulto vacío ya está bloqueado, así que aquí siempre está abierto.
+  const canDelete = editable && !isClosed && bulto.items.length === 0 && Boolean(onDelete);
 
   return (
     <View style={[styles.card, isClosed ? styles.cardClosed : styles.cardOpen]}>
@@ -42,15 +49,38 @@ export function BultoCard({
         style={[styles.header, isClosed ? styles.headerClosed : styles.headerOpen]}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-          <Text style={styles.headerTitle}>{t('picking.bulto.title', { number: bulto.number })}</Text>
+          <Text style={styles.headerTitle}>
+            {t('picking.bulto.title', { number: bulto.number })}
+          </Text>
           <View style={[styles.statusPill, isClosed ? styles.statusClosed : styles.statusOpen]}>
-            <Text style={[styles.statusText, isClosed ? styles.statusTextClosed : styles.statusTextOpen]}>
+            <Text
+              style={[
+                styles.statusText,
+                isClosed ? styles.statusTextClosed : styles.statusTextOpen,
+              ]}
+            >
               {isClosed ? t('picking.bulto.closed') : t('picking.bulto.open')}
             </Text>
           </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={styles.itemCount}>{t('picking.bulto.itemCount', { count: bulto.items.length })}</Text>
+          <Text style={styles.itemCount}>
+            {t('picking.bulto.itemCount', { count: bulto.items.length })}
+          </Text>
+          {canDelete ? (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onDelete?.(bulto.id);
+              }}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('picking.bulto.deleteBulto')}
+              style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Trash2 size={16} color="#DC2626" strokeWidth={2.2} />
+            </Pressable>
+          ) : null}
           {expanded ? (
             <ChevronUp size={18} color="#8E8E93" />
           ) : (
@@ -70,9 +100,9 @@ export function BultoCard({
                 style={[styles.itemRow, idx < bulto.items.length - 1 && styles.itemRowBorder]}
               >
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.itemName} numberOfLines={1}>
+                  <ExpandableText style={styles.itemName} numberOfLines={1}>
                     {item.name}
-                  </Text>
+                  </ExpandableText>
                   <Text style={styles.itemSku}>{item.sku}</Text>
                 </View>
                 {editable && !isClosed ? (
@@ -189,6 +219,9 @@ const styles = StyleSheet.create({
   itemCount: {
     fontSize: 12,
     color: '#8E8E93',
+  },
+  deleteBtn: {
+    padding: 2,
   },
   body: {
     paddingHorizontal: 16,

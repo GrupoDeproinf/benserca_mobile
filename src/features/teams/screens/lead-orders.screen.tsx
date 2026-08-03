@@ -23,8 +23,14 @@ export function LeadOrdersScreen() {
   const [search, setSearch] = useState('');
 
   const allOrders = useOrdersStore((s) => s.orders);
+  // Embalado es el final del recorrido del jefe: al marcarlo el pedido sale de
+  // su lista. Despachado se excluye también porque viene después; si no, el
+  // pedido desaparecería al embalar y reaparecería al despacharse.
   const leadOrders = useMemo(
-    () => allOrders.filter((o) => o.assignedLeadId === user?.uid),
+    () =>
+      allOrders.filter(
+        (o) => o.assignedLeadId === user?.uid && o.status !== 'packed' && o.status !== 'dispatched',
+      ),
     [allOrders, user?.uid],
   );
 

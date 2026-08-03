@@ -1,21 +1,11 @@
-import type { ReactNode } from 'react';
-import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react-native';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import {
-  LayoutAnimation,
-  Platform,
-  Pressable,
-  StyleSheet,
-  UIManager,
-  View,
-} from 'react-native';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from 'react-native';
 import { Text } from '@/shared/components/ui/text';
 
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
@@ -44,6 +34,29 @@ const styles = StyleSheet.create({
     color: '#111827',
     flex: 1,
   },
+  badge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  /** Los tonos con color se pintan como píldora: la sección puede estar
+      colapsada y el badge es lo único que avisa del estado del contenido. */
+  badgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    overflow: 'hidden',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  badgeWarning: {
+    color: '#B45309',
+    backgroundColor: '#FEF3C7',
+  },
+  badgeSuccess: {
+    color: '#047857',
+    backgroundColor: '#ECFDF5',
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -58,6 +71,8 @@ const styles = StyleSheet.create({
   },
 });
 
+type BadgeTone = 'default' | 'warning' | 'success';
+
 interface OrderDetailSectionProps {
   title: string;
   icon?: LucideIcon;
@@ -65,6 +80,8 @@ interface OrderDetailSectionProps {
   collapsible?: boolean;
   defaultExpanded?: boolean;
   badge?: string;
+  /** Con color el badge se pinta como píldora (visible con la sección cerrada). */
+  badgeTone?: BadgeTone;
   marginTop?: number;
 }
 
@@ -75,6 +92,7 @@ export function OrderDetailSection({
   collapsible = false,
   defaultExpanded = true,
   badge,
+  badgeTone = 'default',
   marginTop = 0,
 }: OrderDetailSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -90,7 +108,15 @@ export function OrderDetailSection({
       {Icon ? <Icon size={18} color="#374151" strokeWidth={2} /> : null}
       <Text style={styles.title}>{title}</Text>
       {badge ? (
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280' }}>{badge}</Text>
+        <Text
+          style={[
+            styles.badge,
+            badgeTone === 'warning' && [styles.badgePill, styles.badgeWarning],
+            badgeTone === 'success' && [styles.badgePill, styles.badgeSuccess],
+          ]}
+        >
+          {badge}
+        </Text>
       ) : null}
       {collapsible ? (
         isOpen ? (
