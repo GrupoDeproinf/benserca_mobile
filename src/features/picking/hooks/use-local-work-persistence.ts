@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import {
+  clearOtherUsersLocalWork,
   flushLocalWork,
   loadLocalWork,
   saveLocalWorkDebounced,
@@ -22,9 +23,16 @@ export function useLocalWorkPersistence() {
     let active = true;
 
     loadLocalWork(uid).then((saved) => {
-      if (active && saved.length > 0) {
+      if (!active) return;
+
+      if (saved.length > 0) {
         useOrdersStore.getState().restoreLocalWork(saved);
       }
+
+      // Después de cargar lo propio (y de migrar la clave vieja si era suya):
+      // si quien abrió sesión es otro usuario, el respaldo del anterior ya no
+      // se va a retomar en este dispositivo.
+      void clearOtherUsersLocalWork(uid);
     });
 
     const unsubscribe = useOrdersStore.subscribe((state) => {

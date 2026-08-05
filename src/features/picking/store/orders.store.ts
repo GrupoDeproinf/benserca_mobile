@@ -121,11 +121,26 @@ function patchOrder(orders: Order[], id: string, patch: Partial<Order>): Order[]
 }
 
 /**
+ * ¿El estado local y el remoto son del MISMO ciclo de asignación? Si al picker
+ * le quitaron el pedido y se lo volvieron a asignar, `assigned_at` (o el uid
+ * asignado) cambia: lo trabajado antes pertenece al ciclo anterior y no debe
+ * arrastrarse al nuevo, que tiene que empezar limpio.
+ */
+function isSameAssignment(local: Order, remote: Order): boolean {
+  return (
+    local.assignedPickerId === remote.assignedPickerId && local.assignedAt === remote.assignedAt
+  );
+}
+
+/**
  * Fusiona un pedido remoto con el local: en picking activo o si Firestore aún
  * no trae bultos, prevalece el estado local de bultos / progreso.
  */
 function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Order {
   if (!local) return firestoreOrder;
+
+  // Reasignado: lo local es de un ciclo anterior, manda el servidor.
+  if (!isSameAssignment(local, firestoreOrder)) return firestoreOrder;
 
   // Preserve local bulto state if the order is actively being picked
   if (local.status === 'in_progress' && firestoreOrder.status === 'in_progress') {
@@ -174,6 +189,13 @@ type RemoveItemResult = { ok: true; bultoEmpty: boolean; bultoId: string; bultoN
 
 interface OrdersState {
   orders: Order[];
+  /**
+   * El listener ya trajo pedidos reales del servidor (o de su caché) en esta
+   * sesión. Mientras sea `false` no se puede distinguir "este pedido ya no es
+   * tuyo" de "todavía no llegó la lista", y `restoreLocalWork` necesita esa
+   * distinción para no reinyectar un pedido reasignado.
+   */
+  hydratedFromServer: boolean;
   /** Reemplaza el store con pedidos desde Firestore, preservando estado local de bultos si el pedido está en progreso. */
   hydrateOrders: (incoming: Order[]) => void;
   /**
@@ -229,6 +251,7 @@ interface OrdersState {
 
 export const useOrdersStore = create<OrdersState>((set, get) => ({
   orders: [],
+  hydratedFromServer: false,
 
   hydrateOrders: (incoming) => {
     set((s) => {
@@ -237,6 +260,9 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
         orders: incoming.map((firestoreOrder) =>
           mergeIncomingOrder(firestoreOrder, localMap.get(firestoreOrder.id)),
         ),
+        // Una lista vacía no confirma nada: puede ser una caché fría o un
+        // arranque sin red, y ahí sí hay que poder restaurar desde disco.
+        hydratedFromServer: s.hydratedFromServer || incoming.length > 0,
       };
     });
   },
@@ -275,6 +301,10 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
         // remoto salvo que siga en picking, donde lo local es lo más nuevo.
         if (current.status !== 'in_progress' || local.status !== 'in_progress') return current;
 
+        // Mismo pedido pero otra asignación: se lo quitaron y se lo volvieron a
+        // asignar, así que arranca limpio en vez de heredar bultos viejos.
+        if (!isSameAssignment(local, current)) return current;
+
         return {
           ...current,
           bultos: local.bultos,
@@ -288,7 +318,13 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
       });
 
       // Lo guardado que aún no llegó del listener se agrega tal cual: sin red y
-      // sin caché es la única copia del trabajo hecho.
+      // sin caché es la única copia del trabajo hecho. Pero si el listener YA
+      // trajo la lista del servidor, que el pedido no esté en ella significa
+      // que dejó de ser de este picker (reasignado, anulado): reinyectarlo lo
+      // haría seguir pickeando un pedido que ya no le toca. Queda en disco, no
+      // se pierde; simplemente no se muestra.
+      if (s.hydratedFromServer) return { orders: merged };
+
       return { orders: [...merged, ...savedMap.values()] };
     });
   },
@@ -577,5 +613,5 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     };
   },
 
-  resetOrders: () => set({ orders: [] }),
+  resetOrders: () => set({ orders: [], hydratedFromServer: false }),
 }));

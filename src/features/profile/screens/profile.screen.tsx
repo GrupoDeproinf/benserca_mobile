@@ -7,7 +7,6 @@ import { logout } from '@/features/auth/services/auth.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { useNotificationsStore } from '@/features/notifications/store/notifications.store';
 import { OrderActionButton } from '@/features/picking/components/order-action-button';
-import { clearLocalWork } from '@/features/picking/services/orders-local-work';
 import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-section';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
 import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height';
@@ -124,9 +123,10 @@ export function ProfileScreen() {
 
   const handleSignOut = async () => {
     await logout();
-    // El picking guardado en disco es de esta sesión: no debe reaparecer en la
-    // del próximo usuario del dispositivo.
-    await clearLocalWork();
+    // El picking guardado en disco NO se borra: si este mismo usuario vuelve a
+    // entrar debe recuperar lo trabajado desde el último hito. La clave por
+    // `uid` (ver orders-local-work) impide que otro usuario del dispositivo lo
+    // vea, así que no hace falta limpiarlo aquí.
     useOrdersStore.getState().resetOrders();
     usePickersStore.getState().resetPickers();
     useNotificationsStore.getState().resetNotifications();
