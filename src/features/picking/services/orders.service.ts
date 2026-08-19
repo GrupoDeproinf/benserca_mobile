@@ -62,6 +62,9 @@ async function updatePickerAvailability(
 
 function finalSkusToFirestore(finalSkus: FinalSku[]) {
   return finalSkus.map((s) => ({
+    // Posición del renglón en `original_skus`. Campo aditivo: la web ya recibía
+    // un registro por renglón, esto solo hace explícito a cuál corresponde.
+    line_index: s.lineIndex,
     original_sku: s.originalSku,
     original_quantity: s.originalQuantity,
     packed_sku: s.packedSku,

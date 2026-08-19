@@ -41,6 +41,15 @@ export function BultoCard({
   // Un bulto con contenido no se borra de un toque: primero hay que vaciarlo.
   // Cerrar un bulto vacío ya está bloqueado, así que aquí siempre está abierto.
   const canDelete = editable && !isClosed && bulto.items.length === 0 && Boolean(onDelete);
+  const rowsEditable = editable && !isClosed;
+
+  /**
+   * NO se agrupan los ítems por SKU. Dos renglones del mismo artículo (el
+   * "20 + 2" de Profit) son cantidades independientes —máximo 20 y máximo 2, no
+   * 22— y el picker sube y baja cada una por su cuenta. Fundirlas en una sola
+   * fila perdería justamente esa separación.
+   */
+  const rows = bulto.items;
 
   return (
     <View style={[styles.card, isClosed ? styles.cardClosed : styles.cardOpen]}>
@@ -65,7 +74,7 @@ export function BultoCard({
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={styles.itemCount}>
-            {t('picking.bulto.itemCount', { count: bulto.items.length })}
+            {t('picking.bulto.itemCount', { count: rows.length })}
           </Text>
           {canDelete ? (
             <Pressable
@@ -91,13 +100,13 @@ export function BultoCard({
 
       {expanded ? (
         <View style={styles.body}>
-          {bulto.items.length === 0 ? (
+          {rows.length === 0 ? (
             <Text style={styles.empty}>{t('picking.bulto.empty')}</Text>
           ) : (
-            bulto.items.map((item, idx) => (
+            rows.map((item, idx) => (
               <View
                 key={item.id}
-                style={[styles.itemRow, idx < bulto.items.length - 1 && styles.itemRowBorder]}
+                style={[styles.itemRow, idx < rows.length - 1 && styles.itemRowBorder]}
               >
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <ExpandableText style={styles.itemName} numberOfLines={1}>
@@ -105,7 +114,7 @@ export function BultoCard({
                   </ExpandableText>
                   <Text style={styles.itemSku}>{item.sku}</Text>
                 </View>
-                {editable && !isClosed ? (
+                {rowsEditable ? (
                   <QtyStepper
                     value={item.qty}
                     min={0}

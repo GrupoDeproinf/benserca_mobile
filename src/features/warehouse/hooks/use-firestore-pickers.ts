@@ -3,7 +3,6 @@ import { firestore } from '@/services/firebase';
 import { usePickersStore } from '../store/pickers.store';
 import type { PickerEstado, PickerStatus } from '../types';
 
-// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
 function mapPickerStatus(raw: string | undefined): PickerStatus {
   const map: Record<string, PickerStatus> = {
     disponible: 'disponible',
@@ -41,7 +40,11 @@ function docToPicker(id: string, data: Record<string, any>): PickerEstado {
     uid: id,
     nombre,
     status: mapPickerStatus(data.status as string | undefined),
-    activeOrderId: (data.active_order_id as string | null) ?? null,
+    // La app escribe `current_order_id` (ver updatePickerAvailability) y la web
+    // usa `active_order_id`: se leen los dos, porque este id es lo único que
+    // permite verificar si `is_available: false` sigue siendo cierto.
+    activeOrderId:
+      (data.current_order_id as string | null) ?? (data.active_order_id as string | null) ?? null,
     teamId: (data.team_id as string | null) ?? null,
     bultosToday: (data.bultos_today as number | undefined) ?? 0,
     updatedAt: (data.updated_at as string | undefined) ?? new Date().toISOString(),

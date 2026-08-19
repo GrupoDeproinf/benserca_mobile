@@ -13,6 +13,7 @@ import {
   applyMarkWrapped,
   applyOpenBulto,
   applyPausePicking,
+  applyQuickBundle,
   applyRejectAudit,
   applyRemoveBultoItem,
   applyReopenBulto,
@@ -38,6 +39,7 @@ import {
   firestoreStartPicking,
 } from '../services/orders.service';
 import type { Order, OrderStatus, PauseReason, PickerActionError } from '../types';
+import { ensureItemLineIds } from '../utils/order-snapshot';
 import { canPickerStartOrder } from '../utils/picker-queue';
 
 /**
@@ -233,12 +235,19 @@ interface OrdersState {
   pausePicking: (orderId: string, reason: PauseReason, missingSkus: string[]) => void;
   resumePicking: (orderId: string) => void;
   openBulto: (orderId: string) => OpenBultoResult;
+  /**
+   * Arma de un toque un bulto ya cerrado con `units_per_bundle` unidades de ese
+   * renglón. Devuelve `false` si ya no queda un bulto completo por armar.
+   */
+  createQuickBundle: (orderId: string, lineId: string) => boolean;
   closeBulto: (orderId: string, bultoId: string) => CloseBultoResult;
   reopenBulto: (orderId: string, bultoId: string) => void;
   deleteBulto: (orderId: string, bultoId: string) => void;
   addBultoItem: (
     orderId: string,
     bultoId: string,
+    /** Renglón del pedido al que se le suma (`OrderLine.id`). */
+    lineId: string,
     sku: string,
     name: string,
     qty: number,
@@ -307,7 +316,8 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
 
         return {
           ...current,
-          bultos: local.bultos,
+          // Lo guardado por una versión anterior no trae `lineId` en los ítems.
+          bultos: ensureItemLineIds(local.bultos, current.lines),
           progressPercentage: local.progressPercentage,
           bundlesCreated: local.bundlesCreated,
           finalSkus: local.finalSkus,
@@ -534,6 +544,30 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     return { ok: true, isExtra };
   },
 
+  createQuickBundle: (orderId, lineId) => {
+    const order = get().getOrderById(orderId);
+    if (!order) return false;
+
+    const patch = applyQuickBundle(order, lineId);
+    if (!patch) return false;
+
+    set((s) => ({ orders: patchOrder(s.orders, orderId, patch) }));
+
+    // El bulto nace cerrado: si con eso se cruzó un hito, se persiste igual que
+    // al cerrar uno a mano.
+    const updatedOrder = { ...order, ...patch };
+    if (updatedOrder.lastSavedMilestone > order.lastSavedMilestone) {
+      firestorePartialSave(
+        orderId,
+        updatedOrder.progressPercentage,
+        updatedOrder.bundlesCreated,
+        updatedOrder.finalSkus,
+      ).catch((e) => console.error('[orders.store] quickBundle partialSave error', e));
+    }
+
+    return true;
+  },
+
   closeBulto: (orderId, bultoId) => {
     const order = get().getOrderById(orderId);
     if (!order) return { ok: false, error: 'cannot_close_empty_bulto' };
@@ -561,9 +595,29 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
   reopenBulto: (orderId, bultoId) => {
     const order = get().getOrderById(orderId);
     if (!order) return;
-    set((s) => ({
-      orders: patchOrder(s.orders, orderId, applyReopenBulto(order, bultoId)),
-    }));
+
+    const user = useAuthStore.getState().user;
+
+    /**
+     * Reabrir un bulto de un pedido rechazado YA ES retomar la corrección: no
+     * tiene sentido dejar el pedido en `rejected_review` y obligar al picker a
+     * pulsar además "Reabrir picking". Se hace la misma transición que ese
+     * botón (ver reopenForRevision), incluida la escritura a Firestore.
+     */
+    const resumesRevision = order.status === 'rejected_review' && user != null;
+
+    const patch =
+      resumesRevision && user
+        ? { ...applyReopenBulto(order, bultoId), ...applyReopenForRevision(order, user.uid) }
+        : applyReopenBulto(order, bultoId);
+
+    set((s) => ({ orders: patchOrder(s.orders, orderId, patch) }));
+
+    if (resumesRevision && user) {
+      firestoreReopenForRevision(orderId, user).catch((e) =>
+        console.error('[orders.store] reopenBulto → reopenForRevision Firestore error', e),
+      );
+    }
   },
 
   deleteBulto: (orderId, bultoId) => {
@@ -574,14 +628,14 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     }));
   },
 
-  addBultoItem: (orderId, bultoId, sku, name, qty, options) => {
+  addBultoItem: (orderId, bultoId, lineId, sku, name, qty, options) => {
     const order = get().getOrderById(orderId);
     if (!order) return;
     set((s) => ({
       orders: patchOrder(
         s.orders,
         orderId,
-        applyAddBultoItem(order, bultoId, sku, name, qty, options),
+        applyAddBultoItem(order, bultoId, lineId, sku, name, qty, options),
       ),
     }));
   },

@@ -23,6 +23,8 @@ import { OrderActionButton } from './order-action-button';
 import { QtyStepper } from './qty-stepper';
 
 export interface SubstituteItemEntry {
+  /** Renglón que se está cubriendo con el sustituto (`OrderLine.id`). */
+  lineId: string;
   sku: string;
   name: string;
   qty: number;
@@ -55,17 +57,15 @@ export function SubstituteItemSheet({
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
 
-  const { results: relatedArticulos, loading, isGlobalSearch } = useSubstituteArticulos(
-    originalLine,
-    search,
-    visible,
-  );
+  const {
+    results: relatedArticulos,
+    loading,
+    isGlobalSearch,
+  } = useSubstituteArticulos(originalLine, search, visible);
 
   const maxQty = useMemo(() => {
     if (!targetBulto || !originalLine || !selectedSku) return 0;
-    return getMaxAddQtyForOrderLine(order, targetBulto, selectedSku.sku, [], {
-      originalSku: originalLine.sku,
-    });
+    return getMaxAddQtyForOrderLine(order, targetBulto, originalLine.id);
   }, [order, targetBulto, originalLine, selectedSku]);
 
   useEffect(() => {
@@ -100,6 +100,7 @@ export function SubstituteItemSheet({
     if (!originalLine || !selectedSku || qty < 1 || maxQty < 1) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onConfirm({
+      lineId: originalLine.id,
       sku: selectedSku.sku,
       name: selectedSku.name,
       qty,
@@ -179,9 +180,7 @@ export function SubstituteItemSheet({
           renderItem={({ item }) => {
             const maxAdd =
               targetBulto && originalLine
-                ? getMaxAddQtyForOrderLine(order, targetBulto, item.sku, [], {
-                    originalSku: originalLine.sku,
-                  })
+                ? getMaxAddQtyForOrderLine(order, targetBulto, originalLine.id)
                 : 0;
             const canAdd = maxAdd > 0;
 
@@ -201,7 +200,10 @@ export function SubstituteItemSheet({
                   </Text>
                   <Text style={styles.rowSku}>{item.sku}</Text>
                   <Text style={styles.rowTaxonomy}>
-                    {[item.talla ? t('picking.substitute.tallaLabel', { talla: item.talla }) : null, item.brand]
+                    {[
+                      item.talla ? t('picking.substitute.tallaLabel', { talla: item.talla }) : null,
+                      item.brand,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </Text>
@@ -216,9 +218,7 @@ export function SubstituteItemSheet({
           }}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              {loading ? '' : t('picking.substitute.noRelated')}
-            </Text>
+            <Text style={styles.empty}>{loading ? '' : t('picking.substitute.noRelated')}</Text>
           }
         />
 

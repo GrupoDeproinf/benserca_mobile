@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import { FilterDropdown, type FilterDropdownOption } from '@/shared/components/ui/filter-dropdown';
 import { Toast, useToast } from '@/shared/components/ui/toast';
-import type { Articulo } from '../services/articulos.mapper';
 import type { Bulto, Order, OrderLine } from '../types';
 import {
   getActiveOrderLines,
@@ -18,6 +17,8 @@ import { OrderActionButton } from './order-action-button';
 import { QtyStepper } from './qty-stepper';
 
 export interface AddItemEntry {
+  /** Renglón del pedido al que pertenece la cantidad (`OrderLine.id`). */
+  lineId: string;
   sku: string;
   name: string;
   qty: number;
@@ -33,20 +34,6 @@ interface AddItemSheetProps {
 
 const ALL_CATEGORIES = 'all';
 
-/** Converts an order line to the Articulo shape used by the list. */
-function orderLineToArticulo(line: OrderLine): Articulo {
-  return {
-    sku: line.sku,
-    name: line.name,
-    talla: line.talla,
-    // La taxonomía viaja con la línea: sin ella el artículo no se puede
-    // clasificar ni filtrar por categoría.
-    coCat: line.coCat,
-    coSubl: line.coSubl,
-    category: line.category,
-  };
-}
-
 /**
  * Categoría de la línea, que es a la vez clave y etiqueta del filtro.
  *
@@ -54,19 +41,19 @@ function orderLineToArticulo(line: OrderLine): Articulo {
  * `coCat` queda como respaldo por si algún pedido llegara solo con el código
  * de Profit; los pedidos actuales no lo traen.
  */
-function categoriaDeArticulo(articulo: Articulo): string | null {
-  const nombre = articulo.category?.trim();
+function categoriaDeArticulo(line: OrderLine): string | null {
+  const nombre = line.category?.trim();
   if (nombre) return nombre;
-  const codigo = articulo.coCat?.trim();
+  const codigo = line.coCat?.trim();
   return codigo ? codigo : null;
 }
 
 /** Categorías presentes en la lista, sin repetir y ordenadas alfabéticamente. */
-function buildCategoriaOptions(articulos: Articulo[]): FilterDropdownOption[] {
+function buildCategoriaOptions(lines: OrderLine[]): FilterDropdownOption[] {
   const categorias = new Set<string>();
 
-  for (const articulo of articulos) {
-    const categoria = categoriaDeArticulo(articulo);
+  for (const line of lines) {
+    const categoria = categoriaDeArticulo(line);
     if (categoria) categorias.add(categoria);
   }
 
@@ -86,43 +73,45 @@ export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: Add
   const [categoria, setCategoria] = useState(ALL_CATEGORIES);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  /**
-   * La lista son los artículos que pide el pedido. No se consulta la colección
-   * `articulos`: búsqueda y filtro se resuelven en memoria sobre estas líneas.
-   */
-  const lineArticulos: Articulo[] = useMemo(
-    () => activeLines.map(orderLineToArticulo),
-    [activeLines],
-  );
-
   /** Las categorías del filtro son las de los artículos del propio pedido. */
   const categoriaOptions: FilterDropdownOption[] = useMemo(
     () => [
       { key: ALL_CATEGORIES, label: t('picking.addItem.categoryAll') },
-      ...buildCategoriaOptions(lineArticulos),
+      ...buildCategoriaOptions(activeLines),
     ],
-    [lineArticulos, t],
+    [activeLines, t],
   );
 
-  const displayList: Articulo[] = useMemo(() => {
+  /**
+   * La lista son los RENGLONES del pedido, no los artículos: si Profit mandó el
+   * mismo SKU dos veces (19 + 1), salen dos filas y cada una se completa por
+   * separado. No se consulta la colección `articulos`: búsqueda y filtro se
+   * resuelven en memoria sobre estos renglones.
+   */
+  const displayList: OrderLine[] = useMemo(() => {
     const query = search.trim().toUpperCase();
 
-    return lineArticulos.filter((articulo) => {
-      if (categoria !== ALL_CATEGORIES && categoriaDeArticulo(articulo) !== categoria) {
+    return activeLines.filter((line) => {
+      if (categoria !== ALL_CATEGORIES && categoriaDeArticulo(line) !== categoria) {
         return false;
       }
       if (!query) return true;
-      return (
-        articulo.sku.toUpperCase().includes(query) || articulo.name.toUpperCase().includes(query)
-      );
+      return line.sku.toUpperCase().includes(query) || line.name.toUpperCase().includes(query);
     });
-  }, [lineArticulos, categoria, search]);
+  }, [activeLines, categoria, search]);
+
+  /** SKUs que aparecen en más de un renglón: sus filas se marcan para poder distinguirlas. */
+  const duplicatedSkus = useMemo(() => {
+    const count = new Map<string, number>();
+    for (const line of activeLines) count.set(line.sku, (count.get(line.sku) ?? 0) + 1);
+    return new Set([...count.entries()].filter(([, c]) => c > 1).map(([sku]) => sku));
+  }, [activeLines]);
 
   const pendingAdds: PendingAdd[] = useMemo(
     () =>
       Object.entries(quantities)
         .filter(([, qty]) => qty > 0)
-        .map(([sku, qty]) => ({ sku, qty })),
+        .map(([lineId, qty]) => ({ lineId, qty })),
     [quantities],
   );
 
@@ -142,22 +131,22 @@ export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: Add
     onClose();
   };
 
-  const setSkuQty = (sku: string, qty: number) => {
+  const setLineQty = (lineId: string, qty: number) => {
     if (!bulto) return;
     const max = getMaxAddQtyForOrderLine(
       order,
       bulto,
-      sku,
-      pendingAdds.filter((p) => p.sku !== sku),
+      lineId,
+      pendingAdds.filter((p) => p.lineId !== lineId),
     );
     if (qty > max) showToast(maxReachedTooltip);
     const clamped = Math.max(0, Math.min(qty, max));
     setQuantities((prev) => {
       const next = { ...prev };
       if (clamped <= 0) {
-        delete next[sku];
+        delete next[lineId];
       } else {
-        next[sku] = clamped;
+        next[lineId] = clamped;
       }
       return next;
     });
@@ -165,11 +154,12 @@ export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: Add
 
   const handleAdd = () => {
     const items: AddItemEntry[] = displayList
-      .filter((s) => (quantities[s.sku] ?? 0) > 0)
-      .map((s) => ({
-        sku: s.sku,
-        name: s.name,
-        qty: quantities[s.sku],
+      .filter((line) => (quantities[line.id] ?? 0) > 0)
+      .map((line) => ({
+        lineId: line.id,
+        sku: line.sku,
+        name: line.name,
+        qty: quantities[line.id],
       }));
     if (items.length === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -177,14 +167,14 @@ export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: Add
     reset();
   };
 
-  const renderRow = ({ item }: { item: Articulo }) => {
-    const qty = quantities[item.sku] ?? 0;
+  const renderRow = ({ item }: { item: OrderLine }) => {
+    const qty = quantities[item.id] ?? 0;
     const maxAdd = bulto
       ? getMaxAddQtyForOrderLine(
           order,
           bulto,
-          item.sku,
-          pendingAdds.filter((p) => p.sku !== item.sku),
+          item.id,
+          pendingAdds.filter((p) => p.lineId !== item.id),
         )
       : 0;
     const canAdd = maxAdd > 0;
@@ -195,7 +185,12 @@ export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: Add
           <ExpandableText style={styles.rowName} numberOfLines={2}>
             {item.name}
           </ExpandableText>
-          <Text style={styles.rowSku}>{item.sku}</Text>
+          <Text style={styles.rowSku}>
+            {item.sku}
+            {duplicatedSkus.has(item.sku)
+              ? ` · ${t('picking.addItem.lineQty', { qty: item.requiredQty })}`
+              : ''}
+          </Text>
           <Text style={[styles.maxHint, !canAdd && styles.maxHintMuted]}>
             {canAdd
               ? t('picking.addItem.maxPerArticle', { max: maxAdd })
@@ -204,7 +199,7 @@ export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: Add
         </View>
         <QtyStepper
           value={qty}
-          onChange={(v) => setSkuQty(item.sku, v)}
+          onChange={(v) => setLineQty(item.id, v)}
           min={0}
           max={maxAdd}
           editable
@@ -267,7 +262,7 @@ export function AddItemSheet({ visible, order, bulto, onClose, onAddItems }: Add
 
         <FlatList
           data={displayList}
-          keyExtractor={(i) => i.sku}
+          keyExtractor={(i) => i.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           renderItem={renderRow}

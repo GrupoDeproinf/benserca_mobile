@@ -1,5 +1,5 @@
 import type { FinalSku, Order, OrderLine, OrderStatus, PauseInfo } from '../types';
-import { reconstructBultosFromFinalSkus } from '../utils/order-snapshot';
+import { makeLineId, reconstructBultosFromFinalSkus } from '../utils/order-snapshot';
 
 /**
  * Normaliza una fecha de Firestore (Timestamp, epoch en ms o string) a ISO.
@@ -85,6 +85,29 @@ function readQuantity(value: any): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * `units_per_bundle` de Profit. Solo se acepta un entero positivo: cualquier
+ * otra cosa (0, negativo, ausente, texto) significa que el renglón no se arma
+ * como bulto rápido.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readUnitsPerBundle(value: any): number | undefined {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n) || n < 1) return undefined;
+  return Math.floor(n);
+}
+
+/**
+ * Fotos del artículo. En Firestore `image` es un arreglo de URLs, pero se acepta
+ * también un string suelto por si alguna importación vieja lo mandó así.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readImages(value: any): string[] | undefined {
+  const raw = Array.isArray(value) ? value : value != null ? [value] : [];
+  const urls = raw.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  return urls.length > 0 ? urls : undefined;
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
 function readTalla(data: Record<string, any>): string | undefined {
   const raw = data.talla;
@@ -113,7 +136,11 @@ function readBundleNumbers(value: any): number[] {
 function readFinalSkus(data: Record<string, any>): FinalSku[] {
   return (data.final_skus ?? []).map(
     // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
-    (s: any): FinalSku => ({
+    (s: any, index: number): FinalSku => ({
+      // `line_index` lo escribe esta app. Los pedidos guardados antes de ese
+      // campo caen a la posición del registro, que es donde ya estaban: siempre
+      // se escribió un registro por renglón y en el orden de `original_skus`.
+      lineIndex: typeof s.line_index === 'number' ? s.line_index : index,
       originalSku: s.original_sku ?? '',
       originalQuantity: s.original_quantity ?? 0,
       packedSku: s.packed_sku ?? s.original_sku ?? '',
@@ -137,13 +164,18 @@ function readFinalSkus(data: Record<string, any>): FinalSku[] {
 export function firestoreDocToOrder(id: string, data: Record<string, any>): Order {
   const lines: OrderLine[] = (data.original_skus ?? []).map(
     // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
-    (s: any): OrderLine => ({
+    (s: any, index: number): OrderLine => ({
+      // Profit repite el mismo SKU en varios renglones y no manda ningún id
+      // propio: la posición es la identidad. Ver OrderLine.id.
+      id: makeLineId(s.sku ?? '', index),
       sku: s.sku ?? '',
       // Los pedidos reales traen `descriptions` (plural) aunque el schema
       // documenta `description`: se aceptan las dos para no dejar el nombre
       // en blanco según de qué importación venga el pedido.
       name: s.description ?? s.descriptions ?? '',
       requiredQty: readQuantity(s.quantity),
+      unitsPerBundle: readUnitsPerBundle(s.units_per_bundle),
+      images: readImages(s.image),
       talla: readTalla(s),
       coCat: readRawString(s.co_cat),
       coSubl: readRawString(s.co_subl),

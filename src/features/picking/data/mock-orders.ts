@@ -1,5 +1,5 @@
 import type { FinalSku, Order, OrderLine } from '../types';
-import { buildFinalSkus } from '../utils/order-snapshot';
+import { buildFinalSkus, makeLineId } from '../utils/order-snapshot';
 import { MOCK_SKU_CATALOG } from './mock-skus';
 
 const now = Date.now();
@@ -22,6 +22,9 @@ function line(
 ): OrderLine {
   const catalog = MOCK_SKU_CATALOG.find((s) => s.sku === sku);
   return {
+    // El id real se asigna por posición en `withLineIdentity`, que es donde se
+    // conoce el índice dentro del pedido.
+    id: '',
     sku,
     name,
     requiredQty,
@@ -84,6 +87,31 @@ function withFinalSkus(order: Order): FinalSku[] {
 }
 
 const linesPedTestPlacas = [line('PLACA-MOTO-FORZA', 'Placa Moto Forza', 9, 9)];
+
+/**
+ * Asigna la identidad de renglón igual que el mapper: id por posición, y cada
+ * ítem de bulto enlazado a su renglón. Estos datos de ejemplo no tienen SKUs
+ * repetidos, así que el enlace por SKU es suficiente.
+ */
+function withLineIdentity(order: Order): Order {
+  const withIds = (lines: OrderLine[]) => lines.map((l, i) => ({ ...l, id: makeLineId(l.sku, i) }));
+
+  const lines = withIds(order.lines);
+  const lineIdBySku = new Map(lines.map((l) => [l.sku, l.id]));
+
+  return {
+    ...order,
+    lines,
+    snapshotOriginal: order.snapshotOriginal ? withIds(order.snapshotOriginal) : null,
+    bultos: order.bultos.map((b) => ({
+      ...b,
+      items: b.items.map((item) => ({
+        ...item,
+        lineId: lineIdBySku.get(item.originalSku ?? item.sku) ?? makeLineId(item.sku, 0),
+      })),
+    })),
+  };
+}
 
 export const MOCK_ORDERS: Order[] = [
   {
@@ -439,8 +467,9 @@ export const MOCK_ORDERS: Order[] = [
     rejectedBundles: [],
     approvedBundles: [],
   } as Order;
+  const identified = withLineIdentity(withPause);
   return {
-    ...withPause,
-    finalSkus: withPause.finalSkus.length > 0 ? withPause.finalSkus : withFinalSkus(withPause),
+    ...identified,
+    finalSkus: identified.finalSkus.length > 0 ? identified.finalSkus : withFinalSkus(identified),
   };
 }) as Order[];

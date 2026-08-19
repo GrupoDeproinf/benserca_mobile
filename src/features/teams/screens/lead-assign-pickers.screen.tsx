@@ -55,7 +55,7 @@ export function LeadAssignPickersScreen({ orderId }: LeadAssignPickersScreenProp
         .filter((p) => p.uid !== user?.uid)
         .map((p) => ({
           ...p,
-          status: derivePickerActivity(p.uid, orders, p.isAvailable).status,
+          status: derivePickerActivity(p.uid, orders, p.isAvailable, p.activeOrderId).status,
         }))
         .filter((p) => matchesSearch(p.nombre, search)),
     [allPickers, orders, search, user?.uid],

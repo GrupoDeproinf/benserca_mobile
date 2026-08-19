@@ -222,7 +222,7 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
           <OrderDetailCard>
             {order.lines.map((line, idx) => (
               <View
-                key={line.sku}
+                key={line.id}
                 style={[styles.lineRow, idx < order.lines.length - 1 && styles.lineRowBorder]}
               >
                 <View style={{ flex: 1, marginRight: 8 }}>

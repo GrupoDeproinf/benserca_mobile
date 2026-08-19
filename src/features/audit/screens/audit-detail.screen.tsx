@@ -179,11 +179,17 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
     router.back();
   };
 
-  const dualActionsHeight = canReviewAudit
-    ? estimateOrderActionsHeight(1, insets.bottom)
-    : order.isPaused
-      ? estimateOrderActionsHeight(1, insets.bottom)
-      : 0;
+  /**
+   * El pedido se resuelve solo cuando TODOS los bultos están revisados, y el
+   * resultado ya está determinado por ellos: basta un bulto rechazado para que
+   * el pedido se rechace. Por eso no se muestran dos botones (uno de ellos
+   * siempre inhabilitado), sino la única acción que aplica, y recién cuando no
+   * queda ningún bulto pendiente.
+   */
+  const showAuditDock = canReviewAudit && allReviewed;
+  const showResumeDock = !canReviewAudit && order.isPaused;
+  const dualActionsHeight =
+    showAuditDock || showResumeDock ? estimateOrderActionsHeight(1, insets.bottom) : 0;
 
   const headerMeta = [
     { label: t('audit.detail.picker'), value: pickerName },
@@ -279,7 +285,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
             <OrderDetailCard>
               {originalLines.map((line, idx) => (
                 <View
-                  key={line.sku}
+                  key={line.id}
                   style={[styles.lineRow, idx < originalLines.length - 1 && styles.lineRowBorder]}
                 >
                   <View style={styles.lineInfo}>
@@ -351,35 +357,30 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
         </ScrollView>
       </OrderDetailBodyFade>
 
-      {canReviewAudit ? (
+      {showAuditDock ? (
         <View style={[styles.dualDock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={[styles.dualBtn, !allReviewed && styles.dualBtnDisabled]}>
-            <OrderActionButton
-              label={t('audit.reject.btn')}
-              onPress={() => {
-                if (!allReviewed) return;
-                Haptics.selectionAsync();
-                setRejectSheetVisible(true);
-              }}
-              variant="secondary"
-              icon={XCircle}
-              disabled={!allReviewed}
-            />
-          </View>
-          <View style={[styles.dualBtn, (!allReviewed || !allApproved) && styles.dualBtnDisabled]}>
-            <OrderActionButton
-              label={t('audit.approve.btn')}
-              onPress={() => {
-                if (!allReviewed || !allApproved) return;
-                setConfirmApprove(true);
-              }}
-              variant="primary"
-              icon={CheckCircle2}
-              disabled={!allReviewed || !allApproved}
-            />
+          <View style={styles.dualBtn}>
+            {allApproved ? (
+              <OrderActionButton
+                label={t('audit.approve.orderBtn')}
+                onPress={() => setConfirmApprove(true)}
+                variant="primary"
+                icon={CheckCircle2}
+              />
+            ) : (
+              <OrderActionButton
+                label={t('audit.reject.orderBtn')}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setRejectSheetVisible(true);
+                }}
+                variant="secondary"
+                icon={XCircle}
+              />
+            )}
           </View>
         </View>
-      ) : order.isPaused ? (
+      ) : showResumeDock ? (
         <View style={[styles.dualDock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.dualBtn}>
             <OrderActionButton
@@ -535,8 +536,5 @@ const styles = StyleSheet.create({
   },
   dualBtn: {
     flex: 1,
-  },
-  dualBtnDisabled: {
-    opacity: 0.45,
   },
 });

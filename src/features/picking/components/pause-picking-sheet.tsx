@@ -13,53 +13,71 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { OrderLine, PauseReason } from '../types';
+import type { PauseReason } from '../types';
+import type { MissingLineQty } from '../utils/order-snapshot';
 
 interface PausePickingSheetProps {
   visible: boolean;
-  lines: OrderLine[];
+  /**
+   * Solo los artículos que faltan por armar (ver `getMissingQuantities`). Un
+   * artículo ya completo en los bultos no puede ser el motivo de la pausa, así
+   * que no se ofrece.
+   */
+  pendingItems: MissingLineQty[];
   onClose: () => void;
   onConfirm: (reason: PauseReason, missingSkus: string[]) => void;
 }
 
 const REASONS: PauseReason[] = ['falta_articulo', 'cambio_prioridad'];
 
-export function PausePickingSheet({ visible, lines, onClose, onConfirm }: PausePickingSheetProps) {
+export function PausePickingSheet({
+  visible,
+  pendingItems,
+  onClose,
+  onConfirm,
+}: PausePickingSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   const [selectOpen, setSelectOpen] = useState(false);
   const [reason, setReason] = useState<PauseReason | null>(null);
-  const [missingSkus, setMissingSkus] = useState<Set<string>>(new Set());
+  /**
+   * Selección por RENGLÓN: dos renglones del mismo SKU son pendientes distintos
+   * y se marcan por separado. Lo que viaja a Firestore sigue siendo la lista de
+   * SKUs (`missing_skus`), sin repetir.
+   */
+  const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (visible) {
       setSelectOpen(false);
       setReason(null);
-      setMissingSkus(new Set());
+      setSelectedLines(new Set());
     }
   }, [visible]);
 
   const reasonLabel = (r: PauseReason) =>
-    r === 'falta_articulo' ? t('picking.pause.reasonMissingItem') : t('picking.pause.reasonPriorityChange');
+    r === 'falta_articulo'
+      ? t('picking.pause.reasonMissingItem')
+      : t('picking.pause.reasonPriorityChange');
 
-  const toggleSku = (sku: string) => {
+  const toggleLine = (lineId: string) => {
     Haptics.selectionAsync();
-    setMissingSkus((prev) => {
+    setSelectedLines((prev) => {
       const next = new Set(prev);
-      if (next.has(sku)) next.delete(sku);
-      else next.add(sku);
+      if (next.has(lineId)) next.delete(lineId);
+      else next.add(lineId);
       return next;
     });
   };
 
-  const canConfirm =
-    reason != null && (reason !== 'falta_articulo' || missingSkus.size > 0);
+  const canConfirm = reason != null && (reason !== 'falta_articulo' || selectedLines.size > 0);
 
   const handleConfirm = () => {
     if (!canConfirm || !reason) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    onConfirm(reason, Array.from(missingSkus));
+    const skus = pendingItems.filter((i) => selectedLines.has(i.lineId)).map((i) => i.sku);
+    onConfirm(reason, [...new Set(skus)]);
   };
 
   const handleClose = () => {
@@ -110,7 +128,7 @@ export function PausePickingSheet({ visible, lines, onClose, onConfirm }: PauseP
                     Haptics.selectionAsync();
                     setReason(r);
                     setSelectOpen(false);
-                    if (r !== 'falta_articulo') setMissingSkus(new Set());
+                    if (r !== 'falta_articulo') setSelectedLines(new Set());
                   }}
                   style={styles.selectOptionRow}
                 >
@@ -124,28 +142,38 @@ export function PausePickingSheet({ visible, lines, onClose, onConfirm }: PauseP
           {reason === 'falta_articulo' ? (
             <View style={styles.checklistWrap}>
               <Text style={styles.fieldLabel}>{t('picking.pause.missingItemsLabel')}</Text>
-              <ScrollView style={styles.checklist} keyboardShouldPersistTaps="handled">
-                {lines.map((line) => {
-                  const checked = missingSkus.has(line.sku);
-                  return (
-                    <Pressable
-                      key={line.sku}
-                      onPress={() => toggleSku(line.sku)}
-                      style={[styles.checklistRow, checked && styles.checklistRowChecked]}
-                    >
-                      <View style={styles.checklistRowInfo}>
-                        <Text style={styles.checklistRowName} numberOfLines={2}>
-                          {line.name}
-                        </Text>
-                        <Text style={styles.checklistRowSku}>{line.sku}</Text>
-                      </View>
-                      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                        {checked ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              {pendingItems.length === 0 ? (
+                <Text style={styles.checklistEmpty}>{t('picking.pause.noPendingItems')}</Text>
+              ) : (
+                <ScrollView style={styles.checklist} keyboardShouldPersistTaps="handled">
+                  {pendingItems.map((item) => {
+                    const checked = selectedLines.has(item.lineId);
+                    return (
+                      <Pressable
+                        key={item.lineId}
+                        onPress={() => toggleLine(item.lineId)}
+                        style={[styles.checklistRow, checked && styles.checklistRowChecked]}
+                      >
+                        <View style={styles.checklistRowInfo}>
+                          <Text style={styles.checklistRowName} numberOfLines={2}>
+                            {item.name}
+                          </Text>
+                          <Text style={styles.checklistRowSku}>{item.sku}</Text>
+                          <Text style={styles.checklistRowQty}>
+                            {t('picking.pause.missingQty', {
+                              missing: item.missing,
+                              required: item.required,
+                            })}
+                          </Text>
+                        </View>
+                        <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                          {checked ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
           ) : null}
 
@@ -315,6 +343,13 @@ const styles = StyleSheet.create({
   checklistRowInfo: { flex: 1, minWidth: 0, marginRight: 10 },
   checklistRowName: { fontSize: 13, fontWeight: '600', color: '#111827' },
   checklistRowSku: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
+  checklistRowQty: { fontSize: 11, fontWeight: '700', color: '#B45309', marginTop: 4 },
+  checklistEmpty: {
+    fontSize: 13,
+    color: '#8E8E93',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
   checkbox: {
     width: 22,
     height: 22,

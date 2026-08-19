@@ -124,6 +124,17 @@
       "waitingTitle": "En chequeo",
       "waitingBody": "El pedido está empaquetado y a la espera de que el chequeador lo apruebe. No puedes embalar hasta la aprobación."
     },
+    "skuPreview": {
+      "open": "Ver artículo",
+      "noImage": "Este artículo no tiene foto cargada"
+    },
+    "quickBundle": {
+      "title": "Bultos rápidos",
+      "cardTitle": "Bulto rápido",
+      "unitsPill": "{{units}} uds./bulto",
+      "remaining": "{{count}} bulto(s)",
+      "build": "Armar {{count}} bulto(s)"
+    },
     "queue": {
       "blockTitle": "No puedes iniciar",
       "alreadyActive": "Ya tienes un pedido en proceso. Finalízalo o pon en pausa antes de iniciar otro."
@@ -157,7 +168,8 @@
       "capacityExceededTooltip": "No puedes agregar más de lo pedido",
       "searchHint": "Escribe al menos 2 caracteres para buscar",
       "categoryFilter": "Filtro",
-      "categoryAll": "Todas las categorías"
+      "categoryAll": "Todas las categorías",
+      "lineQty": "pedido: {{qty}}"
     },
     "extraBultos": {
       "title": "Bultos adicionales",
@@ -218,6 +230,8 @@
       "reasonMissingItem": "Falta de artículo",
       "reasonPriorityChange": "Cambio de prioridad",
       "missingItemsLabel": "Marca los artículos faltantes",
+      "missingQty": "Faltan {{missing}} de {{required}}",
+      "noPendingItems": "No quedan artículos pendientes: todo lo del pedido ya está en los bultos.",
       "confirm": "Pausar pedido",
       "bannerTitle": "Pedido pausado",
       "bannerBodyMissing": "Falta de artículo: {{skus}}",
@@ -508,12 +522,14 @@
     },
     "approve": {
       "btn": "Aprobar",
+      "orderBtn": "Aprobar pedido",
       "title": "Aprobar pedido",
       "body": "¿Confirmas que el pedido {{order}} está correcto?",
       "confirm": "Aprobar"
     },
     "reject": {
       "btn": "Rechazar",
+      "orderBtn": "Rechazar pedido",
       "title": "Rechazar pedido",
       "subtitle": "Describe el motivo del rechazo. El picker lo verá al corregir el pedido.",
       "placeholder": "Ej: Faltan 5 unidades del SKU X en el bulto 2...",

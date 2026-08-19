@@ -15,6 +15,17 @@ export type OrderStatus =
 
 /** SKU del pedido tal como llega de Profit (referencia, lo que se DEBE pickear). */
 export interface OrderLine {
+  /**
+   * Identidad del RENGLÓN, no del artículo: `sku#posición` dentro de
+   * `original_skus`.
+   *
+   * Profit repite el mismo SKU en varios renglones (descuentos, bonificaciones:
+   * "19 + 1"), y esos renglones se trabajan por separado — cada uno con su
+   * cantidad y su pendiente. Como Profit no manda ningún identificador de
+   * renglón y los duplicados son idénticos salvo la cantidad, la posición es la
+   * única identidad disponible. Se deriva en el mapper; no se lee de Firestore.
+   */
+  id: string;
   sku: string;
   name: string;
   requiredQty: number;
@@ -23,6 +34,21 @@ export interface OrderLine {
    * si no viene, el artículo NO es sustituible.
    */
   talla?: string;
+  /**
+   * Unidades por bulto que manda Profit (`units_per_bundle`). Cuando viene, el
+   * renglón se puede armar como "bulto rápido": un bulto ya cerrado con
+   * exactamente esta cantidad, sin pasar por el sheet de agregar artículos.
+   *
+   * Solo se arman bultos COMPLETOS: si lo pedido no es múltiplo (pide 20 con
+   * `unitsPerBundle` 12), el resto queda pendiente para meterlo a mano.
+   */
+  unitsPerBundle?: number;
+  /**
+   * Fotos del artículo (`image` en `original_skus`). Es un arreglo: un mismo SKU
+   * puede traer varias. Se usan en la vista previa del renglón (mantener
+   * presionado o el icono del ojo).
+   */
+  images?: string[];
   /** Categoría Profit (`co_cat`). Filtro de candidatos de sustitución. */
   coCat?: string;
   /** Sublínea Profit (`co_subl`). Filtro de candidatos de sustitución. */
@@ -35,6 +61,14 @@ export interface OrderLine {
 /** Ítem metido en un bulto por el picker. */
 export interface BultoItem {
   id: string;
+  /**
+   * Renglón del pedido al que pertenece esta cantidad (`OrderLine.id`).
+   *
+   * Es lo que permite que dos renglones del mismo SKU convivan en un bulto como
+   * ítems distintos, cada uno con su propio contador. Sin esto se fusionaban en
+   * uno solo y lo armado se contaba dos veces.
+   */
+  lineId: string;
   /** SKU realmente empaquetado. */
   sku: string;
   name: string;
@@ -58,8 +92,16 @@ export interface FinalSkuBundle {
   quantity: number;
 }
 
-/** Estado final por SKU original (schema Firestore). */
+/** Estado final por RENGLÓN del pedido (schema Firestore). */
 export interface FinalSku {
+  /**
+   * Posición del renglón en `original_skus` (`line_index` en Firestore).
+   *
+   * Se persiste para que el vínculo registro↔renglón viaje dentro del dato y no
+   * dependa del orden del arreglo. Campo aditivo: la web ignora lo que no
+   * conoce, y ya recibía un registro por renglón (no por SKU).
+   */
+  lineIndex: number;
   originalSku: string;
   originalQuantity: number;
   packedSku: string;

@@ -5,13 +5,13 @@ import { FlatList, View } from 'react-native';
 import { ORDERS_LIST_CARD_GAP } from '@/features/picking/components/orders-list-page';
 import { OrdersSearchFilter } from '@/features/picking/components/orders-search-filter';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
+import type { Order } from '@/features/picking/types';
 import { PickerStatusCard } from '@/features/supervision/components/picker-status-card';
 import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-section';
 import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import type { PickerEstado, PickerStatus } from '@/features/warehouse/types';
 import { derivePickerActivity } from '@/features/warehouse/utils/derive-picker-activity';
-import type { Order } from '@/features/picking/types';
 import { EmptyState } from '@/shared/components/ui/empty-state';
 import { Text } from '@/shared/components/ui/text';
 
@@ -42,15 +42,19 @@ export function LeadPickersScreen() {
       pickers
         .filter((p) => matchesSearch(p, search))
         .map((p) => {
-          const { status, activeOrder } = derivePickerActivity(p.uid, orders, p.isAvailable);
+          const { status, activeOrder } = derivePickerActivity(
+            p.uid,
+            orders,
+            p.isAvailable,
+            p.activeOrderId,
+          );
           return {
             picker: { ...p, status, activeOrderId: activeOrder?.id ?? null },
             activeOrder,
           };
         })
         .sort(
-          (a, b) =>
-            STATUS_ORDER.indexOf(a.picker.status) - STATUS_ORDER.indexOf(b.picker.status),
+          (a, b) => STATUS_ORDER.indexOf(a.picker.status) - STATUS_ORDER.indexOf(b.picker.status),
         ),
     [pickers, orders, search],
   );

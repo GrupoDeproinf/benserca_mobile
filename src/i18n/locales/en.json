@@ -137,7 +137,8 @@
       "capacityExceededTooltip": "Bundle capacity exceeded",
       "searchHint": "Type at least 2 characters to search",
       "categoryFilter": "Filter",
-      "categoryAll": "All categories"
+      "categoryAll": "All categories",
+      "lineQty": "ordered: {{qty}}"
     },
     "extraBultos": {
       "title": "Extra packages",
@@ -182,6 +183,8 @@
       "reasonMissingItem": "Missing item",
       "reasonPriorityChange": "Priority change",
       "missingItemsLabel": "Mark the missing items",
+      "missingQty": "{{missing}} of {{required}} missing",
+      "noPendingItems": "No pending items: everything in the order is already in the packages.",
       "confirm": "Pause order",
       "bannerTitle": "Order paused",
       "bannerBodyMissing": "Missing item: {{skus}}",
@@ -202,6 +205,17 @@
       "btn": "Substitute",
       "needBultoTitle": "Open a bundle",
       "needBultoBody": "Open a bundle before recording a substitution."
+    },
+    "skuPreview": {
+      "open": "View item",
+      "noImage": "This item has no photo"
+    },
+    "quickBundle": {
+      "title": "Quick packages",
+      "cardTitle": "Quick package",
+      "unitsPill": "{{units}} units/package",
+      "remaining": "{{count}} package(s)",
+      "build": "Build {{count}} package(s)"
     },
     "queue": {
       "blockTitle": "Cannot start",
@@ -467,12 +481,14 @@
     },
     "approve": {
       "btn": "Approve",
+      "orderBtn": "Approve order",
       "title": "Approve order",
       "body": "Confirm that order {{order}} is correct?",
       "confirm": "Approve"
     },
     "reject": {
       "btn": "Reject",
+      "orderBtn": "Reject order",
       "title": "Reject order",
       "subtitle": "Describe the reason for rejection. The picker will see this when correcting the order.",
       "placeholder": "E.g. Missing 5 units of SKU X in package 2...",

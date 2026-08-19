@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   Box,
   ClipboardList,
+  Eye,
   type LucideIcon,
   Package,
   PackageOpen,
@@ -34,12 +35,15 @@ import { OrderDetailAlertBanner, OrderDetailHeader } from '../components/order-d
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
 import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { PausePickingSheet } from '../components/pause-picking-sheet';
+import { QuickBundleCard } from '../components/quick-bundle-card';
+import { SkuPreviewSheet } from '../components/sku-preview-sheet';
 import { SubstituteItemSheet } from '../components/substitute-item-sheet';
 import { useOrdersStore } from '../store/orders.store';
 import type { OrderLine, PauseReason } from '../types';
 import { getMaxQtyForBultoItem } from '../utils/bulto-capacity';
 import { getAssignedQtyForLine, getMissingQuantities } from '../utils/order-snapshot';
 import { getEffectiveQueuePosition } from '../utils/picker-queue';
+import { getQuickBundleCandidates } from '../utils/quick-bundles';
 
 interface PickingDetailScreenProps {
   orderId: string;
@@ -93,6 +97,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const reopenBulto = useOrdersStore((s) => s.reopenBulto);
   const deleteBulto = useOrdersStore((s) => s.deleteBulto);
   const addBultoItem = useOrdersStore((s) => s.addBultoItem);
+  const createQuickBundle = useOrdersStore((s) => s.createQuickBundle);
   const removeBultoItem = useOrdersStore((s) => s.removeBultoItem);
   const updateBultoItem = useOrdersStore((s) => s.updateBultoItem);
   const pausePicking = useOrdersStore((s) => s.pausePicking);
@@ -100,6 +105,8 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
 
   const [addSheetBultoId, setAddSheetBultoId] = useState<string | null>(null);
   const [substituteLine, setSubstituteLine] = useState<OrderLine | null>(null);
+  /** Renglón cuya foto y código se están viendo en grande. */
+  const [previewLine, setPreviewLine] = useState<OrderLine | null>(null);
   const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
   const [confirmSheet, setConfirmSheet] = useState<ConfirmState | null>(null);
   const {
@@ -144,6 +151,19 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     hiddenApprovedBultos > 0
       ? order.bultos.filter((b) => !order.approvedBundles.includes(b.number))
       : order.bultos;
+
+  /**
+   * Bultos rápidos: renglones que Profit marca con `units_per_bundle` y que se
+   * arman de un toque. Solo mientras el pedido se puede editar; en modo lectura
+   * o ya empaquetado no hay nada que armar.
+   */
+  const quickBundleCandidates = isEditable ? getQuickBundleCandidates(order) : [];
+
+  const handleQuickBundle = (lineId: string) => {
+    if (createQuickBundle(order.id, lineId)) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
 
   const lastObservation = order.auditObservations[order.auditObservations.length - 1];
   const closedBultos = order.bultos.filter(
@@ -358,8 +378,8 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     items: AddItemEntry[],
     options?: { originalSku?: string; substitutionNote?: string },
   ) => {
-    items.forEach(({ sku, name, qty }) => {
-      addBultoItem(order.id, bultoId, sku, name, qty, options);
+    items.forEach(({ lineId, sku, name, qty }) => {
+      addBultoItem(order.id, bultoId, lineId, sku, name, qty, options);
     });
     setAddSheetBultoId(null);
     setSubstituteLine(null);
@@ -529,13 +549,20 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
           >
             <OrderDetailCard>
               {order.lines.map((line, idx) => {
-                const assigned = getAssignedQtyForLine(order, line.sku);
+                const assigned = getAssignedQtyForLine(order, line.id);
                 const pending = Math.max(0, line.requiredQty - assigned);
                 // Sustitución deshabilitada temporalmente (a pedido del negocio).
                 const canSubstitute = false;
                 return (
-                  <View
-                    key={line.sku}
+                  // Mantener presionado abre la vista previa del artículo: foto
+                  // y código en grande, para cotejar contra la etiqueta física.
+                  <Pressable
+                    key={line.id}
+                    onLongPress={() => {
+                      Haptics.selectionAsync();
+                      setPreviewLine(line);
+                    }}
+                    delayLongPress={250}
                     style={[styles.lineRow, idx < order.lines.length - 1 && styles.lineRowBorder]}
                   >
                     <View style={{ flex: 1, marginRight: 8 }}>
@@ -556,6 +583,22 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                     </View>
                     <View style={styles.lineActions}>
                       <Text style={styles.lineQty}>×{line.requiredQty}</Text>
+                      {/* Atajo visible al "mantener presionado". Va en esta
+                          columna y no junto a la meta: el ancho de la izquierda
+                          varía con el largo de la cantidad (×12 vs ×225), y ahí
+                          los ojos quedaban desalineados entre filas. */}
+                      <Pressable
+                        onPress={() => {
+                          Haptics.selectionAsync();
+                          setPreviewLine(line);
+                        }}
+                        hitSlop={12}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('picking.skuPreview.open')}
+                        style={({ pressed }) => [styles.eyeBtn, pressed && { opacity: 0.5 }]}
+                      >
+                        <Eye size={18} color="#8E8E93" strokeWidth={2.2} />
+                      </Pressable>
                       {isEditable && canSubstitute ? (
                         <Pressable
                           onPress={() => {
@@ -578,7 +621,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                         </Pressable>
                       ) : null}
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </OrderDetailCard>
@@ -594,6 +637,19 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                   })}
                 </Text>
               ) : null}
+              {quickBundleCandidates.length > 0 ? (
+                <View style={styles.quickBundles}>
+                  <Text style={styles.quickBundlesTitle}>{t('picking.quickBundle.title')}</Text>
+                  {quickBundleCandidates.map((candidate) => (
+                    <QuickBundleCard
+                      key={candidate.lineId}
+                      candidate={candidate}
+                      onCreate={handleQuickBundle}
+                    />
+                  ))}
+                </View>
+              ) : null}
+
               {visibleBultos.length === 0 ? (
                 <OrderDetailCard>
                   <Text style={styles.emptyBultosTitle}>{t('picking.detail.noBultos')}</Text>
@@ -652,7 +708,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
           if (!openBultoTarget) return;
           commitAddItems(
             openBultoTarget.id,
-            [{ sku: entry.sku, name: entry.name, qty: entry.qty }],
+            [{ lineId: entry.lineId, sku: entry.sku, name: entry.name, qty: entry.qty }],
             {
               originalSku: entry.originalSku,
               substitutionNote: entry.substitutionNote,
@@ -661,9 +717,11 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         }}
       />
 
+      <SkuPreviewSheet line={previewLine} onClose={() => setPreviewLine(null)} />
+
       <PausePickingSheet
         visible={pauseSheetVisible}
-        lines={order.lines}
+        pendingItems={getMissingQuantities(order)}
         onClose={() => setPauseSheetVisible(false)}
         onConfirm={handleConfirmPause}
       />
@@ -731,6 +789,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF2FF',
   },
   substituteText: { fontSize: 10, fontWeight: '700', color: '#4338CA' },
+  eyeBtn: {
+    alignSelf: 'flex-end',
+    padding: 2,
+  },
+  quickBundles: {
+    marginBottom: 12,
+  },
+  quickBundlesTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
   onlyRejectedNote: {
     fontSize: 12,
     fontWeight: '600',

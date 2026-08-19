@@ -12,6 +12,7 @@ import type {
   PauseReason,
   PickerActionError,
 } from '../types';
+import { getActiveOrderLines } from '../utils/bulto-capacity';
 import { computeBundlesCreated, computeProgressPercentage } from '../utils/order-progress';
 import {
   buildFinalSkus,
@@ -20,6 +21,7 @@ import {
   renumberBultos,
 } from '../utils/order-snapshot';
 import { buildPartialSavePatch } from '../utils/partial-save';
+import { getQuickBundleCandidates } from '../utils/quick-bundles';
 
 function syncPickingMetrics(order: Order, bultos: Bulto[]): Partial<Order> {
   const withBultos = { ...order, bultos };
@@ -184,6 +186,62 @@ export function applyOpenBulto(order: Order): Partial<Order> {
   };
 }
 
+/**
+ * Bulto rápido: crea de un toque TODOS los bultos completos que el renglón
+ * permita, ya cerrados y con `unitsPerBundle` unidades cada uno, sin pasar por
+ * abrir bulto → agregar artículo → cerrar.
+ *
+ * Pedir 12 con empaque de 6 arma dos bultos de 6 en una sola acción. Lo que
+ * sobre por debajo del empaque (pedir 14 deja 2) se arma a mano: un bulto
+ * rápido siempre lleva la cantidad exacta del empaque.
+ *
+ * Las unidades salen de UN solo renglón: dos renglones del mismo SKU son
+ * cantidades independientes y no se mezclan en el mismo ítem.
+ *
+ * No toca los bultos abiertos: los rápidos se agregan al final, así que el
+ * picker puede tener uno a medias sin que esto lo interrumpa.
+ */
+export function applyQuickBundle(order: Order, lineId: string): Partial<Order> | null {
+  const candidate = getQuickBundleCandidates(order).find((c) => c.lineId === lineId);
+  if (!candidate) return null;
+
+  const stamp = Date.now();
+  const nuevos: Bulto[] = Array.from({ length: candidate.availableBundles }, (_, idx) => {
+    const number = order.bultos.length + idx + 1;
+    return {
+      id: `bulto-${order.id}-quick-${stamp}-${idx}`,
+      number,
+      status: 'closed' as const,
+      items: [
+        {
+          id: `bi-${lineId}-quick-${stamp}-${idx}`,
+          lineId,
+          sku: candidate.sku,
+          name: candidate.name,
+          qty: candidate.unitsPerBundle,
+        },
+      ],
+    };
+  });
+
+  const bultos = [...order.bultos, ...nuevos];
+  const withBultos = { ...order, bultos };
+  const base = {
+    ...syncPickingMetrics(order, bultos),
+    hasExtraBultos: order.hasExtraBultos || bultos.length > order.definedBultos,
+  };
+
+  // Nacen cerrados, así que mueven el progreso igual que cerrar bultos a mano y
+  // deben disparar el mismo guardado por hito.
+  const progressPercentage = computeProgressPercentage(withBultos);
+  const milestone = getMilestoneForProgress(progressPercentage, order.lastSavedMilestone);
+  if (milestone > order.lastSavedMilestone) {
+    return { ...base, ...buildPartialSavePatch(withBultos, milestone) };
+  }
+
+  return base;
+}
+
 export function canCloseBulto(order: Order, bultoId: string): PickerActionError | null {
   const bulto = order.bultos.find((b) => b.id === bultoId);
   if (!bulto || bulto.items.length === 0) return 'cannot_close_empty_bulto';
@@ -254,6 +312,7 @@ function shiftBundleNumbers(numbers: number[], deletedNumber: number): number[] 
 export function applyAddBultoItem(
   order: Order,
   bultoId: string,
+  lineId: string,
   sku: string,
   name: string,
   qty: number,
@@ -262,8 +321,11 @@ export function applyAddBultoItem(
   const bultos = order.bultos.map((b) => {
     if (b.id !== bultoId) return b;
 
-    const matchSku = options?.originalSku ?? sku;
-    const existing = b.items.find((i) => i.sku === sku && (i.originalSku ?? i.sku) === matchSku);
+    // La fusión es por RENGLÓN, no por SKU: con "19 + 1" del mismo artículo,
+    // cada renglón es un ítem aparte dentro del bulto y se sube o baja solo.
+    // El SKU también entra porque una sustitución mete otro artículo para el
+    // mismo renglón, y esas cantidades no deben mezclarse.
+    const existing = b.items.find((i) => i.lineId === lineId && i.sku === sku);
 
     const items: BultoItem[] = existing
       ? b.items.map((i) =>
@@ -278,7 +340,8 @@ export function applyAddBultoItem(
       : [
           ...b.items,
           {
-            id: `bi-${Date.now()}`,
+            id: `bi-${lineId}-${sku}-${Date.now()}`,
+            lineId,
             sku,
             name,
             qty,

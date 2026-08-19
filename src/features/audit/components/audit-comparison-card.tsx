@@ -53,7 +53,7 @@ export function AuditComparisonCard({ rows }: AuditComparisonCardProps) {
       </View>
 
       {rows.map((row, idx) => (
-        <View key={row.sku} style={[styles.row, idx < rows.length - 1 && styles.rowBorder]}>
+        <View key={row.lineId} style={[styles.row, idx < rows.length - 1 && styles.rowBorder]}>
           <View style={styles.colProduct}>
             <ExpandableText style={styles.productName} numberOfLines={2}>
               {row.name}
