@@ -34,6 +34,47 @@ export function getAssignedQtyForLine(order: Order, lineId: string): number {
   }, 0);
 }
 
+/** Un ítem que quedó en un bulto pero ya no corresponde a ningún renglón. */
+export interface OrphanBultoItem {
+  bultoId: string;
+  bultoNumber: number;
+  itemId: string;
+  sku: string;
+  name: string;
+  qty: number;
+}
+
+/**
+ * Ítems empaquetados que perdieron su renglón.
+ *
+ * El id de renglón es `sku#index` (ver `makeLineId`), así que si la web cambia
+ * el SKU de un renglón al resolver un faltante, lo que el picker ya había
+ * metido en el bulto deja de corresponder a ninguna línea. Eso NO es cosmético:
+ * `buildFinalSkus` recorre los renglones y no encontraría esos ítems, así que
+ * al empaquetar sus unidades desaparecerían de `final_skus` — estarían en el
+ * bulto físico pero no en el sistema.
+ *
+ * Por eso se detectan, se muestran marcados y bloquean el cierre del pedido
+ * hasta que el picker los saque o los vuelva a agregar contra el renglón nuevo.
+ * Ver `order_missing_items.md` §8.
+ */
+export function getOrphanBultoItems(order: Order): OrphanBultoItem[] {
+  const validLineIds = new Set(order.lines.map((l) => l.id));
+
+  return order.bultos.flatMap((bulto) =>
+    bulto.items
+      .filter((item) => !validLineIds.has(item.lineId))
+      .map((item) => ({
+        bultoId: bulto.id,
+        bultoNumber: bulto.number,
+        itemId: item.id,
+        sku: item.sku,
+        name: item.name,
+        qty: item.qty,
+      })),
+  );
+}
+
 export interface MissingLineQty {
   lineId: string;
   sku: string;

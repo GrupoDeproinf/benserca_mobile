@@ -1,4 +1,4 @@
-import type { FinalSku, Order, OrderLine, OrderStatus, PauseInfo } from '../types';
+import type { FinalSku, MissingItem, Order, OrderLine, OrderStatus, PauseInfo } from '../types';
 import { makeLineId, reconstructBultosFromFinalSkus } from '../utils/order-snapshot';
 
 /**
@@ -55,6 +55,45 @@ function derivePauseInfo(timeline: any[]): PauseInfo | null {
     }
   }
   return null;
+}
+
+/**
+ * Lee `missing_items` de Firestore. Los documentos viejos no tienen el campo:
+ * se tratan como lista vacía.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+function readMissingItems(data: Record<string, any>): MissingItem[] {
+  if (!Array.isArray(data.missing_items)) return [];
+
+  return data.missing_items.map(
+    // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+    (m: any): MissingItem => {
+      const requiredQty = readQuantity(m.required_qty);
+      const availableQty = readQuantity(m.available_qty);
+      return {
+        lineIndex: typeof m.line_index === 'number' ? m.line_index : -1,
+        sku: m.sku ?? '',
+        description: m.description ?? '',
+        requiredQty,
+        availableQty,
+        // La resta viene persistida, pero si un doc la trae mal o ausente se
+        // recalcula: es dato derivado y el valor correcto siempre es la resta.
+        missingQty:
+          typeof m.missing_qty === 'number'
+            ? m.missing_qty
+            : Math.max(0, requiredQty - availableQty),
+        markedByUid: m.marked_by_uid ?? '',
+        markedByName: m.marked_by_name ?? '',
+        markedAt: readTimestamp(m.marked_at),
+        resolution:
+          m.resolution === 'approved' || m.resolution === 'rejected' ? m.resolution : 'pending',
+        resolvedByUid: m.resolved_by_uid ?? null,
+        resolvedByName: m.resolved_by_name ?? null,
+        resolvedAt: readTimestampOrNull(m.resolved_at),
+        resolutionNote: m.resolution_note ?? null,
+      };
+    },
+  );
 }
 
 /** Mapea el status string de Firestore al OrderStatus interno. */
@@ -188,6 +227,7 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
   const status = mapStatus(data.status ?? 'Asignado');
   const timeline = Array.isArray(data.timeline) ? data.timeline : [];
   const isPaused = data.is_paused ?? false;
+  const missingItems = readMissingItems(data);
   const finalSkus = readFinalSkus(data);
   const hasPersistedPicking = finalSkus.some((sku) => sku.bundles.length > 0);
   const bultos = hasPersistedPicking ? reconstructBultosFromFinalSkus(id, finalSkus, lines) : [];
@@ -226,6 +266,12 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
 
     isPaused,
     pauseInfo: isPaused ? derivePauseInfo(timeline) : null,
+
+    missingItems,
+    // La bandera plana de Firestore es la fuente de verdad para consultar, pero
+    // se recalcula desde el array: si la web resolvió un item y no actualizó el
+    // flag, lo que manda es el estado real de los items.
+    hasMissingItems: missingItems.some((m) => m.resolution === 'pending'),
 
     // Se normalizan a ISO: en Firestore estos campos pueden venir como
     // Timestamp, y un Timestamp crudo rompe cualquier `new Date(...)` posterior

@@ -7,6 +7,8 @@ import type {
   AuditObservation,
   Bulto,
   BultoItem,
+  MissingItem,
+  MissingItemsMode,
   Order,
   PauseInfo,
   PauseReason,
@@ -115,6 +117,79 @@ export function applyPausePicking(
 
 export function applyResumePicking(_order: Order): Partial<Order> {
   return { isPaused: false, pauseInfo: null };
+}
+
+/**
+ * Construye los `MissingItem` a reportar a partir de lo que marcó el picker.
+ * `availableQty` es cuánto hay realmente en almacén; la resta contra lo pedido
+ * en ese renglón es `missingQty`.
+ */
+export function buildMissingItems(
+  order: Order,
+  user: SessionUser,
+  marked: { lineId: string; availableQty: number }[],
+): MissingItem[] {
+  const markedAt = new Date().toISOString();
+
+  return marked.flatMap(({ lineId, availableQty }) => {
+    // El índice ES la identidad del renglón (Profit no manda id): se busca por
+    // posición en `lines`, que el mapper construye desde `original_skus`.
+    const lineIndex = order.lines.findIndex((l) => l.id === lineId);
+    if (lineIndex === -1) return [];
+
+    const line = order.lines[lineIndex];
+    const available = Math.max(0, Math.min(availableQty, line.requiredQty));
+
+    return [
+      {
+        lineIndex,
+        sku: line.sku,
+        description: line.name,
+        requiredQty: line.requiredQty,
+        availableQty: available,
+        missingQty: line.requiredQty - available,
+        markedByUid: user.uid,
+        markedByName: user.name,
+        markedAt,
+        resolution: 'pending' as const,
+        resolvedByUid: null,
+        resolvedByName: null,
+        resolvedAt: null,
+        resolutionNote: null,
+      },
+    ];
+  });
+}
+
+/**
+ * Reportar faltantes. NO cambia `status` en ninguno de los dos modos: el estado
+ * "Por pausar" es `hasMissingItems && !isPaused`. Con `mode: 'pause'` además
+ * pausa, reusando el mismo flag ortogonal de siempre.
+ */
+export function applyReportMissingItems(
+  order: Order,
+  user: SessionUser,
+  items: MissingItem[],
+  mode: MissingItemsMode,
+): Partial<Order> {
+  const patch: Partial<Order> = {
+    missingItems: [...order.missingItems, ...items],
+    hasMissingItems: true,
+  };
+
+  if (mode === 'pause') {
+    return {
+      ...patch,
+      ...applyPausePicking(
+        order,
+        user,
+        'falta_articulo',
+        items.map((i) => i.sku),
+      ),
+    };
+  }
+
+  return patch;
 }
 
 // ─── Auditoría ────────────────────────────────────────────────────────────────

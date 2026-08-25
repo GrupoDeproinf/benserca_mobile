@@ -1,6 +1,13 @@
 import firestore from '@react-native-firebase/firestore';
 import type { SessionUser } from '@/shared/types';
-import type { FinalSku, Order, OrderStatus, PauseReason } from '../types';
+import type {
+  FinalSku,
+  MissingItem,
+  MissingItemsMode,
+  Order,
+  OrderStatus,
+  PauseReason,
+} from '../types';
 
 const ORDERS = 'lo_orders';
 
@@ -267,6 +274,86 @@ export async function firestorePausePicking(
         note: `Pedido pausado desde estatus «${fromLabel}».`,
         reason,
         missing_skus: missingSkus,
+      }),
+    });
+  // Al pausar, el picker queda libre para tomar otro pedido.
+  await updatePickerAvailability(user.uid, true, null);
+}
+
+/** Serializa un `MissingItem` recién reportado al formato de Firestore. */
+function missingItemToFirestore(item: MissingItem) {
+  return {
+    line_index: item.lineIndex,
+    sku: item.sku,
+    description: item.description,
+    required_qty: item.requiredQty,
+    available_qty: item.availableQty,
+    missing_qty: item.missingQty,
+    marked_by_uid: item.markedByUid,
+    marked_by_name: item.markedByName,
+    marked_at: item.markedAt,
+    resolution: item.resolution,
+    resolved_by_uid: item.resolvedByUid,
+    resolved_by_name: item.resolvedByName,
+    resolved_at: item.resolvedAt,
+    resolution_note: item.resolutionNote,
+  };
+}
+
+/**
+ * Reporta faltantes de stock en el campo top-level `missing_items`.
+ *
+ * `mode: 'continue'` → estado "Por pausar": el picker sigue armando. NO toca
+ * `status` (los ~27 chequeos sobre `in_progress` deben seguir dando true, si no
+ * el picker no podría seguir editando bultos) ni `is_paused` ni el `timeline`.
+ *
+ * `mode: 'pause'` → además pausa de verdad, reusando el flujo de
+ * `firestorePausePicking`: `is_paused` + entrada de timeline, y el picker queda
+ * libre para otro pedido.
+ *
+ * Ver `order_missing_items.md`.
+ */
+export async function firestoreReportMissingItems(
+  orderId: string,
+  user: SessionUser,
+  items: MissingItem[],
+  mode: MissingItemsMode,
+  fromStatus: OrderStatus,
+): Promise<void> {
+  const serialized = items.map(missingItemToFirestore);
+
+  if (mode === 'continue') {
+    await firestore()
+      .collection(ORDERS)
+      .doc(orderId)
+      .update({
+        has_missing_items: true,
+        missing_items: firestore.FieldValue.arrayUnion(...serialized),
+        updated_at: now(),
+      });
+    return;
+  }
+
+  const fromLabel = STATUS_TO_FIRESTORE[fromStatus] ?? 'En proceso';
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      is_paused: true,
+      has_missing_items: true,
+      missing_items: firestore.FieldValue.arrayUnion(...serialized),
+      updated_at: now(),
+      timeline: firestore.FieldValue.arrayUnion({
+        status: 'Pausa',
+        timestamp: now(),
+        user_uid: user.uid,
+        user_name: user.name,
+        user_role: user.role,
+        note: `Pedido pausado desde estatus «${fromLabel}».`,
+        reason: 'falta_articulo',
+        // DEPRECADO: solo SKUs, sin cantidades ni renglón. Se sigue escribiendo
+        // por compatibilidad hasta que la web migre a `missing_items`.
+        missing_skus: [...new Set(items.map((i) => i.sku))],
       }),
     });
   // Al pausar, el picker queda libre para tomar otro pedido.

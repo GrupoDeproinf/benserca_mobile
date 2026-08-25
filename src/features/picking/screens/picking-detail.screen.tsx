@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import {
   AlertCircle,
-  ArrowLeftRight,
+  AlertTriangle,
   Box,
   ClipboardList,
   Eye,
@@ -34,14 +34,17 @@ import {
 import { OrderDetailAlertBanner, OrderDetailHeader } from '../components/order-detail-header';
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
 import { OrderDetailBodyFade } from '../components/order-detail-transition';
-import { PausePickingSheet } from '../components/pause-picking-sheet';
+import { type MarkedMissingLine, PausePickingSheet } from '../components/pause-picking-sheet';
 import { QuickBundleCard } from '../components/quick-bundle-card';
 import { SkuPreviewSheet } from '../components/sku-preview-sheet';
-import { SubstituteItemSheet } from '../components/substitute-item-sheet';
 import { useOrdersStore } from '../store/orders.store';
-import type { OrderLine, PauseReason } from '../types';
+import type { MissingItemsMode, OrderLine, PauseReason } from '../types';
 import { getMaxQtyForBultoItem } from '../utils/bulto-capacity';
-import { getAssignedQtyForLine, getMissingQuantities } from '../utils/order-snapshot';
+import {
+  getAssignedQtyForLine,
+  getMissingQuantities,
+  getOrphanBultoItems,
+} from '../utils/order-snapshot';
 import { getEffectiveQueuePosition } from '../utils/picker-queue';
 import { getQuickBundleCandidates } from '../utils/quick-bundles';
 
@@ -101,10 +104,15 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const removeBultoItem = useOrdersStore((s) => s.removeBultoItem);
   const updateBultoItem = useOrdersStore((s) => s.updateBultoItem);
   const pausePicking = useOrdersStore((s) => s.pausePicking);
+  const reportMissingItems = useOrdersStore((s) => s.reportMissingItems);
   const resumePicking = useOrdersStore((s) => s.resumePicking);
 
   const [addSheetBultoId, setAddSheetBultoId] = useState<string | null>(null);
-  const [substituteLine, setSubstituteLine] = useState<OrderLine | null>(null);
+  /**
+   * Renglón desde el que se abrió el reporte de faltante. Fija el motivo a
+   * "falta de artículo" y lo deja pre-marcado en la hoja.
+   */
+  const [missingLine, setMissingLine] = useState<OrderLine | null>(null);
   /** Renglón cuya foto y código se están viendo en grande. */
   const [previewLine, setPreviewLine] = useState<OrderLine | null>(null);
   const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
@@ -158,6 +166,34 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
    * o ya empaquetado no hay nada que armar.
    */
   const quickBundleCandidates = isEditable ? getQuickBundleCandidates(order) : [];
+
+  /**
+   * Faltantes sin resolver, indexados por renglón. La identidad es el índice en
+   * `lines` (Profit no manda id, ver `makeLineId`), no el SKU: dos renglones del
+   * mismo artículo se reportan por separado.
+   */
+  const pendingMissingByLineIndex = new Map(
+    order.missingItems
+      .filter((m) => m.resolution === 'pending')
+      .map((m) => [m.lineIndex, m] as const),
+  );
+
+  /**
+   * Renglones que se pueden reportar como faltantes: los que aún no están
+   * completos en bultos y que no tienen ya un reporte pendiente (un faltante
+   * reportado no se puede editar ni duplicar desde la app).
+   */
+  const reportableItems = getMissingQuantities(order).filter((item) => {
+    const lineIndex = order.lines.findIndex((l) => l.id === item.lineId);
+    return lineIndex !== -1 && !pendingMissingByLineIndex.has(lineIndex);
+  });
+
+  /**
+   * Ítems que quedaron sin renglón porque la web cambió el SKU al resolver un
+   * faltante. Si no se resuelven, al empaquetar sus unidades no entrarían en
+   * `final_skus`: estarían en el bulto físico pero no en el sistema.
+   */
+  const orphanItems = getOrphanBultoItems(order);
 
   const handleQuickBundle = (lineId: string) => {
     if (createQuickBundle(order.id, lineId)) {
@@ -265,6 +301,35 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   };
 
   const handleFinishPicking = () => {
+    // Con un faltante sin resolver el pedido no se cierra: la única salida es
+    // pausarlo hasta que la web actualice el pedido.
+    if (order.hasMissingItems) {
+      setConfirmSheet({
+        title: t('picking.missing.blockFinishTitle'),
+        message: t('picking.missing.blockFinishBody'),
+        mode: 'info',
+        tone: 'warning',
+        confirmLabel: t('common.understood'),
+        icon: AlertTriangle,
+      });
+      return;
+    }
+
+    if (orphanItems.length > 0) {
+      setConfirmSheet({
+        title: t('picking.missing.orphanTitle'),
+        message: t('picking.missing.orphanBody'),
+        messageItems: orphanItems.map((o) =>
+          t('picking.missing.orphanLine', { bulto: o.bultoNumber, sku: o.sku, qty: o.qty }),
+        ),
+        mode: 'info',
+        tone: 'warning',
+        confirmLabel: t('common.understood'),
+        icon: AlertTriangle,
+      });
+      return;
+    }
+
     if (order.bultos.length === 0) {
       showNoBultosBlock();
       return;
@@ -328,9 +393,26 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     setPauseSheetVisible(true);
   };
 
-  const handleConfirmPause = (reason: PauseReason, missingSkus: string[]) => {
-    pausePicking(order.id, reason, missingSkus);
+  const handleConfirmPause = (
+    reason: PauseReason,
+    marked: MarkedMissingLine[],
+    mode: MissingItemsMode,
+  ) => {
+    if (marked.length > 0) {
+      // Con faltantes marcados manda el flujo nuevo: `missing_items` + (según el
+      // modo) la pausa. `pausePicking` se reserva para el cambio de prioridad.
+      reportMissingItems(order.id, marked, mode);
+    } else {
+      pausePicking(order.id, reason, []);
+    }
     setPauseSheetVisible(false);
+    setMissingLine(null);
+  };
+
+  const handleReportMissing = (line: OrderLine) => {
+    Haptics.selectionAsync();
+    setMissingLine(line);
+    setPauseSheetVisible(true);
   };
 
   const handleResumePicking = () => {
@@ -373,16 +455,11 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     }
   };
 
-  const commitAddItems = (
-    bultoId: string,
-    items: AddItemEntry[],
-    options?: { originalSku?: string; substitutionNote?: string },
-  ) => {
+  const commitAddItems = (bultoId: string, items: AddItemEntry[]) => {
     items.forEach(({ lineId, sku, name, qty }) => {
-      addBultoItem(order.id, bultoId, lineId, sku, name, qty, options);
+      addBultoItem(order.id, bultoId, lineId, sku, name, qty);
     });
     setAddSheetBultoId(null);
-    setSubstituteLine(null);
   };
 
   const handleAddItemToBulto = (bultoId: string) => {
@@ -524,6 +601,22 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
             />
           ) : null}
 
+          {order.hasMissingItems && !order.isPaused ? (
+            <OrderDetailAlertBanner
+              title={t('picking.missing.bannerTitle')}
+              body={t('picking.missing.bannerBody', {
+                skus: [...pendingMissingByLineIndex.values()].map((m) => m.sku).join(', '),
+              })}
+            />
+          ) : null}
+
+          {orphanItems.length > 0 ? (
+            <OrderDetailAlertBanner
+              title={t('picking.missing.orphanTitle')}
+              body={t('picking.missing.orphanBody')}
+            />
+          ) : null}
+
           {order.status === 'rejected_review' && lastObservation ? (
             <OrderDetailAlertBanner
               title={t('picking.rejection.title')}
@@ -551,8 +644,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
               {order.lines.map((line, idx) => {
                 const assigned = getAssignedQtyForLine(order, line.id);
                 const pending = Math.max(0, line.requiredQty - assigned);
-                // Sustitución deshabilitada temporalmente (a pedido del negocio).
-                const canSubstitute = false;
+                // Un renglón ya reportado no se puede volver a reportar ni
+                // corregir desde la app: solo la web lo resuelve.
+                const reported = pendingMissingByLineIndex.get(idx);
                 return (
                   // Mantener presionado abre la vista previa del artículo: foto
                   // y código en grande, para cotejar contra la etiqueta física.
@@ -599,25 +693,22 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                       >
                         <Eye size={18} color="#8E8E93" strokeWidth={2.2} />
                       </Pressable>
-                      {isEditable && canSubstitute ? (
+                      {reported ? (
+                        <View style={styles.reportedBadge}>
+                          <AlertTriangle size={12} color="#B45309" strokeWidth={2.4} />
+                          <Text style={styles.reportedBadgeText}>
+                            {t('picking.missing.reportedBadge', { missing: reported.missingQty })}
+                          </Text>
+                        </View>
+                      ) : isEditable && !order.isPaused && pending > 0 ? (
                         <Pressable
-                          onPress={() => {
-                            const openBultoTarget = order.bultos.find((b) => b.status === 'open');
-                            if (!openBultoTarget) {
-                              setConfirmSheet({
-                                title: t('picking.substitute.needBultoTitle'),
-                                message: t('picking.substitute.needBultoBody'),
-                                mode: 'info',
-                                confirmLabel: t('common.understood'),
-                              });
-                              return;
-                            }
-                            setSubstituteLine(line);
-                          }}
-                          style={styles.substituteBtn}
+                          onPress={() => handleReportMissing(line)}
+                          style={styles.reportMissingBtn}
                         >
-                          <ArrowLeftRight size={14} color="#4338CA" />
-                          <Text style={styles.substituteText}>{t('picking.substitute.btn')}</Text>
+                          <AlertTriangle size={14} color="#B45309" strokeWidth={2.2} />
+                          <Text style={styles.reportMissingText}>
+                            {t('picking.missing.reportBtn')}
+                          </Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -697,32 +788,18 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         }}
       />
 
-      <SubstituteItemSheet
-        visible={substituteLine !== null}
-        order={order}
-        originalLine={substituteLine}
-        targetBulto={order.bultos.find((b) => b.status === 'open') ?? null}
-        onClose={() => setSubstituteLine(null)}
-        onConfirm={(entry) => {
-          const openBultoTarget = order.bultos.find((b) => b.status === 'open');
-          if (!openBultoTarget) return;
-          commitAddItems(
-            openBultoTarget.id,
-            [{ lineId: entry.lineId, sku: entry.sku, name: entry.name, qty: entry.qty }],
-            {
-              originalSku: entry.originalSku,
-              substitutionNote: entry.substitutionNote,
-            },
-          );
-        }}
-      />
-
       <SkuPreviewSheet line={previewLine} onClose={() => setPreviewLine(null)} />
 
       <PausePickingSheet
         visible={pauseSheetVisible}
-        pendingItems={getMissingQuantities(order)}
-        onClose={() => setPauseSheetVisible(false)}
+        pendingItems={reportableItems}
+        lockedReason={missingLine ? 'falta_articulo' : undefined}
+        focusLineId={missingLine?.id}
+        alreadyReported={order.hasMissingItems}
+        onClose={() => {
+          setPauseSheetVisible(false);
+          setMissingLine(null);
+        }}
         onConfirm={handleConfirmPause}
       />
 
@@ -779,16 +856,28 @@ const styles = StyleSheet.create({
   lineMeta: { fontSize: 11, color: '#6B7280', marginTop: 4, lineHeight: 16 },
   lineActions: { alignItems: 'flex-end', gap: 6 },
   lineQty: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  substituteBtn: {
+  reportMissingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#FFFBEB',
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: '#FDE68A',
   },
-  substituteText: { fontSize: 10, fontWeight: '700', color: '#4338CA' },
+  reportMissingText: { fontSize: 10, fontWeight: '700', color: '#B45309' },
+  reportedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+  },
+  reportedBadgeText: { fontSize: 10, fontWeight: '700', color: '#B45309' },
   eyeBtn: {
     alignSelf: 'flex-end',
     padding: 2,

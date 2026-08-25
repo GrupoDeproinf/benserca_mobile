@@ -160,6 +160,48 @@ export interface PauseInfo {
   note?: string | null;
 }
 
+/** Estado de resolución de un faltante. Solo la web lo cambia. */
+export type MissingItemResolution = 'pending' | 'approved' | 'rejected';
+
+/**
+ * Artículo que el picker reportó como faltante de stock: el pedido pide
+ * `requiredQty` pero en almacén solo hay `availableQty`.
+ *
+ * Vive en el campo top-level `missing_items` de `lo_orders` (NO en el
+ * `timeline`, que es append-only y no se puede editar): la web necesita
+ * poder marcarlo resuelto. Ver `order_missing_items.md`.
+ */
+export interface MissingItem {
+  /**
+   * Posición del renglón en `original_skus`. Es la identidad: Profit repite el
+   * mismo SKU en varios renglones y no manda ningún id. Ver `OrderLine.id`.
+   */
+  lineIndex: number;
+  sku: string;
+  description: string;
+  requiredQty: number;
+  /** Cuánto hay realmente en almacén. Lo ingresa el picker (0 … requiredQty - 1). */
+  availableQty: number;
+  /** `requiredQty - availableQty`. Se calcula al marcar y no se recalcula. */
+  missingQty: number;
+  markedByUid: string;
+  markedByName: string;
+  markedAt: string;
+  /** Lo maneja la web. Nace en `pending`. */
+  resolution: MissingItemResolution;
+  resolvedByUid: string | null;
+  resolvedByName: string | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
+}
+
+/** Qué hace el picker después de reportar un faltante. */
+export type MissingItemsMode =
+  /** Sigue armando el pedido: estado "Por pausar". No escribe timeline. */
+  | 'continue'
+  /** Pausa de verdad: `is_paused` + entrada de timeline. Se libera para otro pedido. */
+  | 'pause';
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -209,6 +251,19 @@ export interface Order {
   /** Pausa activa del picking. No cambia `status`; es un flag ortogonal. */
   isPaused: boolean;
   pauseInfo: PauseInfo | null;
+
+  /**
+   * Faltantes de stock reportados. Los resueltos se conservan como histórico:
+   * al no escribirse timeline en el flujo "Continuar picking", este array es el
+   * único registro de que hubo un faltante.
+   */
+  missingItems: MissingItem[];
+  /**
+   * `true` si queda al menos un faltante en `pending`. Es un flag ortogonal más
+   * (como `isPaused`), NO un `status`: combinado con `isPaused` describe el
+   * estado "Por pausar". Ver `order_missing_items.md` §4.
+   */
+  hasMissingItems: boolean;
 
   createdAt: string;
   assignedAt: string | null;

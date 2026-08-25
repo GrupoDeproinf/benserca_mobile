@@ -18,9 +18,11 @@ import {
   applyRemoveBultoItem,
   applyReopenBulto,
   applyReopenForRevision,
+  applyReportMissingItems,
   applyResumePicking,
   applyStartPicking,
   applyUpdateBultoItem,
+  buildMissingItems,
   canCloseBulto,
   canFinishPicking,
   canOpenBulto,
@@ -35,10 +37,17 @@ import {
   firestorePausePicking,
   firestoreRejectAudit,
   firestoreReopenForRevision,
+  firestoreReportMissingItems,
   firestoreResumePicking,
   firestoreStartPicking,
 } from '../services/orders.service';
-import type { Order, OrderStatus, PauseReason, PickerActionError } from '../types';
+import type {
+  MissingItemsMode,
+  Order,
+  OrderStatus,
+  PauseReason,
+  PickerActionError,
+} from '../types';
 import { ensureItemLineIds } from '../utils/order-snapshot';
 import { canPickerStartOrder } from '../utils/picker-queue';
 
@@ -135,6 +144,21 @@ function isSameAssignment(local: Order, remote: Order): boolean {
 }
 
 /**
+ * Los renglones del pedido cambiaron en el servidor. Pasa cuando la web resuelve
+ * un faltante y corrige la cantidad o el SKU de un renglón: a partir de ahí el
+ * `snapshotOriginal` local (congelado al iniciar el picking) quedó viejo y
+ * seguir usándolo haría que el pedido se arme contra las cantidades anteriores.
+ * Ver `order_missing_items.md` §8.
+ */
+function linesChanged(local: Order, remote: Order): boolean {
+  if (local.lines.length !== remote.lines.length) return true;
+  return local.lines.some((line, i) => {
+    const remoteLine = remote.lines[i];
+    return !remoteLine || line.id !== remoteLine.id || line.requiredQty !== remoteLine.requiredQty;
+  });
+}
+
+/**
  * Fusiona un pedido remoto con el local: en picking activo o si Firestore aún
  * no trae bultos, prevalece el estado local de bultos / progreso.
  */
@@ -156,7 +180,13 @@ function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Or
       finalSkus: local.finalSkus,
       hasExtraBultos: local.hasExtraBultos,
       lastSavedMilestone: local.lastSavedMilestone,
-      snapshotOriginal: local.snapshotOriginal ?? firestoreOrder.snapshotOriginal,
+      // Los bultos locales se conservan aunque los renglones hayan cambiado: si
+      // se descartaran, el picker perdería sin aviso lo que ya armó. Los ítems
+      // que queden sin renglón se detectan con `getOrphanBultoItems` y él los
+      // resuelve. El snapshot viejo sí se descarta: manda el pedido nuevo.
+      snapshotOriginal: linesChanged(local, firestoreOrder)
+        ? firestoreOrder.snapshotOriginal
+        : (local.snapshotOriginal ?? firestoreOrder.snapshotOriginal),
       // Se renumeran junto con los bultos al borrar uno (ver applyDeleteBulto),
       // así que mientras se pickea manda lo local igual que el resto.
       rejectedBundles: local.rejectedBundles,
@@ -233,6 +263,15 @@ interface OrdersState {
     approvedBundles: number[],
   ) => void;
   pausePicking: (orderId: string, reason: PauseReason, missingSkus: string[]) => void;
+  /**
+   * Reporta faltantes de stock. Con `mode: 'continue'` el picker sigue armando
+   * (estado "Por pausar"); con `mode: 'pause'` además pausa y se libera.
+   */
+  reportMissingItems: (
+    orderId: string,
+    marked: { lineId: string; availableQty: number }[],
+    mode: MissingItemsMode,
+  ) => void;
   resumePicking: (orderId: string) => void;
   openBulto: (orderId: string) => OpenBultoResult;
   /**
@@ -512,6 +551,27 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     // envía para registrarlo en la nota de la entrada de timeline.
     firestorePausePicking(orderId, user, reason, missingSkus, order.status).catch((e) =>
       console.error('[orders.store] pausePicking Firestore error', e),
+    );
+  },
+
+  reportMissingItems: (orderId, marked, mode) => {
+    const order = get().getOrderById(orderId);
+    if (!order) return;
+
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const items = buildMissingItems(order, user, marked);
+    if (items.length === 0) return;
+
+    set((s) => ({
+      orders: patchOrder(s.orders, orderId, applyReportMissingItems(order, user, items, mode)),
+    }));
+
+    // `order.status` no cambia por reportar un faltante: se manda solo para la
+    // nota de la entrada de timeline cuando además se pausa.
+    firestoreReportMissingItems(orderId, user, items, mode, order.status).catch((e) =>
+      console.error('[orders.store] reportMissingItems Firestore error', e),
     );
   },
 

@@ -202,22 +202,6 @@
       "confirmBody": "El pedido pasará a estatus Despachado.",
       "confirm": "Despachar"
     },
-    "substitute": {
-      "title": "Sustituir artículo",
-      "original": "Artículo original",
-      "tallaLabel": "Talla: {{talla}}",
-      "relatedHint": "Artículos sustituibles de la misma categoría (otras tallas)",
-      "searchAnyHint": "Buscando en la misma categoría",
-      "noRelated": "No hay artículos sustituibles en esta categoría",
-      "maxQtyHint": "Máx. {{max}} uds.",
-      "noSpace": "No queda cantidad pendiente para sustituir",
-      "noteLabel": "Motivo de sustitución (opcional)",
-      "notePlaceholder": "Ej: No había existencia del artículo pedido…",
-      "confirm": "Confirmar sustitución",
-      "btn": "Sustituir",
-      "needBultoTitle": "Abre un bulto",
-      "needBultoBody": "Abre un bulto antes de registrar una sustitución."
-    },
     "rejection": {
       "title": "Observación del chequeador",
       "onlyRejected": "Mostrando {{shown}} de {{total}} bultos — solo los rechazados"
@@ -229,13 +213,33 @@
       "reasonPlaceholder": "Selecciona un motivo",
       "reasonMissingItem": "Falta de artículo",
       "reasonPriorityChange": "Cambio de prioridad",
-      "missingItemsLabel": "Marca los artículos faltantes",
       "missingQty": "Faltan {{missing}} de {{required}}",
       "noPendingItems": "No quedan artículos pendientes: todo lo del pedido ya está en los bultos.",
       "confirm": "Pausar pedido",
       "bannerTitle": "Pedido pausado",
       "bannerBodyMissing": "Falta de artículo: {{skus}}",
-      "bannerBodyPriority": "Motivo: cambio de prioridad"
+      "bannerBodyPriority": "Motivo: cambio de prioridad",
+      "missingItemsLabel": "Marca los faltantes e indica cuántas hay en almacén"
+    },
+    "missing": {
+      "title": "Reportar faltante",
+      "subtitle": "Indica cuántas unidades hay en almacén.",
+      "reportBtn": "Faltante",
+      "reportedBadge": "Faltan {{missing}}",
+      "availableLabel": "¿Cuántas hay en almacén?",
+      "continueBtn": "Continuar picking",
+      "pauseBtn": "Pausar pedido",
+      "bannerTitle": "Faltante reportado",
+      "bannerBody": "Esperando que la oficina resuelva: {{skus}}. Puedes seguir armando el pedido, pero no finalizarlo.",
+      "blockFinishTitle": "Faltante sin resolver",
+      "blockFinishBody": "No puedes finalizar el pedido mientras la oficina no resuelva el faltante. Si no puedes esperar, pausa el pedido y toma otro.",
+      "orphanTitle": "El pedido cambió",
+      "orphanBody": "La oficina cambió artículos que ya tenías armados. Sácalos del bulto y vuelve a agregarlos según el pedido nuevo, o no se registrarán al finalizar.",
+      "orphanLine": "Bulto {{bulto}}: {{sku}} ×{{qty}}",
+      "pauseOnlyHint": "Ya hay un faltante esperando resolución. Puedes pausar el pedido para tomar otro mientras la oficina lo resuelve.",
+      "availableShort": "Hay:",
+      "listLabel": "Marca el artículo e indica cuántas HAY en almacén",
+      "availableOf": "de {{required}}"
     }
   },
   "welcome": {

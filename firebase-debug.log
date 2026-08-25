@@ -1,34 +1,31 @@
-[debug] [2026-08-12T15:24:07.832Z] ----------------------------------------------------------------------
-[debug] [2026-08-12T15:24:07.833Z] Command:       /Users/manuelgoncalves/.nvm/versions/node/v24.19.0/bin/node /Users/manuelgoncalves/.nvm/versions/node/v24.19.0/bin/firebase projects:list
-[debug] [2026-08-12T15:24:07.833Z] CLI Version:   15.26.0
-[debug] [2026-08-12T15:24:07.833Z] Platform:      darwin
-[debug] [2026-08-12T15:24:07.833Z] Node Version:  v24.19.0
-[debug] [2026-08-12T15:24:07.833Z] Detected Agent: claude-code_2-1-222_agent
-[debug] [2026-08-12T15:24:07.833Z] Time:          Wed Aug 12 2026 11:24:07 GMT-0400 (Venezuela Time)
-[debug] [2026-08-12T15:24:07.834Z] ----------------------------------------------------------------------
+[debug] [2026-08-25T17:04:21.586Z] ----------------------------------------------------------------------
+[debug] [2026-08-25T17:04:21.587Z] Command:       /Users/manuelgoncalves/.nvm/versions/node/v24.19.0/bin/node /Users/manuelgoncalves/.nvm/versions/node/v24.19.0/bin/firebase projects:list
+[debug] [2026-08-25T17:04:21.587Z] CLI Version:   15.26.0
+[debug] [2026-08-25T17:04:21.587Z] Platform:      darwin
+[debug] [2026-08-25T17:04:21.587Z] Node Version:  v24.19.0
+[debug] [2026-08-25T17:04:21.587Z] Detected Agent: claude-code_2-1-237_agent
+[debug] [2026-08-25T17:04:21.587Z] Time:          Tue Aug 25 2026 13:04:21 GMT-0400 (Venezuela Time)
+[debug] [2026-08-25T17:04:21.587Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2026-08-12T15:24:07.838Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
-[debug] [2026-08-12T15:24:08.115Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2026-08-12T15:24:08.115Z] > authorizing via signed-in user (manu@tovi.app)
-[debug] [2026-08-12T15:24:08.116Z] Checked if tokens are valid: false, expires at: 1786135302655
-[debug] [2026-08-12T15:24:08.116Z] Checked if tokens are valid: false, expires at: 1786135302655
-[debug] [2026-08-12T15:24:08.116Z] > refreshing access token with scopes: []
-[debug] [2026-08-12T15:24:08.116Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
-[debug] [2026-08-12T15:24:08.116Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
-[debug] [2026-08-12T15:24:08.556Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 400
-[debug] [2026-08-12T15:24:08.556Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-25T17:04:21.651Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-08-25T17:04:21.651Z] > authorizing via signed-in user (manu@tovi.app)
+[debug] [2026-08-25T17:04:21.655Z] Checked if tokens are valid: false, expires at: 1786135302655
+[debug] [2026-08-25T17:04:21.655Z] Checked if tokens are valid: false, expires at: 1786135302655
+[debug] [2026-08-25T17:04:21.655Z] > refreshing access token with scopes: []
+[debug] [2026-08-25T17:04:21.656Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-08-25T17:04:21.656Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-25T17:04:22.203Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 400
+[debug] [2026-08-25T17:04:22.203Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
 [error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
 
 For CI servers and headless environments, generate a new token with firebase login:ci
 [error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
 
 For CI servers and headless environments, generate a new token with firebase login:ci
-[debug] [2026-08-12T15:24:08.557Z] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+[debug] [2026-08-25T17:04:22.204Z] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
 
 For CI servers and headless environments, generate a new token with firebase login:ci
-[debug] [2026-08-12T15:24:08.578Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
-[debug] [2026-08-12T15:24:08.578Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
-[debug] [2026-08-12T15:24:08.795Z] FirebaseError: Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+[debug] [2026-08-25T17:04:22.721Z] FirebaseError: Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
 
 For CI servers and headless environments, generate a new token with firebase login:ci
     at invalidCredentialError (/Users/manuelgoncalves/.nvm/versions/node/v24.19.0/lib/node_modules/firebase-tools/lib/auth.js:178:12)
