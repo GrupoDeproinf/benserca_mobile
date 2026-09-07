@@ -28,6 +28,7 @@ import {
   OrderDetailSection,
 } from '@/features/picking/components/order-detail-section';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
+import { pauseBannerBodyKey } from '@/features/picking/utils/order-status';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
 import { ExpandableText } from '@/shared/components/ui/expandable-text';
@@ -207,13 +208,9 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
         {order.isPaused && order.pauseInfo ? (
           <OrderDetailAlertBanner
             title={t('picking.pause.bannerTitle')}
-            body={
-              order.pauseInfo.reason === 'falta_articulo'
-                ? t('picking.pause.bannerBodyMissing', {
-                    skus: order.pauseInfo.missingSkus.join(', '),
-                  })
-                : t('picking.pause.bannerBodyPriority')
-            }
+            body={t(pauseBannerBodyKey(order.pauseInfo.reason), {
+              skus: order.pauseInfo.missingSkus.join(', '),
+            })}
             author={order.pauseInfo.authorName}
           />
         ) : null}

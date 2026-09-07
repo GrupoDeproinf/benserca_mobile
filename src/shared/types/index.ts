@@ -29,6 +29,7 @@ export type NotificationType =
   | 'picking_continued_with_mismatch'
   | 'order_audit_approved'
   | 'order_audit_rejected'
+  | 'order_corrected'
   // Pausa de pedidos (App↔Web). Ver order_pause.md
   | 'order_paused'
   | 'order_unpaused'

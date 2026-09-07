@@ -261,6 +261,8 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
     finalSkus,
     auditObservations: [],
     auditResult: data.audit?.result ?? null,
+    auditedByUid: data.audit?.audited_by_uid ?? null,
+    auditedByName: data.audit?.audited_by_name ?? null,
     rejectedBundles: readBundleNumbers(data.audit?.rejected_bundles),
     approvedBundles: readBundleNumbers(data.audit?.approved_bundles),
 

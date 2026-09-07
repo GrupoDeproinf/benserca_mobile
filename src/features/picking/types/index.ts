@@ -122,7 +122,7 @@ export interface AuditObservation {
 }
 
 /** Motivo de la pausa de picking. */
-export type PauseReason = 'falta_articulo' | 'cambio_prioridad';
+export type PauseReason = 'falta_articulo' | 'cambio_prioridad' | 'sku_duplicado';
 
 /**
  * Entrada del historial de eventos del pedido (`timeline` en Firestore). Es
@@ -151,7 +151,11 @@ export interface TimelineEntry {
  */
 export interface PauseInfo {
   reason: PauseReason;
-  /** SKUs marcados como faltantes; solo aplica si `reason === 'falta_articulo'`. */
+  /**
+   * SKUs asociados al motivo: los marcados como faltantes si
+   * `reason === 'falta_articulo'`, o los detectados como repetidos si
+   * `reason === 'sku_duplicado'` (ver `getDuplicateSkus`).
+   */
   missingSkus: string[];
   authorId: string;
   authorName: string;
@@ -234,6 +238,12 @@ export interface Order {
   auditObservations: AuditObservation[];
   /** Resultado de la última auditoría (`audit.result` en Firestore). */
   auditResult: 'approved' | 'rejected' | null;
+  /**
+   * Chequeador de la última auditoría (`audit.audited_by_*`). Es a quien se le
+   * avisa cuando el picker termina de corregir el pedido.
+   */
+  auditedByUid: string | null;
+  auditedByName: string | null;
   /**
    * Números de bulto que el chequeador rechazó (`audit.rejected_bundles`).
    * Se vacía al aprobar el pedido.

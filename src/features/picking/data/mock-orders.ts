@@ -468,6 +468,8 @@ export const MOCK_ORDERS: Order[] = [
     hasMissingItems: false,
     rejectedBundles: [],
     approvedBundles: [],
+    auditedByUid: null,
+    auditedByName: null,
   } as Order;
   const identified = withLineIdentity(withPause);
   return {

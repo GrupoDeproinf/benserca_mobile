@@ -109,7 +109,8 @@
       "bultosDone": "Created",
       "tallaMeta": "Size: {{talla}}",
       "skus": "SKUs",
-      "extraBultosFlag": "Extra packages"
+      "extraBultosFlag": "Extra packages",
+      "duplicateSkuTag": "Duplicate"
     },
     "check": {
       "waitingTitle": "Under review",
@@ -182,13 +183,17 @@
       "reasonPlaceholder": "Select a reason",
       "reasonMissingItem": "Missing item",
       "reasonPriorityChange": "Priority change",
+      "reasonDuplicateSku": "Duplicate SKU",
       "missingQty": "{{missing}} of {{required}} missing",
       "noPendingItems": "No pending items: everything in the order is already in the packages.",
       "confirm": "Pause order",
       "bannerTitle": "Order paused",
       "bannerBodyMissing": "Missing item: {{skus}}",
       "bannerBodyPriority": "Reason: priority change",
-      "missingItemsLabel": "Mark the shortages and enter how many are in stock"
+      "bannerBodyDuplicate": "Duplicate SKU: {{skus}}",
+      "missingItemsLabel": "Mark the shortages and enter how many are in stock",
+      "duplicateSkusLabel": "Duplicate SKUs detected",
+      "noDuplicateSkus": "No duplicate SKUs were detected in this order."
     },
     "missing": {
       "title": "Report shortage",
@@ -439,7 +444,8 @@
       "picker": "Picker",
       "bultos": "Packages",
       "packed": "Packed",
-      "extraBultos": "Extra packages"
+      "extraBultos": "Extra packages",
+      "corrected": "CORRECTED"
     },
     "detail": {
       "notFound": "Order not found.",

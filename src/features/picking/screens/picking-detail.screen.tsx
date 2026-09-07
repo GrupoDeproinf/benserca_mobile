@@ -37,14 +37,17 @@ import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { type MarkedMissingLine, PausePickingSheet } from '../components/pause-picking-sheet';
 import { QuickBundleCard } from '../components/quick-bundle-card';
 import { SkuPreviewSheet } from '../components/sku-preview-sheet';
+import { useFirestoreOrder } from '../hooks/use-firestore-order';
 import { useOrdersStore } from '../store/orders.store';
 import type { MissingItemsMode, OrderLine, PauseReason } from '../types';
 import { getMaxQtyForBultoItem } from '../utils/bulto-capacity';
 import {
   getAssignedQtyForLine,
+  getDuplicateSkus,
   getMissingQuantities,
   getOrphanBultoItems,
 } from '../utils/order-snapshot';
+import { pauseBannerBodyKey } from '../utils/order-status';
 import { getEffectiveQueuePosition } from '../utils/picker-queue';
 import { getQuickBundleCandidates } from '../utils/quick-bundles';
 
@@ -78,6 +81,14 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useCurrentUser();
+
+  // Suscripción propia al documento, además del listener de la lista (ver
+  // useSessionOrdersListener): esta pantalla se queda abierta mientras el
+  // picker arma el pedido, y si el listener de lista tarda o se corta (app en
+  // segundo plano, reconexión), el detalle igual se mantiene al día con lo
+  // que cambie en el pedido (SKU eliminado, sustituido, etc.) sin esperar a
+  // que se cierre sesión.
+  useFirestoreOrder(orderId || null);
 
   const allOrders = useOrdersStore((s) => s.orders);
   const order = useMemo(() => allOrders.find((o) => o.id === orderId), [allOrders, orderId]);
@@ -194,6 +205,21 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
    * `final_skus`: estarían en el bulto físico pero no en el sistema.
    */
   const orphanItems = getOrphanBultoItems(order);
+
+  /**
+   * SKUs que Profit repitió en más de un renglón: son los candidatos que se
+   * ofrecen en la hoja de pausa para el motivo `sku_duplicado` (ver
+   * `getDuplicateSkus`). El picker elige cuáles de ellos son el problema real.
+   */
+  const duplicateSkuCandidates = getDuplicateSkus(order.lines);
+  /**
+   * Lo que el picker efectivamente marcó al pausar por SKU duplicado (no todos
+   * los candidatos: ver `duplicateSkuCandidates`). Se resalta en la lista de
+   * renglones mientras la pausa siga activa con ese motivo.
+   */
+  const duplicateSkuSet = new Set(
+    order.pauseInfo?.reason === 'sku_duplicado' ? order.pauseInfo.missingSkus : [],
+  );
 
   const handleQuickBundle = (lineId: string) => {
     if (createQuickBundle(order.id, lineId)) {
@@ -397,13 +423,17 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     reason: PauseReason,
     marked: MarkedMissingLine[],
     mode: MissingItemsMode,
+    selectedDuplicateSkus: string[],
   ) => {
     if (marked.length > 0) {
       // Con faltantes marcados manda el flujo nuevo: `missing_items` + (según el
-      // modo) la pausa. `pausePicking` se reserva para el cambio de prioridad.
+      // modo) la pausa. `pausePicking` se reserva para el cambio de prioridad y
+      // el SKU duplicado.
       reportMissingItems(order.id, marked, mode);
     } else {
-      pausePicking(order.id, reason, []);
+      // Con SKU duplicado, lo que se guarda es lo que el picker marcó en la
+      // hoja, no todos los candidatos detectados (ver `duplicateSkuCandidates`).
+      pausePicking(order.id, reason, reason === 'sku_duplicado' ? selectedDuplicateSkus : []);
     }
     setPauseSheetVisible(false);
     setMissingLine(null);
@@ -590,13 +620,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
           {order.isPaused && order.pauseInfo ? (
             <OrderDetailAlertBanner
               title={t('picking.pause.bannerTitle')}
-              body={
-                order.pauseInfo.reason === 'falta_articulo'
-                  ? t('picking.pause.bannerBodyMissing', {
-                      skus: order.pauseInfo.missingSkus.join(', '),
-                    })
-                  : t('picking.pause.bannerBodyPriority')
-              }
+              body={t(pauseBannerBodyKey(order.pauseInfo.reason), {
+                skus: order.pauseInfo.missingSkus.join(', '),
+              })}
               author={order.pauseInfo.authorName}
             />
           ) : null}
@@ -647,6 +673,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                 // Un renglón ya reportado no se puede volver a reportar ni
                 // corregir desde la app: solo la web lo resuelve.
                 const reported = pendingMissingByLineIndex.get(idx);
+                const isDuplicateSku = duplicateSkuSet.has(line.sku);
                 return (
                   // Mantener presionado abre la vista previa del artículo: foto
                   // y código en grande, para cotejar contra la etiqueta física.
@@ -657,13 +684,26 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                       setPreviewLine(line);
                     }}
                     delayLongPress={250}
-                    style={[styles.lineRow, idx < order.lines.length - 1 && styles.lineRowBorder]}
+                    style={[
+                      styles.lineRow,
+                      idx < order.lines.length - 1 && styles.lineRowBorder,
+                      isDuplicateSku && styles.lineRowDuplicate,
+                    ]}
                   >
                     <View style={{ flex: 1, marginRight: 8 }}>
                       <ExpandableText style={styles.lineName} numberOfLines={2}>
                         {line.name}
                       </ExpandableText>
-                      <Text style={styles.lineSku}>{line.sku}</Text>
+                      <View style={styles.lineSkuRow}>
+                        <Text style={styles.lineSku}>{line.sku}</Text>
+                        {isDuplicateSku ? (
+                          <View style={styles.duplicateSkuTag}>
+                            <Text style={styles.duplicateSkuTagText}>
+                              {t('picking.detail.duplicateSkuTag')}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <Text style={styles.lineMeta}>
                         {t('picking.detail.lineMeta', {
                           required: line.requiredQty,
@@ -793,6 +833,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
       <PausePickingSheet
         visible={pauseSheetVisible}
         pendingItems={reportableItems}
+        duplicateSkus={duplicateSkuCandidates}
         lockedReason={missingLine ? 'falta_articulo' : undefined}
         focusLineId={missingLine?.id}
         alreadyReported={order.hasMissingItems}
@@ -851,8 +892,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth * 2,
     borderBottomColor: '#F3F4F6',
   },
+  // Se resalta cuando el picker marcó ese SKU al pausar por "sku_duplicado"
+  // (ver `duplicateSkuSet`), para reconocerlo de un vistazo en la lista.
+  lineRowDuplicate: { backgroundColor: '#EFF6FF' },
   lineName: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  lineSku: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
+  lineSkuRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  lineSku: { fontSize: 11, color: '#8E8E93' },
+  duplicateSkuTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#DBEAFE',
+  },
+  duplicateSkuTagText: { fontSize: 9, fontWeight: '700', color: '#1D4ED8' },
   lineMeta: { fontSize: 11, color: '#6B7280', marginTop: 4, lineHeight: 16 },
   lineActions: { alignItems: 'flex-end', gap: 6 },
   lineQty: { fontSize: 16, fontWeight: '800', color: '#111827' },

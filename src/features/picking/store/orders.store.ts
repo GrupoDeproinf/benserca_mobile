@@ -48,7 +48,12 @@ import type {
   PauseReason,
   PickerActionError,
 } from '../types';
-import { ensureItemLineIds } from '../utils/order-snapshot';
+import { computeBundlesCreated, computeProgressPercentage } from '../utils/order-progress';
+import {
+  buildFinalSkus,
+  ensureItemLineIds,
+  reconcileBultosWithLines,
+} from '../utils/order-snapshot';
 import { canPickerStartOrder } from '../utils/picker-queue';
 
 /**
@@ -99,6 +104,29 @@ function notifyFinishPickingOutcomes(order: Order, user: SessionUser): void {
       console.error('[orders.store] picking_continued_with_mismatch notify error', e),
     );
   }
+}
+
+/**
+ * Notificación App→App al chequeador cuando el picker termina de corregir un
+ * pedido que él había rechazado. Sin esto el pedido vuelve a la cola en
+ * silencio: el chequeador no usa listener en tiempo real (ver
+ * use-session-orders-listener) y solo lo vería al refrescar a mano.
+ *
+ * Se dirige a quien rechazó (`audit.audited_by_uid`), no a todos los
+ * chequeadores: es quien sabe qué pidió corregir.
+ */
+function notifyOrderCorrected(order: Order, user: SessionUser): void {
+  if (!order.auditedByUid) return;
+
+  createNotification({
+    message: `El pedido #${order.orderNumber} fue corregido y está listo para re-chequeo`,
+    type: 'order_corrected',
+    channel: 'app',
+    recipients: [{ uid: order.auditedByUid, name: order.auditedByName ?? order.auditedByUid }],
+    orderNumber: Number(order.orderNumber),
+    createdBy: user.uid,
+    createdByName: user.name,
+  }).catch((e) => console.error('[orders.store] order_corrected notify error', e));
 }
 
 /** Notificación App→App (channel `app`) al picker cuando el chequeador resuelve el chequeo. */
@@ -159,8 +187,24 @@ function linesChanged(local: Order, remote: Order): boolean {
 }
 
 /**
+ * ¿Esta sesión es quien realmente arma el pedido (o parte del equipo que lo
+ * arma)? Solo ese dispositivo tiene edición optimista de bultos que proteger.
+ * Un chequeador o un supervisor viendo el mismo pedido (ambos con listeners
+ * que traen pedidos ajenos: ver useAuditQueueRefresh y
+ * useSessionOrdersListener para `supervisor_almacen`) no escribe bultos
+ * localmente, así que congelar su vista en el primer snapshot que recibió
+ * solo lo deja desactualizado — un SKU eliminado del pedido en el servidor
+ * nunca se refleja hasta reabrir sesión, que rehidrata el store desde cero.
+ */
+function isActiveWorker(order: Order, userUid: string | undefined): boolean {
+  if (!userUid) return false;
+  return order.assignedPickerId === userUid || order.teamPickerUids.includes(userUid);
+}
+
+/**
  * Fusiona un pedido remoto con el local: en picking activo o si Firestore aún
- * no trae bultos, prevalece el estado local de bultos / progreso.
+ * no trae bultos, prevalece el estado local de bultos / progreso — pero solo
+ * para quien realmente lo está armando (ver `isActiveWorker`).
  */
 function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Order {
   if (!local) return firestoreOrder;
@@ -168,25 +212,44 @@ function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Or
   // Reasignado: lo local es de un ciclo anterior, manda el servidor.
   if (!isSameAssignment(local, firestoreOrder)) return firestoreOrder;
 
+  const ownWork = isActiveWorker(firestoreOrder, useAuthStore.getState().user?.uid);
+
   // Preserve local bulto state if the order is actively being picked
-  if (local.status === 'in_progress' && firestoreOrder.status === 'in_progress') {
+  if (ownWork && local.status === 'in_progress' && firestoreOrder.status === 'in_progress') {
     // Firestore may lag behind local state during active picking.
     // Keep all locally-computed picking fields authoritative.
+
+    // Un renglón desapareció del pedido (no una sustitución de faltante, que
+    // mantiene la misma cantidad de renglones y sigue resolviéndose a mano vía
+    // `getOrphanBultoItems`): lo que ya se había metido en un bulto para ese
+    // renglón ya no corresponde a nada y se descarta solo, en tiempo real, en
+    // vez de dejarlo colgado hasta que el picker cierre sesión.
+    const lineRemoved = firestoreOrder.lines.length < local.lines.length;
+    // No solo remoción: un renglón agregado (o con cantidad corregida) también
+    // debe reflejarse en `final_skus` y el progreso, aunque el picker no lo
+    // haya tocado en ningún bulto todavía (queda con `packedQuantity: 0`).
+    const linesDiffer = linesChanged(local, firestoreOrder);
+    const bultos = lineRemoved
+      ? reconcileBultosWithLines(local.bultos, firestoreOrder.lines)
+      : local.bultos;
+    const snapshotOriginal = linesDiffer
+      ? firestoreOrder.snapshotOriginal
+      : (local.snapshotOriginal ?? firestoreOrder.snapshotOriginal);
+    const metricsBase = { ...firestoreOrder, bultos, snapshotOriginal };
+
     return {
       ...firestoreOrder,
-      bultos: local.bultos,
-      progressPercentage: local.progressPercentage,
-      bundlesCreated: local.bundlesCreated,
-      finalSkus: local.finalSkus,
+      bultos,
+      progressPercentage: linesDiffer
+        ? computeProgressPercentage(metricsBase)
+        : local.progressPercentage,
+      bundlesCreated: lineRemoved ? computeBundlesCreated(bultos) : local.bundlesCreated,
+      finalSkus: linesDiffer ? buildFinalSkus(metricsBase, bultos) : local.finalSkus,
       hasExtraBultos: local.hasExtraBultos,
       lastSavedMilestone: local.lastSavedMilestone,
-      // Los bultos locales se conservan aunque los renglones hayan cambiado: si
-      // se descartaran, el picker perdería sin aviso lo que ya armó. Los ítems
-      // que queden sin renglón se detectan con `getOrphanBultoItems` y él los
-      // resuelve. El snapshot viejo sí se descarta: manda el pedido nuevo.
-      snapshotOriginal: linesChanged(local, firestoreOrder)
-        ? firestoreOrder.snapshotOriginal
-        : (local.snapshotOriginal ?? firestoreOrder.snapshotOriginal),
+      // El snapshot viejo se descarta si los renglones cambiaron: manda el
+      // pedido nuevo.
+      snapshotOriginal,
       // Se renumeran junto con los bultos al borrar uno (ver applyDeleteBulto),
       // así que mientras se pickea manda lo local igual que el resto.
       rejectedBundles: local.rejectedBundles,
@@ -196,7 +259,7 @@ function mergeIncomingOrder(firestoreOrder: Order, local: Order | undefined): Or
 
   // Tras finalizar, Firestore puede llegar antes de tener final_skus mapeados.
   // Conservar bultos locales si el remoto aún no los trae.
-  if (local.bultos.length > 0 && firestoreOrder.bultos.length === 0) {
+  if (ownWork && local.bultos.length > 0 && firestoreOrder.bultos.length === 0) {
     return {
       ...firestoreOrder,
       bultos: local.bultos,
@@ -353,16 +416,30 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
         // asignar, así que arranca limpio en vez de heredar bultos viejos.
         if (!isSameAssignment(local, current)) return current;
 
+        // Si el proceso murió en background y la web tocó los renglones
+        // mientras tanto, `current` (recién hidratado de Firestore) ya trae el
+        // pedido nuevo pero lo guardado en disco es de antes: no se puede
+        // confiar ciegamente en el `snapshotOriginal`/`final_skus` local o el
+        // renglón agregado/corregido desaparecería hasta el próximo cambio.
+        const linesDiffer = linesChanged(local, current);
+        const bultos = ensureItemLineIds(local.bultos, current.lines);
+        const snapshotOriginal = linesDiffer
+          ? current.snapshotOriginal
+          : (local.snapshotOriginal ?? current.snapshotOriginal);
+        const metricsBase = { ...current, bultos, snapshotOriginal };
+
         return {
           ...current,
           // Lo guardado por una versión anterior no trae `lineId` en los ítems.
-          bultos: ensureItemLineIds(local.bultos, current.lines),
-          progressPercentage: local.progressPercentage,
-          bundlesCreated: local.bundlesCreated,
-          finalSkus: local.finalSkus,
+          bultos,
+          progressPercentage: linesDiffer
+            ? computeProgressPercentage(metricsBase)
+            : local.progressPercentage,
+          bundlesCreated: linesDiffer ? computeBundlesCreated(bultos) : local.bundlesCreated,
+          finalSkus: linesDiffer ? buildFinalSkus(metricsBase, bultos) : local.finalSkus,
           hasExtraBultos: local.hasExtraBultos,
           lastSavedMilestone: local.lastSavedMilestone,
-          snapshotOriginal: local.snapshotOriginal ?? current.snapshotOriginal,
+          snapshotOriginal,
         };
       });
 
@@ -427,6 +504,11 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
         console.error('[orders.store] finishPicking Firestore error', e),
       );
       notifyFinishPickingOutcomes(updatedOrder, user);
+
+      // Se mira el pedido ANTES del parche: `order.auditResult` sigue en
+      // 'rejected' mientras la corrección no se apruebe, y eso es lo que
+      // distingue "terminó el picking" de "terminó de corregir".
+      if (order.auditResult === 'rejected') notifyOrderCorrected(updatedOrder, user);
     }
 
     return { ok: true };

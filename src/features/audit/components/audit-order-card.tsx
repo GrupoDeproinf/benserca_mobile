@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Box, Calendar, ChevronRight, ClipboardList, User } from 'lucide-react-native';
+import { Box, Calendar, ChevronRight, ClipboardList, RotateCcw, User } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
@@ -8,6 +8,7 @@ import {
   PAUSED_BADGE_STYLE,
   PAUSED_STATUS_I18N_KEY,
   statusLabelKey,
+  wasCorrectedAfterRejection,
 } from '@/features/picking/utils/order-status';
 
 interface AuditOrderCardProps {
@@ -101,6 +102,15 @@ export function AuditOrderCard({ order, pickerName }: AuditOrderCardProps) {
           <View style={styles.headerBody}>
             <View style={styles.titleRow}>
               <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+              {/* Vuelve al chequeo tras un rechazo. No necesita estatus propio:
+                  se deriva de que siga marcado como rechazado en la auditoría
+                  (ver wasCorrectedAfterRejection). */}
+              {wasCorrectedAfterRejection(order) ? (
+                <View style={styles.correctedBadge}>
+                  <RotateCcw size={9} color="#047857" strokeWidth={2.6} />
+                  <Text style={styles.correctedBadgeText}>{t('audit.card.corrected')}</Text>
+                </View>
+              ) : null}
               {order.hasExtraBultos ? (
                 <View style={styles.extraBadge}>
                   <Text style={styles.extraBadgeText}>{t('audit.card.extraBultos')}</Text>
@@ -205,6 +215,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#111827',
+  },
+  correctedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  correctedBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#047857',
   },
   extraBadge: {
     backgroundColor: '#FEF3C7',

@@ -29,6 +29,10 @@ import {
 import { OrderDetailBodyFade } from '@/features/picking/components/order-detail-transition';
 import { useFirestoreOrder } from '@/features/picking/hooks/use-firestore-order';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
+import {
+  pauseBannerBodyKey,
+  wasCorrectedAfterRejection,
+} from '@/features/picking/utils/order-status';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import { resolvePickerName } from '@/features/warehouse/utils/resolve-picker-name';
 import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
@@ -102,14 +106,24 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
    * que ya se habían aprobado no se revisan de cero; llegan premarcados como
    * aprobados (y colapsados) y solo los corregidos quedan pendientes.
    */
-  const isReReview = Boolean(
-    order && order.status === 'to_pack' && order.approvedBundles.length > 0,
-  );
+  const isReReview = Boolean(order && wasCorrectedAfterRejection(order));
+
+  /**
+   * Firma de la revisión previa. El pedido llega del store y el listener puede
+   * actualizarlo después de montada la pantalla, así que el premarcado no se
+   * puede atar solo al id: si se atara, una primera versión sin
+   * `approved_bundles` dejaría todo pendiente para siempre. Cambia solo cuando
+   * cambia la auditoría, no en cada snapshot, así que no pisa lo que el
+   * chequeador vaya marcando.
+   */
+  const auditSignature = order
+    ? `${order.id}:${order.status}:${order.approvedBundles.join(',')}`
+    : '';
 
   const seededOrderRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!order || seededOrderRef.current === order.id) return;
-    seededOrderRef.current = order.id;
+    if (!order || seededOrderRef.current === auditSignature) return;
+    seededOrderRef.current = auditSignature;
 
     if (!isReReview) {
       setBultoReviews({});
@@ -123,7 +137,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
       if (order.approvedBundles.includes(bulto.number)) seeded[bulto.id] = 'approved';
     }
     setBultoReviews(seeded);
-  }, [order, isReReview]);
+  }, [order, isReReview, auditSignature]);
 
   if (!user) {
     return (
@@ -238,13 +252,9 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
           {order.isPaused && order.pauseInfo ? (
             <OrderDetailAlertBanner
               title={t('picking.pause.bannerTitle')}
-              body={
-                order.pauseInfo.reason === 'falta_articulo'
-                  ? t('picking.pause.bannerBodyMissing', {
-                      skus: order.pauseInfo.missingSkus.join(', '),
-                    })
-                  : t('picking.pause.bannerBodyPriority')
-              }
+              body={t(pauseBannerBodyKey(order.pauseInfo.reason), {
+                skus: order.pauseInfo.missingSkus.join(', '),
+              })}
               author={order.pauseInfo.authorName}
             />
           ) : null}
@@ -343,7 +353,10 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
             ) : (
               order.bultos.map((bulto) => (
                 <AuditBultoAccordion
-                  key={bulto.id}
+                  // La firma entra en la key para que, si la auditoría previa
+                  // llega después del primer render, el acordeón se remonte y
+                  // recalcule si abre abierto o colapsado.
+                  key={`${bulto.id}:${auditSignature}`}
                   bulto={bulto}
                   reviewStatus={bultoReviews[bulto.id] ?? null}
                   readOnly={alreadyProcessed}

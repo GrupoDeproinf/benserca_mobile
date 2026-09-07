@@ -118,7 +118,8 @@
       "lineMeta": "Pedido: {{required}} · Asignado: {{assigned}} · Pendiente: {{pending}}",
       "tallaMeta": "Talla: {{talla}}",
       "skus": "SKUs",
-      "extraBultosFlag": "Bultos adicionales"
+      "extraBultosFlag": "Bultos adicionales",
+      "duplicateSkuTag": "Duplicado"
     },
     "check": {
       "waitingTitle": "En chequeo",
@@ -213,13 +214,17 @@
       "reasonPlaceholder": "Selecciona un motivo",
       "reasonMissingItem": "Falta de artículo",
       "reasonPriorityChange": "Cambio de prioridad",
+      "reasonDuplicateSku": "SKU duplicado",
       "missingQty": "Faltan {{missing}} de {{required}}",
       "noPendingItems": "No quedan artículos pendientes: todo lo del pedido ya está en los bultos.",
       "confirm": "Pausar pedido",
       "bannerTitle": "Pedido pausado",
       "bannerBodyMissing": "Falta de artículo: {{skus}}",
       "bannerBodyPriority": "Motivo: cambio de prioridad",
-      "missingItemsLabel": "Marca los faltantes e indica cuántas hay en almacén"
+      "bannerBodyDuplicate": "SKU duplicado: {{skus}}",
+      "missingItemsLabel": "Marca los faltantes e indica cuántas hay en almacén",
+      "duplicateSkusLabel": "SKUs duplicados detectados",
+      "noDuplicateSkus": "No se detectaron SKUs duplicados en este pedido."
     },
     "missing": {
       "title": "Reportar faltante",
@@ -480,7 +485,8 @@
       "picker": "Picker",
       "bultos": "Bultos",
       "packed": "Empaquetado",
-      "extraBultos": "Bultos adicionales"
+      "extraBultos": "Bultos adicionales",
+      "corrected": "CORREGIDO"
     },
     "detail": {
       "notFound": "Pedido no encontrado.",

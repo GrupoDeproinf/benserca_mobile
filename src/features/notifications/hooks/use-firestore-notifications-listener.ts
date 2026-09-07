@@ -14,6 +14,7 @@ const KNOWN_TYPES = new Set<NotificationType>([
   'picking_continued_with_mismatch',
   'order_audit_approved',
   'order_audit_rejected',
+  'order_corrected',
 ]);
 
 function toNotificationType(raw: unknown): NotificationType {

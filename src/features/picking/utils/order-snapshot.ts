@@ -19,6 +19,21 @@ export function closeOpenBultosWithItems(bultos: Bulto[]): Bulto[] {
 }
 
 /**
+ * SKUs que Profit repitió en más de un renglón del pedido. El picker no tiene
+ * forma de saber si son dos artículos distintos que coinciden en código o un
+ * error de importación, así que se detectan para resaltarlos en la lista de
+ * renglones y para poder pausar el pedido con motivo `sku_duplicado`.
+ */
+export function getDuplicateSkus(lines: OrderLine[]): string[] {
+  const counts = new Map<string, number>();
+  for (const line of lines) {
+    if (!line.sku) continue;
+    counts.set(line.sku, (counts.get(line.sku) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([sku]) => sku);
+}
+
+/**
  * Identidad de un renglón del pedido. Ver `OrderLine.id`: Profit no manda
  * ningún id, así que se usa la posición dentro de `original_skus`.
  */
@@ -73,6 +88,40 @@ export function getOrphanBultoItems(order: Order): OrphanBultoItem[] {
         qty: item.qty,
       })),
   );
+}
+
+/**
+ * Descarta de los bultos ya armados lo que corresponde a un renglón que la web
+ * eliminó por completo del pedido (no una sustitución de faltante, que sigue
+ * resolviéndose a mano — ver `getOrphanBultoItems` y `order_missing_items.md`
+ * §8). Si el SKU sigue existiendo en algún renglón, el ítem se reengancha por
+ * SKU: cuando se borra un renglón anterior, los que quedan corren de posición
+ * y su `lineId` (que incluye el índice, ver `makeLineId`) cambia aunque el
+ * artículo siga siendo el mismo.
+ *
+ * Solo tiene sentido llamarla cuando el pedido remoto trae MENOS renglones que
+ * el local: con la misma cantidad, un SKU distinto en la misma posición es una
+ * sustitución, y ahí el picker debe decidir qué hacer con lo ya armado.
+ */
+export function reconcileBultosWithLines(bultos: Bulto[], lines: OrderLine[]): Bulto[] {
+  const validLineIds = new Set(lines.map((l) => l.id));
+  const skuStillExists = new Set(lines.map((l) => l.sku));
+  const consumed = new Set<string>();
+
+  return bultos.map((bulto) => ({
+    ...bulto,
+    items: bulto.items.flatMap((item) => {
+      if (validLineIds.has(item.lineId)) return [item];
+
+      const sku = resolveOriginalSku(item);
+      if (!skuStillExists.has(sku)) return [];
+
+      const line = lines.find((l) => l.sku === sku && !consumed.has(l.id));
+      if (!line) return [];
+      consumed.add(line.id);
+      return [{ ...item, lineId: line.id }];
+    }),
+  }));
 }
 
 export interface MissingLineQty {

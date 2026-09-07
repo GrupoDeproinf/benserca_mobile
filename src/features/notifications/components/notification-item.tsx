@@ -30,6 +30,7 @@ export const NOTIFICATION_TYPE_META: Record<
   order_updated: { icon: RefreshCw, iconColor: '#0891B2', iconBg: '#ECFEFF' },
   order_recovered: { icon: RotateCcw, iconColor: '#7C3AED', iconBg: '#F5F3FF' },
   order_annulled: { icon: Ban, iconColor: '#6B7280', iconBg: '#F3F4F6' },
+  order_corrected: { icon: RotateCcw, iconColor: '#16A34A', iconBg: '#ECFDF5' },
   picking_finished_incomplete: { icon: PackageX, iconColor: '#B45309', iconBg: '#FFFBEB' },
   picking_continued_with_mismatch: { icon: PackageSearch, iconColor: '#B45309', iconBg: '#FFFBEB' },
   order_audit_approved: { icon: PackageCheck, iconColor: '#059669', iconBg: '#ECFDF5' },

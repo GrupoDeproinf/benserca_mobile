@@ -32,6 +32,13 @@ interface PausePickingSheetProps {
    */
   pendingItems: MissingLineQty[];
   /**
+   * SKUs repetidos en el pedido (ver `getDuplicateSkus`): son los candidatos
+   * que se ofrecen para marcar cuando el motivo es `sku_duplicado`. El picker
+   * elige cuáles de ellos son el problema real (Profit puede repetir un código
+   * por error de importación sin que sea necesariamente el que está armando).
+   */
+  duplicateSkus?: string[];
+  /**
    * Fija el motivo y oculta el selector. Se usa al entrar desde un renglón
    * concreto de la lista de artículos, donde el motivo solo puede ser faltante.
    */
@@ -46,13 +53,19 @@ interface PausePickingSheetProps {
   alreadyReported?: boolean;
   onClose: () => void;
   /**
-   * `marked` viene vacío con motivo `cambio_prioridad`: ahí no hay faltantes y
-   * `mode` siempre es `'pause'`.
+   * `marked` viene vacío salvo con motivo `falta_articulo`; `selectedDuplicateSkus`
+   * viene vacío salvo con motivo `sku_duplicado`. `mode` siempre es `'pause'`
+   * fuera de `falta_articulo`.
    */
-  onConfirm: (reason: PauseReason, marked: MarkedMissingLine[], mode: MissingItemsMode) => void;
+  onConfirm: (
+    reason: PauseReason,
+    marked: MarkedMissingLine[],
+    mode: MissingItemsMode,
+    selectedDuplicateSkus: string[],
+  ) => void;
 }
 
-const REASONS: PauseReason[] = ['falta_articulo', 'cambio_prioridad'];
+const REASONS: PauseReason[] = ['falta_articulo', 'sku_duplicado', 'cambio_prioridad'];
 
 /**
  * Cuánto hay en almacén: entero entre 0 y `required - 1`. El tope es
@@ -70,6 +83,7 @@ function parseAvailable(raw: string, required: number): number | null {
 export function PausePickingSheet({
   visible,
   pendingItems,
+  duplicateSkus = [],
   lockedReason,
   focusLineId,
   alreadyReported = false,
@@ -88,6 +102,8 @@ export function PausePickingSheet({
   const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
   /** Texto crudo del input por renglón; se valida al confirmar. */
   const [availableByLine, setAvailableByLine] = useState<Record<string, string>>({});
+  /** SKUs duplicados que el picker marcó como el problema real. */
+  const [selectedDuplicateSkus, setSelectedDuplicateSkus] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (visible) {
@@ -95,13 +111,15 @@ export function PausePickingSheet({
       setReason(lockedReason ?? null);
       setSelectedLines(focusLineId ? new Set([focusLineId]) : new Set());
       setAvailableByLine({});
+      setSelectedDuplicateSkus(new Set());
     }
   }, [visible, lockedReason, focusLineId]);
 
-  const reasonLabel = (r: PauseReason) =>
-    r === 'falta_articulo'
-      ? t('picking.pause.reasonMissingItem')
-      : t('picking.pause.reasonPriorityChange');
+  const reasonLabel = (r: PauseReason) => {
+    if (r === 'falta_articulo') return t('picking.pause.reasonMissingItem');
+    if (r === 'sku_duplicado') return t('picking.pause.reasonDuplicateSku');
+    return t('picking.pause.reasonPriorityChange');
+  };
 
   const toggleLine = (lineId: string) => {
     Haptics.selectionAsync();
@@ -109,6 +127,16 @@ export function PausePickingSheet({
       const next = new Set(prev);
       if (next.has(lineId)) next.delete(lineId);
       else next.add(lineId);
+      return next;
+    });
+  };
+
+  const toggleDuplicateSku = (sku: string) => {
+    Haptics.selectionAsync();
+    setSelectedDuplicateSkus((prev) => {
+      const next = new Set(prev);
+      if (next.has(sku)) next.delete(sku);
+      else next.add(sku);
       return next;
     });
   };
@@ -131,14 +159,24 @@ export function PausePickingSheet({
    */
   const canPauseOnly = isMissingReason && alreadyReported && selectedLines.size === 0;
 
+  const isDuplicateReason = reason === 'sku_duplicado';
   const canContinue = isMissingReason && canReport;
-  const canPause = isMissingReason ? canReport || canPauseOnly : reason != null;
+  const canPause = isMissingReason
+    ? canReport || canPauseOnly
+    : isDuplicateReason
+      ? selectedDuplicateSkus.size > 0
+      : reason != null;
 
   const handleConfirm = (mode: MissingItemsMode) => {
     if (!reason) return;
     if (mode === 'continue' ? !canContinue : !canPause) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    onConfirm(reason, isMissingReason ? markedLines : [], isMissingReason ? mode : 'pause');
+    onConfirm(
+      reason,
+      isMissingReason ? markedLines : [],
+      isMissingReason ? mode : 'pause',
+      isDuplicateReason ? [...selectedDuplicateSkus] : [],
+    );
   };
 
   const handleClose = () => {
@@ -267,6 +305,33 @@ export function PausePickingSheet({
                           </View>
                         ) : null}
                       </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+          ) : null}
+
+          {reason === 'sku_duplicado' ? (
+            <View style={styles.checklistWrap}>
+              <Text style={styles.fieldLabel}>{t('picking.pause.duplicateSkusLabel')}</Text>
+              {duplicateSkus.length === 0 ? (
+                <Text style={styles.checklistEmpty}>{t('picking.pause.noDuplicateSkus')}</Text>
+              ) : (
+                <ScrollView style={styles.checklist} keyboardShouldPersistTaps="handled">
+                  {duplicateSkus.map((sku) => {
+                    const checked = selectedDuplicateSkus.has(sku);
+                    return (
+                      <Pressable
+                        key={sku}
+                        onPress={() => toggleDuplicateSku(sku)}
+                        style={[styles.checklistRow, checked && styles.checklistRowChecked]}
+                      >
+                        <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                          {checked ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
+                        </View>
+                        <Text style={styles.duplicateSkuRowText}>{sku}</Text>
+                      </Pressable>
                     );
                   })}
                 </ScrollView>
@@ -529,6 +594,11 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
     paddingVertical: 20,
+  },
+  duplicateSkuRowText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
   },
   qtyRow: {
     flexDirection: 'row',
