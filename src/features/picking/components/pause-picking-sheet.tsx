@@ -193,7 +193,8 @@ export function PausePickingSheet({
     >
       <KeyboardAvoidingView
         style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios'}
       >
         <Pressable style={styles.backdrop} onPress={handleClose} accessibilityRole="button" />
 
