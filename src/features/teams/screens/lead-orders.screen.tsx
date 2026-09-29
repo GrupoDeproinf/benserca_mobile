@@ -49,7 +49,8 @@ export function LeadOrdersScreen() {
   const allOrders = useOrdersStore((s) => s.orders);
   // Embalado es el final del recorrido del jefe: al marcarlo el pedido sale de
   // su lista. Despachado se excluye también porque viene después; si no, el
-  // pedido desaparecería al embalar y reaparecería al despacharse.
+  // pedido desaparecería al embalar y reaparecería al despacharse. El mismo
+  // hueco cubre `Listo para despachar`, `En guía` y `Rechazado en guía`.
   // Incluye los que tiene asignados como picker aunque el `team.chief_uid` sea
   // de otro jefe (picker ascendido a jefe con pedidos pendientes).
   const leadOrders = useMemo(

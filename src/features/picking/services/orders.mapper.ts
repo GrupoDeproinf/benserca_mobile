@@ -96,7 +96,15 @@ function readMissingItems(data: Record<string, any>): MissingItem[] {
   );
 }
 
-/** Mapea el status string de Firestore al OrderStatus interno. */
+/**
+ * Mapea el status string de Firestore al OrderStatus interno.
+ *
+ * `Listo para despachar` (y lo que sigue: guía, rechazo de guía) cierra el
+ * pedido por completo. La web no borra `assigned_to`, así que el listener por
+ * uid lo sigue trayendo. Si cayera en el default `assigned`, la lista lo
+ * mostraría como recién asignado. Se tratan como `dispatched`, que picker y
+ * jefe ya excluyen de la carga activa.
+ */
 function mapStatus(raw: string): OrderStatus {
   const map: Record<string, OrderStatus> = {
     Nuevo: 'new',
@@ -107,6 +115,9 @@ function mapStatus(raw: string): OrderStatus {
     Embalado: 'packed',
     Rechazado: 'rejected_review',
     Despachado: 'dispatched',
+    'Listo para despachar': 'dispatched',
+    'En guía': 'dispatched',
+    'Rechazado en guía': 'dispatched',
     Anulado: 'annulled',
     Recuperado: 'recovered',
   };
