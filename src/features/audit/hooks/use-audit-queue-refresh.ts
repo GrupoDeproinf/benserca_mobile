@@ -14,9 +14,15 @@ import { useSyncStore } from '@/features/sync/store/sync.store';
 import { firestore } from '@/services/firebase';
 
 /**
- * Carga la cola del chequeador: Empaquetado + pausados, en un solo refresh.
- * Fetch puntual (no realtime) — con muchos chequeadores, un onSnapshot sobre
- * toda la cola sale caro. Se dispara al montar y bajo demanda (refresh).
+ * Carga la cola de chequeo: Empaquetado + pausados de TODO el almacén, en un
+ * solo refresh. Fetch puntual (no realtime) — con muchos chequeadores, un
+ * onSnapshot sobre toda la cola sale caro. Se dispara al montar y bajo
+ * demanda (refresh).
+ *
+ * La usan tanto el auditor como el jefe de almacén (su pestaña "Cola" es
+ * idéntica a la del chequeador): a diferencia del listener de sesión del
+ * jefe, que solo trae los pedidos de su propio equipo, esta cola no filtra
+ * por `team.chief_uid` — debe verse igual sin importar quién la abra.
  */
 export function useAuditQueueRefresh() {
   const user = useCurrentUser();
@@ -27,7 +33,7 @@ export function useAuditQueueRefresh() {
   const prevSnapshotRef = useRef<Map<string, OrderSnapshotSig> | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!user || user.role !== 'auditor') return;
+    if (!user || (user.role !== 'auditor' && user.role !== 'warehouse_lead')) return;
     setRefreshing(true);
     try {
       const [packedSnap, pausedSnap] = await Promise.all([

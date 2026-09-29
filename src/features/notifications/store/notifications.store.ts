@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { shareByKey } from '@/shared/lib/structural-sharing';
 import { MOCK_NOTIFICATIONS } from '../data/mock-notifications';
 import type { AppNotification, NotificationType, UserRole } from '@/shared/types';
 
@@ -73,12 +74,19 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     })),
 
   hydrateFirestoreNotifications: (incoming) =>
-    set((state) => ({
-      notifications: [
-        ...incoming,
-        ...state.notifications.filter((n) => !n.firestoreId),
-      ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    })),
+    set((state) => {
+      // El listener trae las notificaciones de TODOS los usuarios del canal y
+      // filtra en el cliente: la mayoría de los snapshots no cambian nada para
+      // este usuario, y en ese caso no se debe notificar a los suscriptores.
+      const notifications = shareByKey(
+        state.notifications,
+        [...incoming, ...state.notifications.filter((n) => !n.firestoreId)].sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt),
+        ),
+        (n) => n.id,
+      );
+      return notifications === state.notifications ? state : { notifications };
+    }),
 
   resetNotifications: () =>
     set({ notifications: [...MOCK_NOTIFICATIONS] }),

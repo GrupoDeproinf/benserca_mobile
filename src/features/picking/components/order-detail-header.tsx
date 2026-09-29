@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RefreshIconButton } from '@/shared/components/ui/refresh-icon-button';
 import type { OrderStatus } from '../types';
 import {
   ORDER_STATUS_I18N_KEY,
@@ -252,6 +253,10 @@ interface OrderDetailHeaderProps {
   animateEnter?: boolean;
   /** Meta card dentro del scroll (no fija bajo la franja negra). */
   metaInScroll?: boolean;
+  /** Si se pasa, muestra el botón de refrescar datos de artículo junto al badge. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  refreshAccessibilityLabel?: string;
 }
 
 /** Expande la franja negra al entrar; al volver el stack hace slide nativo. */
@@ -268,6 +273,9 @@ export function OrderDetailHeader({
   footer,
   animateEnter = true,
   metaInScroll = false,
+  onRefresh,
+  refreshing = false,
+  refreshAccessibilityLabel,
 }: OrderDetailHeaderProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -360,6 +368,13 @@ export function OrderDetailHeader({
                 <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
                   <Text style={[styles.badgeText, { color: badgeStyle.text }]}>{statusLabel}</Text>
                 </View>
+              ) : null}
+              {onRefresh ? (
+                <RefreshIconButton
+                  onPress={onRefresh}
+                  refreshing={refreshing}
+                  accessibilityLabel={refreshAccessibilityLabel}
+                />
               ) : null}
             </View>
           </Animated.View>

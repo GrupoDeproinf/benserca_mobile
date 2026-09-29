@@ -3,6 +3,8 @@ import { Box, Calendar, ChevronRight, ClipboardList, RotateCcw, User } from 'luc
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { useCurrentUser } from '@/features/auth/store/auth.store';
+import { getRoleRouteSegment } from '@/features/auth/constants/routes';
 import type { Order } from '@/features/picking/types';
 import {
   PAUSED_BADGE_STYLE,
@@ -85,11 +87,13 @@ function MetaBlock({
 export function AuditOrderCard({ order, pickerName }: AuditOrderCardProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const user = useCurrentUser();
   const pickerDisplay = splitDisplayName(pickerName ?? '');
+  const roleSegment = user ? getRoleRouteSegment(user.role) : 'auditor';
 
   return (
     <Pressable
-      onPress={() => router.push(`/(app)/auditor/audit/${order.id}` as never)}
+      onPress={() => router.push(`/(app)/${roleSegment}/audit/${order.id}` as never)}
       style={({ pressed }) => ({ opacity: pressed ? 0.96 : 1 })}
       android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: false }}
     >

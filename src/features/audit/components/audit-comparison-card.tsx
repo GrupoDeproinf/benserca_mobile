@@ -1,5 +1,7 @@
+import * as Haptics from 'expo-haptics';
+import { Eye } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { OrderDetailCard } from '@/features/picking/components/order-detail-section';
 import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import type { AuditComparisonRow } from '../utils/audit-comparison';
@@ -12,6 +14,8 @@ const STATUS_COLOR = {
 
 interface AuditComparisonCardProps {
   rows: AuditComparisonRow[];
+  /** Abre la vista previa (foto + código) del renglón. Vacío para renglones huérfanos. */
+  onPreviewRow?: (lineId: string) => void;
 }
 
 function LegendChip({ color, label }: { color: string; label: string }) {
@@ -34,7 +38,7 @@ function DiffBadge({ diff, status }: { diff: number; status: AuditComparisonRow[
   );
 }
 
-export function AuditComparisonCard({ rows }: AuditComparisonCardProps) {
+export function AuditComparisonCard({ rows, onPreviewRow }: AuditComparisonCardProps) {
   const { t } = useTranslation();
 
   return (
@@ -54,11 +58,27 @@ export function AuditComparisonCard({ rows }: AuditComparisonCardProps) {
 
       {rows.map((row, idx) => (
         <View key={row.lineId} style={[styles.row, idx < rows.length - 1 && styles.rowBorder]}>
-          <View style={styles.colProduct}>
-            <ExpandableText style={styles.productName} numberOfLines={2}>
-              {row.name}
-            </ExpandableText>
-            <Text style={styles.productSku}>{row.sku}</Text>
+          <View style={[styles.colProduct, styles.productRow]}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ExpandableText style={styles.productName} numberOfLines={2}>
+                {row.name}
+              </ExpandableText>
+              <Text style={styles.productSku}>{row.sku}</Text>
+            </View>
+            {onPreviewRow ? (
+              <Pressable
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  onPreviewRow(row.lineId);
+                }}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('picking.skuPreview.open')}
+                style={({ pressed }) => [styles.eyeBtn, pressed && { opacity: 0.5 }]}
+              >
+                <Eye size={16} color="#8E8E93" strokeWidth={2.2} />
+              </Pressable>
+            ) : null}
           </View>
           <Text style={styles.qtyCell}>{row.required}</Text>
           <Text style={[styles.qtyCell, styles.qtyPicked, { color: STATUS_COLOR[row.status] }]}>
@@ -123,6 +143,14 @@ const styles = StyleSheet.create({
     width: undefined,
     textAlign: 'left',
     paddingRight: 8,
+  },
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  eyeBtn: {
+    padding: 2,
   },
   row: {
     flexDirection: 'row',

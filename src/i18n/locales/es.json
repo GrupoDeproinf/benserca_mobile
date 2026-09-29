@@ -22,7 +22,8 @@
     "picker": "Picker",
     "warehouse_lead": "Jefe / Supervisor",
     "auditor": "Chequeador",
-    "supervisor_almacen": "Supervisor de almacén"
+    "supervisor_almacen": "Supervisor de almacén",
+    "pedido_cargador": "Cargador"
   },
   "orderStatus": {
     "new": "Nuevo",
@@ -32,6 +33,7 @@
     "packed": "Embalado",
     "rejectedReview": "Rechazado - Revisión",
     "audited": "Auditado",
+    "corrected": "Corregido",
     "approved": "Aprobado",
     "paused": "En pausa",
     "dispatched": "Despachado",
@@ -119,7 +121,11 @@
       "tallaMeta": "Talla: {{talla}}",
       "skus": "SKUs",
       "extraBultosFlag": "Bultos adicionales",
-      "duplicateSkuTag": "Duplicado"
+      "duplicateSkuTag": "Duplicado",
+      "refreshArticles": "Actualizar datos de artículo",
+      "refreshSuccess": "{{count}} artículo(s) actualizado(s)",
+      "refreshNoChanges": "Los artículos ya estaban al día",
+      "refreshError": "No se pudo actualizar. Intenta de nuevo."
     },
     "check": {
       "waitingTitle": "En chequeo",
@@ -155,7 +161,21 @@
       "cannotCloseEmptyBody": "No puedes cerrar un bulto sin ítems.",
       "emptyModalTitle": "Bulto {{number}} quedó vacío",
       "emptyModalBody": "Este bulto no tiene artículos. ¿Qué deseas hacer?",
-      "deleteBulto": "Eliminar bulto"
+      "deleteBulto": "Eliminar bulto",
+      "select": "Seleccionar",
+      "selectAll": "Seleccionar todos",
+      "deleteSelected": "Eliminar ({{count}})",
+      "deleteSelectedTitle": "¿Eliminar {{count}} bulto(s)?",
+      "deleteSelectedBody": "Los bultos seleccionados se eliminarán y los restantes se renumerarán.",
+      "deleteSelectedBodyWithItems": "Los artículos de los bultos seleccionados volverán a quedar pendientes y los bultos restantes se renumerarán.",
+      "deleteSelectedConfirm": "Eliminar {{count}}",
+      "numberPrefix": "Bulto",
+      "renumberInputLabel": "Nuevo número de bulto",
+      "renumberHint": "Toca el número de un bulto seleccionado para cambiarlo.",
+      "renumberDone": "El Bulto {{from}} ahora es el Bulto {{to}}",
+      "deleteBultoConfirmTitle": "¿Eliminar el bulto {{number}}?",
+      "deleteBultoConfirmBody": "El bulto se eliminará y los bultos restantes se renumerarán.",
+      "deleteBultoConfirmBodyWithItems": "Los artículos de este bulto volverán a quedar pendientes y los bultos restantes se renumerarán."
     },
     "addItem": {
       "title": "Agregar artículo al Bulto {{number}}",
@@ -191,7 +211,9 @@
       "missingTitle": "Finalizar con faltantes",
       "missingBody": "Hay cantidades sin asignar:",
       "missingLine": "{{qty}} uds. de {{name}}",
-      "missingConfirm": "Finalizar igual"
+      "missingConfirm": "Finalizar igual",
+      "noteLabel": "Nota (opcional)",
+      "notePlaceholder": "Escribe por qué cierras el pedido con faltantes"
     },
     "wrap": {
       "confirmTitle": "Marcar como embalado",
@@ -466,6 +488,48 @@
       "continue": "Continuar picking"
     }
   },
+  "loading": {
+    "screen": {
+      "title": "Carga de camión",
+      "subtitle": "Pedidos embalados listos para subir al camión",
+      "ordersCount": "pedidos",
+      "searchPlaceholder": "Buscar pedido o cliente...",
+      "emptyTitle": "Sin pedidos por cargar",
+      "emptySubtitle": "Los pedidos embalados aparecerán aquí."
+    },
+    "card": {
+      "client": "Cliente",
+      "bultos": "Bultos",
+      "loaded": "Cargados",
+      "progress": "Carga",
+      "readyBadge": "LISTO"
+    },
+    "detail": {
+      "notFound": "Pedido no encontrado.",
+      "bultos": "Bultos",
+      "loaded": "Cargados",
+      "progress": "Carga",
+      "linesTitle": "Detalle del pedido",
+      "bultosTitle": "Bultos para subir al camión",
+      "bultoTitle": "Bulto {{number}}",
+      "itemCount": "{{count}} ítem(s) · {{units}} unidad(es)",
+      "loadedTag": "En el camión",
+      "pendingTag": "Por cargar",
+      "markLoaded": "Marcar bulto {{number}} como cargado",
+      "unmarkLoaded": "Desmarcar bulto {{number}}",
+      "noBultos": "Este pedido no tiene bultos registrados.",
+      "dispatch": "Despachar pedido",
+      "dispatchConfirmTitle": "¿Despachar pedido?",
+      "dispatchConfirmBody": "Los {{count}} bultos están en el camión. El pedido pasará a Despachado y saldrá de tu lista.",
+      "dispatchConfirm": "Despachar",
+      "pendingTitle": "Faltan bultos por cargar",
+      "pendingBody": "Marca todos los bultos como cargados antes de despachar. Faltan: {{bultos}}.",
+      "noBultosTitle": "Sin bultos registrados",
+      "noBultosBody": "No se puede despachar un pedido sin bultos. Revísalo en la web.",
+      "pausedTitle": "Pedido en pausa",
+      "pausedBody": "No se puede despachar un pedido pausado."
+    }
+  },
   "audit": {
     "screen": {
       "subtitle": "Pedidos empaquetados listos para revisar",
@@ -528,7 +592,24 @@
       "reviewRejected": "Rechazado",
       "pendingReview": "Pendiente",
       "picked": "Armado",
-      "required": "Req."
+      "required": "Req.",
+      "select": "Seleccionar bulto {{number}}",
+      "itemsChecked": "{{checked}}/{{total}} correctos",
+      "checkItemsHint": "Tilda los artículos que están bien. Solo se aprueba con todos tildados; al rechazar, los no tildados quedan como el problema.",
+      "checkItem": "Marcar {{name}} como correcto"
+    },
+    "group": {
+      "bultoCount": "{{count}} bulto(s)",
+      "unitsEach": "×{{qty}} c/u",
+      "approvedCount": "{{count}} aprobado(s)",
+      "rejectedCount": "{{count}} rechazado(s)",
+      "pendingCount": "{{count}} pendiente(s)",
+      "selectedCount": "{{count}} seleccionado(s)",
+      "selectAll": "Seleccionar todos los bultos de {{name}}"
+    },
+    "bulk": {
+      "approve": "Aprobar ({{count}})",
+      "reject": "Rechazar ({{count}})"
     },
     "approve": {
       "btn": "Aprobar",
@@ -545,7 +626,8 @@
       "placeholder": "Ej: Faltan 5 unidades del SKU X en el bulto 2...",
       "required": "La observación es obligatoria.",
       "confirm": "Rechazar pedido",
-      "bultoLine": "Bulto {{number}}: revisar contenido."
+      "bultoLine": "Bulto {{number}}: revisar contenido.",
+      "bultoLineItems": "Bulto {{number}}: revisar {{items}}."
     },
     "paused": {
       "title": "Pedidos pausados",
@@ -700,5 +782,10 @@
     "offlineWithPending": "Sin conexión — hay cambios pendientes de enviar",
     "pending": "Enviando cambios…",
     "catalogReady": "Catálogo listo para trabajar sin conexión"
+  },
+  "errorScreen": {
+    "title": "Algo salió mal",
+    "body": "La pantalla se cerró por un error inesperado. Puedes reintentar sin salir de la sesión.",
+    "retry": "Reintentar"
   }
 }

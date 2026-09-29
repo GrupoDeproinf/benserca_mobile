@@ -12,10 +12,18 @@ import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
 import type { PickerEstado, PickerStatus } from '@/features/warehouse/types';
 import { derivePickerActivity } from '@/features/warehouse/utils/derive-picker-activity';
+import { pickerStatusLabelKey } from '@/features/warehouse/utils/picker-status';
 import { EmptyState } from '@/shared/components/ui/empty-state';
 import { Text } from '@/shared/components/ui/text';
 
 const STATUS_ORDER: PickerStatus[] = ['en_proceso', 'reservado', 'por_embalar', 'disponible'];
+
+/** Opciones del filtro: los mismos estados que muestra cada card, más "Todos". */
+const PICKER_STATUS_FILTERS: readonly string[] = ['all', ...STATUS_ORDER];
+
+function pickerStatusFilterLabel(value: string, t: (key: string) => string): string {
+  return value === 'all' ? t('common.all') : t(pickerStatusLabelKey(value as PickerStatus));
+}
 
 /** Picker con estado y pedido activo derivados de sus pedidos reales. */
 interface PickerRow {
@@ -33,6 +41,7 @@ export function LeadPickersScreen() {
   const { t } = useTranslation();
   const tabBarHeight = useAppTabBarHeight();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const pickers = usePickersStore((s) => s.pickers);
   const orders = useOrdersStore((s) => s.orders);
@@ -53,10 +62,13 @@ export function LeadPickersScreen() {
             activeOrder,
           };
         })
+        // El estado real se deriva de los pedidos (`derivePickerActivity`), no
+        // del campo guardado, así que el filtro se aplica DESPUÉS del map.
+        .filter((row) => statusFilter === 'all' || row.picker.status === statusFilter)
         .sort(
           (a, b) => STATUS_ORDER.indexOf(a.picker.status) - STATUS_ORDER.indexOf(b.picker.status),
         ),
-    [pickers, orders, search],
+    [pickers, orders, search, statusFilter],
   );
 
   const listHeader = (
@@ -68,7 +80,10 @@ export function LeadPickersScreen() {
         <OrdersSearchFilter
           search={search}
           onSearchChange={setSearch}
-          showFilter={false}
+          filterValue={statusFilter}
+          onFilterChange={setStatusFilter}
+          filterOptions={PICKER_STATUS_FILTERS}
+          getFilterLabel={pickerStatusFilterLabel}
           embedded
           searchPlaceholder={t('supervision.screen.searchPlaceholder')}
         />

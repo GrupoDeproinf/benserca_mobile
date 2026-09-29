@@ -4,6 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, RefreshControl, View } from 'react-native';
 import { ORDERS_LIST_CARD_GAP } from '@/features/picking/components/orders-list-page';
 import { OrdersSearchFilter } from '@/features/picking/components/orders-search-filter';
+import {
+  matchesOrderListFilter,
+  type OrderListFilter,
+} from '@/features/picking/utils/order-status';
 import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-section';
 import { useAppTabBarHeight } from '@/features/tabs/hooks/use-app-tab-bar-height';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
@@ -14,11 +18,20 @@ import { AuditOrderCard } from '../components/audit-order-card';
 import { useAuditQueue } from '../hooks/use-audit-queue';
 import { useAuditQueueRefresh } from '../hooks/use-audit-queue-refresh';
 
+/**
+ * La cola del chequeador mezcla dos cosas (`useAuditQueue`): pedidos en
+ * Empaquetado esperando revisión y pedidos en pausa esperando que alguien los
+ * reanude. Sin filtro no había forma de ver solo unos u otros, que es justo lo
+ * que se necesita cuando la cola crece.
+ */
+const AUDIT_FILTERS: readonly OrderListFilter[] = ['all', 'to_pack', 'corrected', 'paused'];
+
 function matchesSearch(order: { orderNumber: string; client: string }, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return (
-    order.orderNumber.toLowerCase().includes(q) || order.client.toLowerCase().includes(q)
+    String(order.orderNumber).toLowerCase().includes(q) ||
+    String(order.client).toLowerCase().includes(q)
   );
 }
 
@@ -26,6 +39,7 @@ export function AuditQueueScreen() {
   const { t } = useTranslation();
   const tabBarHeight = useAppTabBarHeight();
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<OrderListFilter>('all');
 
   const queue = useAuditQueue();
   const pickers = usePickersStore((s) => s.pickers);
@@ -33,7 +47,7 @@ export function AuditQueueScreen() {
 
   const filtered = useMemo(() => {
     return queue
-      .filter((o) => matchesSearch(o, search))
+      .filter((o) => matchesOrderListFilter(o, filter) && matchesSearch(o, search))
       .sort((a, b) => {
         // Pausados primero para que el chequeador los vea al entrar.
         if (a.isPaused !== b.isPaused) return a.isPaused ? -1 : 1;
@@ -45,18 +59,17 @@ export function AuditQueueScreen() {
         ).getTime();
         return bTime - aTime;
       });
-  }, [queue, search]);
+  }, [queue, filter, search]);
 
   const listHeader = (
     <View style={{ paddingBottom: 8 }}>
-      <AppHeroTitleSection
-        title={t('audit.screen.title')}
-        subtitle={t('audit.screen.subtitle')}
-      >
+      <AppHeroTitleSection title={t('audit.screen.title')} subtitle={t('audit.screen.subtitle')}>
         <OrdersSearchFilter
           search={search}
           onSearchChange={setSearch}
-          showFilter={false}
+          filterValue={filter}
+          onFilterChange={(value) => setFilter(value as OrderListFilter)}
+          filterOptions={AUDIT_FILTERS}
           embedded
           searchPlaceholder={t('audit.screen.searchPlaceholder')}
           onRefresh={refresh}

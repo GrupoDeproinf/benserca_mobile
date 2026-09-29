@@ -1,5 +1,5 @@
-import type { Bulto, Order, OrderLine } from '../types';
-import { getAssignedQtyForLine } from './order-snapshot';
+import type { Bulto, BultoItem, Order, OrderLine } from '../types';
+import { getAssignedQtyByLine, getAssignedQtyForLine } from './order-snapshot';
 
 /**
  * Ya no existe el concepto de "capacidad de bulto" (units_per_bundle).
@@ -65,4 +65,34 @@ export function getMaxQtyForBultoItem(order: Order, itemId: string): number {
   const required = line?.requiredQty ?? Number.POSITIVE_INFINITY;
   const assignedElsewhere = getAssignedQtyForLine(order, target.lineId) - target.qty;
   return Math.max(0, required - assignedElsewhere);
+}
+
+/**
+ * Lo mismo que `getMaxQtyForBultoItem`, pero indexando el pedido UNA vez y
+ * devolviendo la consulta. El detalle pide el máximo de cada ítem visible en
+ * cada render, y hacerlo con la función de arriba recorría todos los bultos
+ * dos veces por ítem: O(ítems²) en cada toque del stepper.
+ */
+export function createBultoItemMaxQty(order: Order): (itemId: string) => number {
+  const assignedByLine = getAssignedQtyByLine(order.bultos);
+
+  // Primera aparición, igual que el `find`/`break` de la versión por ítem.
+  const itemById = new Map<string, BultoItem>();
+  for (const bulto of order.bultos) {
+    for (const item of bulto.items) {
+      if (!itemById.has(item.id)) itemById.set(item.id, item);
+    }
+  }
+  const requiredByLine = new Map<string, number>();
+  for (const line of getActiveOrderLines(order)) {
+    if (!requiredByLine.has(line.id)) requiredByLine.set(line.id, line.requiredQty);
+  }
+
+  return (itemId) => {
+    const target = itemById.get(itemId);
+    if (!target) return 0;
+    const required = requiredByLine.get(target.lineId) ?? Number.POSITIVE_INFINITY;
+    const assignedElsewhere = (assignedByLine.get(target.lineId) ?? 0) - target.qty;
+    return Math.max(0, required - assignedElsewhere);
+  };
 }

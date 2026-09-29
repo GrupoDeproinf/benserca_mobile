@@ -2,8 +2,8 @@
   "expo": {
     "name": "benserca",
     "slug": "benserca_mobile",
-    "version": "1.0.0",
-    "orientation": "portrait",
+    "version": "1.5.2",
+    "orientation": "default",
     "icon": "./assets/icons/icon.png",
     "scheme": "benserca_mobile",
     "userInterfaceStyle": "automatic",
@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.benserca.app",
+      "versionCode": 17,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",

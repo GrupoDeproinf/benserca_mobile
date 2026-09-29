@@ -1,6 +1,6 @@
 import type { Order } from '../types';
 import { getActiveOrderLines } from './bulto-capacity';
-import { getAssignedQtyForLine } from './order-snapshot';
+import { getAssignedQtyByLine } from './order-snapshot';
 
 /**
  * Renglón que Profit marca con `units_per_bundle`: se puede armar de un toque,
@@ -48,6 +48,11 @@ export function getQuickBundleCandidates(order: Order): QuickBundleCandidate[] {
   const skuCount = new Map<string, number>();
   for (const line of lines) skuCount.set(line.sku, (skuCount.get(line.sku) ?? 0) + 1);
 
+  // Índice por id en vez de un `find` dentro del bucle: con 250 renglones eso
+  // era O(renglones²) en cada render de la pantalla.
+  const liveById = new Map(order.lines.map((l) => [l.id, l]));
+  const assignedByLine = getAssignedQtyByLine(order.bultos);
+
   const candidates: QuickBundleCandidate[] = [];
 
   for (const line of lines) {
@@ -57,11 +62,11 @@ export function getQuickBundleCandidates(order: Order): QuickBundleCandidate[] {
      * una versión de la app que todavía no leía este campo. Describe el empaque
      * del artículo, no la cantidad pedida.
      */
-    const liveLine = order.lines.find((l) => l.id === line.id);
+    const liveLine = liveById.get(line.id);
     const unitsPerBundle = liveLine?.unitsPerBundle ?? line.unitsPerBundle;
     if (!unitsPerBundle || unitsPerBundle < 1) continue;
 
-    const pending = Math.max(0, line.requiredQty - getAssignedQtyForLine(order, line.id));
+    const pending = Math.max(0, line.requiredQty - (assignedByLine.get(line.id) ?? 0));
     // Solo bultos completos, y siempre dentro del mismo renglón.
     const availableBundles = Math.floor(pending / unitsPerBundle);
     if (availableBundles < 1) continue;

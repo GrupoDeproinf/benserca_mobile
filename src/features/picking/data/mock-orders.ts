@@ -468,6 +468,7 @@ export const MOCK_ORDERS: Order[] = [
     hasMissingItems: false,
     rejectedBundles: [],
     approvedBundles: [],
+    loadedBundles: [],
     auditedByUid: null,
     auditedByName: null,
   } as Order;

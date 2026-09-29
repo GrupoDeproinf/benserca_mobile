@@ -1,13 +1,17 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePickersStore } from '@/features/warehouse/store/pickers.store';
+import { listStaffEmailsForType, sendMail } from '@/services/firebase/mail.service';
 import { createNotification } from '@/services/firebase/notifications.service';
+import { shareByKey } from '@/shared/lib/structural-sharing';
 import type { SessionUser } from '@/shared/types';
 import {
   applyAddBultoItem,
   applyApproveAudit,
   applyCloseBulto,
   applyDeleteBulto,
+  applyDeleteBultos,
+  applyMoveBultos,
   applyFinishPicking,
   applyMarkDispatched,
   applyMarkWrapped,
@@ -20,6 +24,7 @@ import {
   applyReopenForRevision,
   applyReportMissingItems,
   applyResumePicking,
+  applySetBundleLoaded,
   applyStartPicking,
   applyUpdateBultoItem,
   buildMissingItems,
@@ -27,7 +32,17 @@ import {
   canFinishPicking,
   canOpenBulto,
 } from '../domain/order-actions';
+import { computeArticleDataRefresh } from '../domain/refresh-article-data';
+import { buildOrderCompletedMail } from '../emails/order-completed';
+import { buildOrderDuplicateSkusMail } from '../emails/order-duplicate-skus';
+import { buildOrderRejectedMail } from '../emails/order-rejected';
 import {
+  fetchArticuloDataByCodigos,
+  fetchArticulosByIds,
+  updateArticuloDataDescripcion,
+} from '../services/articulo-data.service';
+import {
+  firestoreApplyArticleDataPatches,
   firestoreApproveAudit,
   firestoreAssignSelfAsPicker,
   firestoreFinishPicking,
@@ -39,7 +54,9 @@ import {
   firestoreReopenForRevision,
   firestoreReportMissingItems,
   firestoreResumePicking,
+  firestoreSetBundleLoaded,
   firestoreStartPicking,
+  STATUS_TO_FIRESTORE,
 } from '../services/orders.service';
 import type {
   MissingItemsMode,
@@ -57,23 +74,31 @@ import {
 import { canPickerStartOrder } from '../utils/picker-queue';
 
 /**
- * Notificaciones App→Web (channel `web`, `recipients: []` = broadcast) al
- * finalizar picking: SKUs faltantes y/o sustituciones. Ver notifications.md §2.6.
+ * Notificaciones al finalizar picking: SKUs faltantes y/o sustituciones. Ver
+ * notifications.md §2.6.
+ *
+ * `note` es lo que el picker escribió al confirmar "Finalizar igual" en
+ * `FinishMissingSheet` (antes no existía forma de dejar por qué se cerraba
+ * el pedido así). Viaja en `motivo` junto al detalle de faltantes.
  */
-function notifyFinishPickingOutcomes(order: Order, user: SessionUser): void {
+function notifyFinishPickingOutcomes(order: Order, user: SessionUser, note?: string): void {
   const orderNumber = Number(order.orderNumber);
   const missing = order.finalSkus.filter((s) => !s.substituted && s.difference > 0);
   const substituted = order.finalSkus.filter((s) => s.substituted);
 
   if (missing.length > 0) {
-    const motivo = missing
+    const missingDetail = missing
       .map(
         (s) =>
           `Falta SKU ${s.originalSku} — cantidad pedida ${s.originalQuantity}, encontrada ${s.packedQuantity}`,
       )
       .join('; ');
+    const motivo = note ? `${missingDetail}. Nota del picker: ${note}` : missingDetail;
+    const message = `Picking finalizado con SKUs incompletos en el pedido #${order.orderNumber}`;
+
+    // App → Web: la oficina lo ve en su dashboard (ver notifications.md §2.6.1).
     createNotification({
-      message: `Picking finalizado con SKUs incompletos en el pedido #${order.orderNumber}`,
+      message,
       type: 'picking_finished_incomplete',
       channel: 'web',
       recipients: [],
@@ -82,6 +107,24 @@ function notifyFinishPickingOutcomes(order: Order, user: SessionUser): void {
       createdBy: user.uid,
       createdByName: user.name,
     }).catch((e) => console.error('[orders.store] picking_finished_incomplete notify error', e));
+
+    // App → App: sin esto el cierre con faltantes no deja ningún rastro
+    // visible dentro de la app (la de arriba solo la lee la web). Va al jefe
+    // de almacén asignado al pedido, que es quien decide qué hacer.
+    if (order.assignedLeadId) {
+      createNotification({
+        message,
+        type: 'picking_finished_incomplete',
+        channel: 'app',
+        recipients: [{ uid: order.assignedLeadId, name: order.assignedLeadId }],
+        orderNumber,
+        motivo,
+        createdBy: user.uid,
+        createdByName: user.name,
+      }).catch((e) =>
+        console.error('[orders.store] picking_finished_incomplete app notify error', e),
+      );
+    }
   }
 
   if (substituted.length > 0) {
@@ -154,6 +197,96 @@ function notifyAuditOutcome(
     createdByName: user.name,
   }).catch((e) => console.error(`[orders.store] order_audit_${outcome} notify error`, e));
 }
+
+/**
+ * Correo `order_duplicate_skus` (correos.md §5). Se dispara al pausar con
+ * motivo `sku_duplicado`, con los SKUs que el picker efectivamente marcó
+ * (no todos los candidatos que ofrece `getDuplicateSkus`).
+ */
+async function notifyDuplicateSkusMail(
+  order: Order,
+  user: SessionUser,
+  markedSkus: string[],
+): Promise<void> {
+  try {
+    const recipients = await listStaffEmailsForType('order_duplicate_skus');
+    if (recipients.length === 0) return;
+
+    const duplicateSkus = markedSkus.map((sku) => ({
+      sku,
+      description: order.lines.find((l) => l.sku === sku)?.name ?? '',
+      lineCount: order.lines.filter((l) => l.sku === sku).length,
+    }));
+
+    const mail = buildOrderDuplicateSkusMail({
+      orderNumber: order.orderNumber,
+      clientName: order.client,
+      statusLabel: STATUS_TO_FIRESTORE[order.status],
+      actorName: user.name,
+      actorEmail: user.email,
+      motivo: '—',
+      duplicateSkus,
+    });
+
+    await sendMail({ to: recipients, ...mail });
+  } catch (e) {
+    console.error('[orders.store] order_duplicate_skus mail error', e);
+  }
+}
+
+/**
+ * Correo `order_rejected` (correos.md §6). El actor es quien rechaza el
+ * pedido en `rejectAudit` — el chequeador/auditor, no el picker (el doc dice
+ * "picker" pero en esta app el único flujo de rechazo es del chequeador).
+ */
+async function notifyOrderRejectedMail(
+  order: Order,
+  user: SessionUser,
+  motivo: string,
+): Promise<void> {
+  try {
+    const recipients = await listStaffEmailsForType('order_rejected');
+    if (recipients.length === 0) return;
+
+    const mail = buildOrderRejectedMail({
+      orderNumber: order.orderNumber,
+      clientName: order.client,
+      statusLabel: STATUS_TO_FIRESTORE[order.status],
+      actorName: user.name,
+      actorEmail: user.email,
+      motivo,
+    });
+
+    await sendMail({ to: recipients, ...mail });
+  } catch (e) {
+    console.error('[orders.store] order_rejected mail error', e);
+  }
+}
+
+/** Correo `order_completed` (correos.md §7). Se dispara al terminar el picking. */
+async function notifyOrderCompletedMail(order: Order, user: SessionUser): Promise<void> {
+  try {
+    const recipients = await listStaffEmailsForType('order_completed');
+    if (recipients.length === 0) return;
+
+    const mail = buildOrderCompletedMail({
+      orderNumber: order.orderNumber,
+      clientName: order.client,
+      statusLabel: STATUS_TO_FIRESTORE[order.status],
+      actorName: user.name,
+      actorEmail: user.email,
+      bundlesCreated: order.bundlesCreated,
+      bundlesDefined: order.definedBultos,
+      finishedAt: order.packedAt ?? new Date().toISOString(),
+    });
+
+    await sendMail({ to: recipients, ...mail });
+  } catch (e) {
+    console.error('[orders.store] order_completed mail error', e);
+  }
+}
+
+const orderKey = (order: Order) => order.id;
 
 function patchOrder(orders: Order[], id: string, patch: Partial<Order>): Order[] {
   return orders.map((o) => (o.id === id ? { ...o, ...patch } : o));
@@ -281,6 +414,9 @@ type StartPickingResult = { ok: true } | { ok: false; error: 'already_active_ord
 type CloseBultoResult = { ok: true } | { ok: false; error: PickerActionError };
 type FinishPickingResult = { ok: true } | { ok: false; error: PickerActionError };
 type RemoveItemResult = { ok: true; bultoEmpty: boolean; bultoId: string; bultoNumber: number };
+export type RefreshArticleDataResult =
+  | { ok: true; linesUpdated: number; catalogUpdated: number }
+  | { ok: false; error: string };
 
 interface OrdersState {
   orders: Order[];
@@ -308,9 +444,14 @@ interface OrdersState {
   getOrdersByPicker: (pickerId: string) => Order[];
   hasActiveOrder: (pickerId: string) => boolean;
   startPicking: (orderId: string, pickerId: string) => StartPickingResult;
-  finishPicking: (orderId: string, pickerId: string) => FinishPickingResult;
+  /** `missingNote` es la nota opcional que el picker deja al finalizar con faltantes. */
+  finishPicking: (orderId: string, pickerId: string, missingNote?: string) => FinishPickingResult;
+  /** Trae la data de artículo más nueva de `articulos_data`/`articulos` y corrige lo que cambió. */
+  refreshArticleData: (orderId: string) => Promise<RefreshArticleDataResult>;
   markWrapped: (orderId: string) => void;
   markDispatched: (orderId: string) => void;
+  /** Cargador: marca o desmarca un bulto como subido al camión. */
+  setBundleLoaded: (orderId: string, bundleNumber: number, loaded: boolean) => void;
   reopenForRevision: (orderId: string, pickerId: string) => void;
   /** Actualización optimista de `team.picker_uids` (el listener de Firestore la confirma). */
   setTeamPickers: (orderId: string, pickerUids: string[]) => void;
@@ -345,6 +486,10 @@ interface OrdersState {
   closeBulto: (orderId: string, bultoId: string) => CloseBultoResult;
   reopenBulto: (orderId: string, bultoId: string) => void;
   deleteBulto: (orderId: string, bultoId: string) => void;
+  /** Borra varios bultos de una vez (selección múltiple del picker). */
+  deleteBultos: (orderId: string, bultoIds: string[]) => void;
+  /** Cambia el número de los bultos seleccionados: el primero pasa a `targetNumber`. */
+  moveBultos: (orderId: string, bultoIds: string[], targetNumber: number) => void;
   addBultoItem: (
     orderId: string,
     bultoId: string,
@@ -367,14 +512,23 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
   hydrateOrders: (incoming) => {
     set((s) => {
       const localMap = new Map(s.orders.map((o) => [o.id, o]));
-      return {
-        orders: incoming.map((firestoreOrder) =>
+      // Los pedidos que no cambiaron conservan su referencia (ver shareByKey):
+      // sin esto cada snapshot redibujaba todas las pantallas suscritas.
+      const orders = shareByKey(
+        s.orders,
+        incoming.map((firestoreOrder) =>
           mergeIncomingOrder(firestoreOrder, localMap.get(firestoreOrder.id)),
         ),
-        // Una lista vacía no confirma nada: puede ser una caché fría o un
-        // arranque sin red, y ahí sí hay que poder restaurar desde disco.
-        hydratedFromServer: s.hydratedFromServer || incoming.length > 0,
-      };
+        orderKey,
+      );
+      // Una lista vacía no confirma nada: puede ser una caché fría o un
+      // arranque sin red, y ahí sí hay que poder restaurar desde disco.
+      const hydratedFromServer = s.hydratedFromServer || incoming.length > 0;
+
+      // Snapshot que solo confirma lo que ya había (típico tras una escritura
+      // propia): devolver el mismo estado evita notificar a los suscriptores.
+      if (orders === s.orders && hydratedFromServer === s.hydratedFromServer) return s;
+      return { orders, hydratedFromServer };
     });
   },
 
@@ -388,7 +542,8 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
           mergeIncomingOrder(firestoreOrder, byId.get(firestoreOrder.id)),
         );
       }
-      return { orders: Array.from(byId.values()) };
+      const orders = shareByKey(s.orders, Array.from(byId.values()), orderKey);
+      return orders === s.orders ? s : { orders };
     });
   },
 
@@ -487,7 +642,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     return { ok: true };
   },
 
-  finishPicking: (orderId, pickerId) => {
+  finishPicking: (orderId, pickerId, missingNote) => {
     const order = get().getOrderById(orderId);
     if (!order) return { ok: false, error: 'empty_open_bulto_exists' };
 
@@ -503,7 +658,8 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
       firestoreFinishPicking(orderId, updatedOrder, user).catch((e) =>
         console.error('[orders.store] finishPicking Firestore error', e),
       );
-      notifyFinishPickingOutcomes(updatedOrder, user);
+      notifyFinishPickingOutcomes(updatedOrder, user, missingNote);
+      notifyOrderCompletedMail(updatedOrder, user);
 
       // Se mira el pedido ANTES del parche: `order.auditResult` sigue en
       // 'rejected' mientras la corrección no se apruebe, y eso es lo que
@@ -512,6 +668,56 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     }
 
     return { ok: true };
+  },
+
+  refreshArticleData: async (orderId) => {
+    const order = get().getOrderById(orderId);
+    if (!order) return { ok: false, error: 'order_not_found' };
+
+    try {
+      const skus = order.lines.map((l) => l.sku);
+      const articuloDataByCodigo = await fetchArticuloDataByCodigos(skus);
+      const uidArticulos = [...articuloDataByCodigo.values()].map((a) => a.uidArticulo);
+      const articulosById = await fetchArticulosByIds(uidArticulos);
+
+      const { articuloDataPatches, orderLinePatches } = computeArticleDataRefresh(
+        order.lines,
+        articuloDataByCodigo,
+        articulosById,
+      );
+
+      await Promise.all([
+        firestoreApplyArticleDataPatches(orderId, orderLinePatches),
+        ...articuloDataPatches.map((p) => updateArticuloDataDescripcion(p.docId, p.descripcion)),
+      ]);
+
+      if (orderLinePatches.length > 0) {
+        const patchByIndex = new Map(orderLinePatches.map((p) => [p.index, p]));
+        set((s) => ({
+          orders: patchOrder(s.orders, orderId, {
+            lines: order.lines.map((line, index) => {
+              const linePatch = patchByIndex.get(index);
+              if (!linePatch) return line;
+              return {
+                ...line,
+                name: linePatch.description,
+                images: linePatch.images ?? undefined,
+                unitsPerBundle: linePatch.unitsPerBundle ?? undefined,
+              };
+            }),
+          }),
+        }));
+      }
+
+      return {
+        ok: true,
+        linesUpdated: orderLinePatches.length,
+        catalogUpdated: articuloDataPatches.length,
+      };
+    } catch (e) {
+      console.error('[orders.store] refreshArticleData error', e);
+      return { ok: false, error: e instanceof Error ? e.message : 'unknown' };
+    }
   },
 
   markWrapped: (orderId) => {
@@ -536,6 +742,25 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     if (user) {
       firestoreMarkDispatched(orderId, user).catch((e) =>
         console.error('[orders.store] markDispatched Firestore error', e),
+      );
+    }
+  },
+
+  setBundleLoaded: (orderId, bundleNumber, loaded) => {
+    const order = get().getOrderById(orderId);
+    // Solo se carga lo embalado: un pedido que ya salió (o que volvió atrás en
+    // la web) no debe cambiar su registro de carga desde aquí.
+    if (!order || order.status !== 'packed') return;
+    if (order.loadedBundles.includes(bundleNumber) === loaded) return;
+
+    set((s) => ({
+      orders: patchOrder(s.orders, orderId, applySetBundleLoaded(order, bundleNumber, loaded)),
+    }));
+
+    const user = useAuthStore.getState().user;
+    if (user) {
+      firestoreSetBundleLoaded(orderId, bundleNumber, loaded, user).catch((e) =>
+        console.error('[orders.store] setBundleLoaded Firestore error', e),
       );
     }
   },
@@ -615,6 +840,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
         (e) => console.error('[orders.store] rejectAudit Firestore error', e),
       );
       notifyAuditOutcome(order, user, 'rejected', observation);
+      notifyOrderRejectedMail(order, user, observation);
     }
   },
 
@@ -634,6 +860,10 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     firestorePausePicking(orderId, user, reason, missingSkus, order.status).catch((e) =>
       console.error('[orders.store] pausePicking Firestore error', e),
     );
+
+    if (reason === 'sku_duplicado' && missingSkus.length > 0) {
+      notifyDuplicateSkusMail(order, user, missingSkus);
+    }
   },
 
   reportMissingItems: (orderId, marked, mode) => {
@@ -767,6 +997,22 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     if (!order) return;
     set((s) => ({
       orders: patchOrder(s.orders, orderId, applyDeleteBulto(order, bultoId)),
+    }));
+  },
+
+  deleteBultos: (orderId, bultoIds) => {
+    const order = get().getOrderById(orderId);
+    if (!order || bultoIds.length === 0) return;
+    set((s) => ({
+      orders: patchOrder(s.orders, orderId, applyDeleteBultos(order, bultoIds)),
+    }));
+  },
+
+  moveBultos: (orderId, bultoIds, targetNumber) => {
+    const order = get().getOrderById(orderId);
+    if (!order || bultoIds.length === 0) return;
+    set((s) => ({
+      orders: patchOrder(s.orders, orderId, applyMoveBultos(order, bultoIds, targetNumber)),
     }));
   },
 

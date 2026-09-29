@@ -21,7 +21,7 @@ export function AuthBrandFooter({ tone = 'default' }: AuthBrandFooterProps) {
       <Text
         className={
           onDark
-            ? 'text-xs font-medium text-white/40'
+            ? 'text-sm font-semibold text-white/60'
             : 'text-xs font-medium text-foreground/45 dark:text-foreground-dark/45'
         }
       >

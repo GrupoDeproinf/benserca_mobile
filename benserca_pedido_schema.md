@@ -71,6 +71,13 @@
     "audited_at": null
   },
 
+  "loading": {
+    "loaded_bundles": [],
+    "updated_at": null,
+    "updated_by_uid": null,
+    "updated_by_name": null
+  },
+
   "timeline": []
 }
 ```
@@ -115,6 +122,21 @@ aprobado sigue visible aunque lo cierre. Ambas se vacían al aprobar el pedido.
 
 > Los bultos se renumeran al eliminar uno, así que ambas listas se reajustan en
 > `applyDeleteBulto` para no quedar apuntando al bulto equivocado.
+
+## Carga al camión (`loading`)
+
+Lo escribe el rol **cargador** (`pedido_cargador`) en la app, solo sobre pedidos
+**Embalados**. Cada bulto que sube al camión se agrega a `loaded_bundles` por
+**número de bulto** (el mismo `bundle_num` de `final_skus`).
+
+| Campo | Para qué se usa |
+|---|---|
+| `loaded_bundles` | Números de bulto ya subidos al camión. Se modifica con `arrayUnion`/`arrayRemove` para que dos cargadores del mismo pedido no se pisen |
+| `updated_at`, `updated_by_*` | Última marca y quién la hizo |
+
+Con **todos** los bultos marcados el cargador despacha: el pedido pasa a
+**Despachado** (`dispatched_at` + entrada en `timeline`). El objeto no existe en
+pedidos que nunca pasaron por la carga; tratarlo como lista vacía.
 
 ### Reglas de `difference`
 
@@ -325,9 +347,9 @@ Ejemplo sustitución: pidieron 10 cascos rojos, enviaron 10 cascos azules → `s
 | En proceso | Picker armando bultos activamente |
 | Empaquetado | Picker finalizó el picking (botón "Finalizar picking") |
 | Auditado | Chequeador aprobó (obligatorio, antes del embalaje) |
-| Embalado | Picker confirmó embalaje físico (solo tras la aprobación del chequeador) |
+| Embalado | Picker confirmó embalaje físico (solo tras la aprobación del chequeador). Queda en la lista del cargador |
 | Rechazado | Chequeador rechazó, vuelve a Empaquetado |
-| Despachado | Salió en una guía |
+| Despachado | El cargador subió todos los bultos al camión y lo despachó desde la app (o salió en una guía) |
 
 ---
 

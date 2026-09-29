@@ -2,12 +2,13 @@ import type { LucideIcon } from 'lucide-react-native';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from 'react-native';
+import { LayoutAnimation, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/ui/text';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Antes se llamaba aquí a `UIManager.setLayoutAnimationEnabledExperimental`:
+// con la arquitectura nueva (`newArchEnabled=true`) es un no-op que además
+// avisa por consola en cada arranque. En Fabric `LayoutAnimation.configureNext`
+// funciona sin ese interruptor.
 
 const styles = StyleSheet.create({
   wrap: {

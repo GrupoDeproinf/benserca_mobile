@@ -3,13 +3,13 @@ import { X } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Dimensions,
   Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,8 +22,6 @@ interface SkuPreviewSheetProps {
   onClose: () => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 /**
  * Vista previa del artículo de un renglón: sus fotos y el código en grande.
  *
@@ -35,6 +33,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export function SkuPreviewSheet({ line, onClose }: SkuPreviewSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  // Se lee en cada render y no una vez al cargar el módulo: la app también se
+  // usa en horizontal, y con el ancho fijo el carrusel quedaba desfasado al
+  // girar la tablet (fotos cortadas y la paginación contando mal).
+  const { width: screenWidth } = useWindowDimensions();
   const [page, setPage] = useState(0);
 
   const images = line?.images ?? [];
@@ -47,7 +49,7 @@ export function SkuPreviewSheet({ line, onClose }: SkuPreviewSheetProps) {
   };
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const next = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
     setPage(next);
   };
 
@@ -80,13 +82,13 @@ export function SkuPreviewSheet({ line, onClose }: SkuPreviewSheetProps) {
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onMomentumScrollEnd={onScroll}
-                style={styles.carousel}
+                style={[styles.carousel, { width: screenWidth }]}
               >
                 {images.map((uri) => (
-                  <View key={uri} style={styles.slide}>
+                  <View key={uri} style={[styles.slide, { width: screenWidth }]}>
                     <Image
                       source={{ uri }}
-                      style={styles.image}
+                      style={[styles.image, { width: screenWidth - 64 }]}
                       contentFit="contain"
                       transition={150}
                     />
@@ -144,17 +146,14 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   carousel: {
-    width: SCREEN_WIDTH,
     height: 260,
   },
   slide: {
-    width: SCREEN_WIDTH,
     height: 260,
     alignItems: 'center',
     justifyContent: 'center',
   },
   image: {
-    width: SCREEN_WIDTH - 64,
     height: 240,
   },
   dots: {

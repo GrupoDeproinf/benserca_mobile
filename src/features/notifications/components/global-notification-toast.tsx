@@ -38,13 +38,24 @@ export function GlobalNotificationToast() {
   const handleNotificationPress = useNotificationPress();
 
   const progress = useSharedValue(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * El temporizador que desmonta el banner al terminar la animación de salida.
+   * Se guarda en una ref (antes era un `setTimeout` suelto) porque si llegaba
+   * otra notificación dentro de esos milisegundos, el timer viejo la borraba
+   * del banner apenas aparecía.
+   */
+  const exitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [displayed, setDisplayed] = useState(incoming);
 
   const dismiss = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
+    autoDismissRef.current = null;
     progress.value = withTiming(0, { duration: EXIT_MS, easing: Easing.in(Easing.cubic) });
-    setTimeout(() => {
+
+    if (exitRef.current) clearTimeout(exitRef.current);
+    exitRef.current = setTimeout(() => {
+      exitRef.current = null;
       setDisplayed(null);
       clearIncomingToast();
     }, EXIT_MS);
@@ -53,31 +64,54 @@ export function GlobalNotificationToast() {
   useEffect(() => {
     if (!incoming) return;
 
+    // Una notificación nueva cancela la salida de la anterior; si no, su timer
+    // se dispara después y deja el banner en blanco.
+    if (exitRef.current) {
+      clearTimeout(exitRef.current);
+      exitRef.current = null;
+    }
+
     setDisplayed(incoming);
     progress.value = 0;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     progress.value = withTiming(1, { duration: ENTER_MS, easing: Easing.out(Easing.cubic) });
 
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(dismiss, AUTO_DISMISS_MS);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
+    if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
+    autoDismissRef.current = setTimeout(dismiss, AUTO_DISMISS_MS);
   }, [incoming, progress, dismiss]);
+
+  // Al desmontar (cierre de sesión, recarga) no debe quedar ningún timer vivo
+  // llamando a `setState` sobre un componente que ya no existe.
+  useEffect(
+    () => () => {
+      if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
+      if (exitRef.current) clearTimeout(exitRef.current);
+    },
+    [],
+  );
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ translateY: (1 - progress.value) * -OFFSET_Y }],
   }));
 
-  if (!displayed) return null;
-
-  const meta = NOTIFICATION_TYPE_META[displayed.type];
+  const meta = displayed ? NOTIFICATION_TYPE_META[displayed.type] : undefined;
   const Icon = meta?.icon;
 
+  /**
+   * El `Modal` se controla con `visible` en vez de montarse y desmontarse: en
+   * Android cada montaje crea un `Dialog` nativo nuevo sobre la pantalla (o
+   * sobre otra hoja abierta), y hacerlo con cada notificación que entra es el
+   * camino corto a que se rompa.
+   */
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={dismiss}>
+    <Modal
+      visible={displayed !== null}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={dismiss}
+    >
       <View style={[styles.wrap, { top: insets.top + 8 }]} pointerEvents="box-none">
         <Animated.View style={[styles.card, animatedStyle]}>
           <Pressable
@@ -95,10 +129,10 @@ export function GlobalNotificationToast() {
             ) : null}
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.title} numberOfLines={1}>
-                {displayed.title}
+                {displayed?.title ?? ''}
               </Text>
               <Text style={styles.body} numberOfLines={2}>
-                {displayed.body}
+                {displayed?.body ?? ''}
               </Text>
             </View>
           </Pressable>

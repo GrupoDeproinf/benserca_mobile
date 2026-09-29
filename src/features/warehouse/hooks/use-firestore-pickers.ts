@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { firestore } from '@/services/firebase';
+import { createIncrementalMapper } from '@/services/firebase/incremental-snapshot';
 import { usePickersStore } from '../store/pickers.store';
 import type { PickerEstado, PickerStatus } from '../types';
 
@@ -60,14 +61,19 @@ export function useFirestorePickers() {
   const setPickers = usePickersStore((s) => s.setPickers);
 
   useEffect(() => {
+    // Solo se re-mapean los docs que cambiaron: `docToPicker` rellena
+    // `updatedAt` con la hora actual si falta, y re-mapear todo en cada
+    // snapshot hacía que cada picker pareciera distinto siempre.
+    const mapPickers = createIncrementalMapper((id, data) =>
+      hasPickerRole(data) ? docToPicker(id, data) : null,
+    );
+
     const unsub = firestore()
       .collection('u_pickers')
       .where('is_active', '==', true)
       .onSnapshot(
         (snapshot) => {
-          const pickers = snapshot.docs
-            .filter((doc) => hasPickerRole(doc.data()))
-            .map((doc) => docToPicker(doc.id, doc.data()));
+          const pickers = mapPickers(snapshot).filter((p): p is PickerEstado => p !== null);
           setPickers(pickers);
         },
         (err) => {

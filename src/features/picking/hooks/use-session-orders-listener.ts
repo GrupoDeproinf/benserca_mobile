@@ -10,7 +10,9 @@ import {
 } from '@/features/notifications/utils/order-notifications';
 import { useSyncStore } from '@/features/sync/store/sync.store';
 import { firestore } from '@/services/firebase';
+import { createIncrementalMapper } from '@/services/firebase/incremental-snapshot';
 import { firestoreDocToOrder } from '../services/orders.mapper';
+import { STATUS_TO_FIRESTORE } from '../services/orders.service';
 import type { Order } from '../types';
 import { useOrdersStore } from '../store/orders.store';
 
@@ -20,7 +22,11 @@ import { useOrdersStore } from '../store/orders.store';
  *   - picker         → sus pedidos individuales (assigned_to.uid) MÁS los
  *                       pedidos de equipo donde forma parte (team.picker_uids,
  *                       ver lead-assign-pickers / teams.store).
- *   - warehouse_lead → pedidos de su equipo (team.chief_uid)
+ *   - warehouse_lead → pedidos de su equipo (team.chief_uid) MÁS los que
+ *                       tiene asignados como picker (assigned_to.uid).
+ *   - pedido_cargador → todos los pedidos Embalados del almacén (listos para
+ *                       subir al camión). Es una cola acotada: al despachar,
+ *                       el pedido sale de la query.
  *
  * El auditor NO usa este listener: con muchos chequeadores conectados, un
  * onSnapshot sobre toda la cola "Empaquetado" resulta caro. En su lugar usa
@@ -72,86 +78,75 @@ export function useSessionOrdersListener() {
       prevSnapshotRef.current = toSnapshotMap(mapped);
     };
 
-    if (user.role === 'picker') {
-      // Firestore no permite consultar por OR entre dos campos distintos, así
-      // que se combinan dos listeners (asignación individual + equipo) y se
-      // deduplica por id antes de hidratar el store.
-      const bySelf = new Map<string, Order>();
-      const byTeam = new Map<string, Order>();
-
-      const emitMerged = () => {
-        const merged = new Map<string, Order>([...bySelf, ...byTeam]);
-        emit([...merged.values()]);
-      };
-
-      const unsubSelf = col.where('assigned_to.uid', '==', user.uid).onSnapshot(
-        { includeMetadataChanges: true },
-        (snapshot) => {
-          trackSyncStatus(snapshot);
-          if (isMetadataOnly(snapshot)) return;
-          bySelf.clear();
-          for (const doc of snapshot.docs) {
-            bySelf.set(doc.id, firestoreDocToOrder(doc.id, doc.data()));
-          }
-          emitMerged();
-        },
-        (err) => console.error('[useSessionOrdersListener] picker self', err),
-      );
-
-      const unsubTeam = col
-        .where('team.picker_uids', 'array-contains', user.uid)
-        .onSnapshot(
-          { includeMetadataChanges: true },
-          (snapshot) => {
-            trackSyncStatus(snapshot);
-            if (isMetadataOnly(snapshot)) return;
-            byTeam.clear();
-            for (const doc of snapshot.docs) {
-              byTeam.set(doc.id, firestoreDocToOrder(doc.id, doc.data()));
-            }
-            emitMerged();
-          },
-          (err) => console.error('[useSessionOrdersListener] picker team', err),
-        );
-
-      return () => {
-        unsubSelf();
-        unsubTeam();
-      };
-    }
-
-    const buildQuery = () => {
+    // Firestore no permite consultar por OR entre dos campos distintos, así que
+    // los roles con dos criterios abren un listener por criterio y se deduplica
+    // por id antes de hidratar el store.
+    const buildQueries = (): FirebaseFirestoreTypes.Query[] => {
       switch (user.role) {
+        case 'picker':
+          // Asignación individual + pedidos de equipo.
+          return [
+            col.where('assigned_to.uid', '==', user.uid),
+            col.where('team.picker_uids', 'array-contains', user.uid),
+          ];
         case 'warehouse_lead':
-          return col.where('team.chief_uid', '==', user.uid);
+          // Además de los pedidos de su equipo, los que tiene a su nombre como
+          // picker: si a un picker lo pasan a jefe con pedidos ya asignados,
+          // esos pedidos conservan el `team.chief_uid` del jefe anterior y sin
+          // este listener desaparecerían de su lista.
+          return [
+            col.where('team.chief_uid', '==', user.uid),
+            col.where('assigned_to.uid', '==', user.uid),
+          ];
         case 'supervisor_almacen':
           // Visualizador: ve TODOS los pedidos del almacén, sin filtro.
-          return col;
+          return [col];
+        case 'pedido_cargador':
+          // En tiempo real (a diferencia del chequeador): mientras se carga el
+          // camión se embalan pedidos nuevos, y si hay dos cargadores cada uno
+          // debe ver los bultos que va marcando el otro.
+          return [col.where('status', '==', STATUS_TO_FIRESTORE.packed)];
         default:
-          return null;
+          return [];
       }
     };
 
-    const query = buildQuery();
-    if (!query) return;
+    const queries = buildQueries();
+    if (queries.length === 0) return;
+
+    const results: Map<string, Order>[] = [];
+
+    const emitMerged = () => {
+      const merged = new Map<string, Order>();
+      for (const result of results) {
+        for (const [id, order] of result) merged.set(id, order);
+      }
+      emit([...merged.values()]);
+    };
 
     // `includeMetadataChanges` habilita el estado de sincronización: Firestore
     // avisa si el snapshot vino de caché (sin servidor) y si quedan escrituras
     // sin confirmar. Ver sync.store.
-    const unsub = query.onSnapshot(
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        trackSyncStatus(snapshot);
-        if (isMetadataOnly(snapshot)) return;
+    const unsubs = queries.map((query, index) => {
+      const result = new Map<string, Order>();
+      results.push(result);
+      const mapOrders = createIncrementalMapper(firestoreDocToOrder);
 
-        const mapped = snapshot.docs.map((doc) => firestoreDocToOrder(doc.id, doc.data()));
-        emit(mapped);
-      },
-      (err) => {
-        console.error('[useSessionOrdersListener]', err);
-      },
-    );
+      return query.onSnapshot(
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          trackSyncStatus(snapshot);
+          if (isMetadataOnly(snapshot)) return;
+          result.clear();
+          for (const order of mapOrders(snapshot)) result.set(order.id, order);
+          emitMerged();
+        },
+        (err) => console.error(`[useSessionOrdersListener] ${user.role} #${index}`, err),
+      );
+    });
 
-    return unsub;
+    return () => {
+      for (const unsub of unsubs) unsub();
+    };
   }, [user?.uid, user?.role, hydrateOrders, t]);
 }

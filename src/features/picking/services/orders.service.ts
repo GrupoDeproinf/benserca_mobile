@@ -12,7 +12,7 @@ import type {
 const ORDERS = 'lo_orders';
 
 /** Mapa inverso de `mapStatus` (orders.mapper): OrderStatus interno → string Firestore. */
-const STATUS_TO_FIRESTORE: Record<OrderStatus, string> = {
+export const STATUS_TO_FIRESTORE: Record<OrderStatus, string> = {
   new: 'Nuevo',
   assigned: 'Asignado',
   in_progress: 'En proceso',
@@ -156,6 +156,32 @@ export async function firestoreMarkDispatched(orderId: string, user: SessionUser
       dispatched_at: now(),
       updated_at: now(),
       timeline: firestore.FieldValue.arrayUnion(timelineEntry('Despachado', user)),
+    });
+}
+
+/**
+ * Marca o desmarca un bulto como subido al camión (rol cargador). Va con
+ * `arrayUnion`/`arrayRemove` y no reescribiendo la lista: dos cargadores
+ * pueden estar subiendo bultos del mismo pedido a la vez, y así ninguno pisa
+ * lo que marcó el otro.
+ */
+export async function firestoreSetBundleLoaded(
+  orderId: string,
+  bundleNumber: number,
+  loaded: boolean,
+  user: SessionUser,
+): Promise<void> {
+  await firestore()
+    .collection(ORDERS)
+    .doc(orderId)
+    .update({
+      'loading.loaded_bundles': loaded
+        ? firestore.FieldValue.arrayUnion(bundleNumber)
+        : firestore.FieldValue.arrayRemove(bundleNumber),
+      'loading.updated_at': now(),
+      'loading.updated_by_uid': user.uid,
+      'loading.updated_by_name': user.name,
+      updated_at: now(),
     });
 }
 
@@ -388,6 +414,58 @@ export async function firestoreResumePicking(
     });
   // Al reanudar, el picker vuelve a estar ocupado con este pedido.
   await updatePickerAvailability(user.uid, false, orderId);
+}
+
+export interface OriginalSkuArticleDataPatch {
+  /** Posición del renglón en `original_skus`. */
+  index: number;
+  description: string;
+  images: string[] | null;
+  unitsPerBundle: number | null;
+}
+
+/**
+ * Corrige `description`/`image`/`units_per_bundle` de renglones puntuales de
+ * `original_skus` con la data más nueva de `articulos_data`/`articulos`.
+ *
+ * Nunca toca `sku` ni el resto de campos: `OrderLine.id` sale de `sku` + índice
+ * (ver `order-snapshot.ts`) y los ítems de bulto apuntan a ese `lineId` — tocar
+ * el SKU huerfanaría lo ya armado (ver `order_missing_items.md` §8).
+ *
+ * Firestore no permite actualizar un solo elemento de un array de mapas: hay
+ * que leer el doc crudo, mutar en memoria y reescribir el array completo.
+ */
+export async function firestoreApplyArticleDataPatches(
+  orderId: string,
+  patches: OriginalSkuArticleDataPatch[],
+): Promise<void> {
+  if (patches.length === 0) return;
+
+  const docRef = firestore().collection(ORDERS).doc(orderId);
+  const snap = await docRef.get();
+  const data = snap.data();
+  if (!data) return;
+
+  // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
+  const originalSkus: Record<string, any>[] = Array.isArray(data.original_skus)
+    ? [...data.original_skus]
+    : [];
+
+  for (const patch of patches) {
+    const line = originalSkus[patch.index];
+    if (!line) continue;
+    originalSkus[patch.index] = {
+      ...line,
+      description: patch.description,
+      image: patch.images,
+      units_per_bundle: patch.unitsPerBundle,
+    };
+  }
+
+  await docRef.update({
+    original_skus: originalSkus,
+    updated_at: now(),
+  });
 }
 
 export async function firestoreApproveAudit(orderId: string, user: SessionUser): Promise<void> {

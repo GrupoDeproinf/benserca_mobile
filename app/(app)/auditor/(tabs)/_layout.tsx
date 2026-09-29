@@ -27,6 +27,9 @@ export default function AuditorTabsLayout() {
         screenOptions={{
           headerShown: false,
           animation: 'none',
+          // Las pestañas ocultas no se re-renderizan hasta volver a ellas: una
+          // vez visitadas quedan montadas y suscritas a los stores.
+          freezeOnBlur: true,
           tabBarActiveTintColor: TAB_BAR_COLORS.active,
           tabBarInactiveTintColor: TAB_BAR_COLORS.inactive,
           tabBarActiveBackgroundColor: 'transparent',

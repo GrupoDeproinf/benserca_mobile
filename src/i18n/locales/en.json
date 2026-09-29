@@ -21,7 +21,8 @@
     "picker": "Picker",
     "warehouse_lead": "Warehouse lead",
     "auditor": "Checker",
-    "supervisor_almacen": "Warehouse supervisor"
+    "supervisor_almacen": "Warehouse supervisor",
+    "pedido_cargador": "Loader"
   },
   "orderStatus": {
     "new": "New",
@@ -31,6 +32,7 @@
     "packed": "Packed",
     "rejectedReview": "Rejected - Review",
     "audited": "Audited",
+    "corrected": "Corrected",
     "approved": "Approved",
     "paused": "Paused",
     "dispatched": "Dispatched",
@@ -110,7 +112,11 @@
       "tallaMeta": "Size: {{talla}}",
       "skus": "SKUs",
       "extraBultosFlag": "Extra packages",
-      "duplicateSkuTag": "Duplicate"
+      "duplicateSkuTag": "Duplicate",
+      "refreshArticles": "Refresh article data",
+      "refreshSuccess": "{{count}} item(s) updated",
+      "refreshNoChanges": "Items were already up to date",
+      "refreshError": "Couldn't refresh. Try again."
     },
     "check": {
       "waitingTitle": "Under review",
@@ -124,7 +130,22 @@
       "empty": "No items added",
       "addItem": "Add item",
       "close": "Close package",
-      "reopen": "Reopen"
+      "reopen": "Reopen",
+      "deleteBulto": "Delete package",
+      "select": "Select",
+      "selectAll": "Select all",
+      "deleteSelected": "Delete ({{count}})",
+      "deleteSelectedTitle": "Delete {{count}} package(s)?",
+      "deleteSelectedBody": "The selected packages will be deleted and the remaining ones renumbered.",
+      "deleteSelectedBodyWithItems": "Items in the selected packages will go back to pending and the remaining packages will be renumbered.",
+      "deleteSelectedConfirm": "Delete {{count}}",
+      "numberPrefix": "Package",
+      "renumberInputLabel": "New package number",
+      "renumberHint": "Tap the number of a selected package to change it.",
+      "renumberDone": "Package {{from}} is now Package {{to}}",
+      "deleteBultoConfirmTitle": "Delete package {{number}}?",
+      "deleteBultoConfirmBody": "The package will be deleted and the remaining ones renumbered.",
+      "deleteBultoConfirmBodyWithItems": "Items in this package will go back to pending and the remaining packages will be renumbered."
     },
     "addItem": {
       "title": "Add item to Bulto {{number}}",
@@ -155,7 +176,13 @@
       "noBultosBody": "You can't finish picking without building at least one package.",
       "confirmTitle": "Finish picking",
       "confirmBody": "Final state will be calculated. The order will move to 'To pack'.",
-      "confirm": "Finish"
+      "confirm": "Finish",
+      "missingTitle": "Finish with missing items",
+      "missingBody": "There are unassigned quantities:",
+      "missingLine": "{{qty}} units of {{name}}",
+      "missingConfirm": "Finish anyway",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Write why you're closing the order with missing items"
     },
     "pack": {
       "confirmTitle": "Mark as packed",
@@ -425,6 +452,48 @@
       "continue": "Continue picking"
     }
   },
+  "loading": {
+    "screen": {
+      "title": "Truck loading",
+      "subtitle": "Wrapped orders ready to load onto the truck",
+      "ordersCount": "orders",
+      "searchPlaceholder": "Search order or client...",
+      "emptyTitle": "No orders to load",
+      "emptySubtitle": "Wrapped orders will appear here."
+    },
+    "card": {
+      "client": "Client",
+      "bultos": "Packages",
+      "loaded": "Loaded",
+      "progress": "Loading",
+      "readyBadge": "READY"
+    },
+    "detail": {
+      "notFound": "Order not found.",
+      "bultos": "Packages",
+      "loaded": "Loaded",
+      "progress": "Loading",
+      "linesTitle": "Order detail",
+      "bultosTitle": "Packages to load onto the truck",
+      "bultoTitle": "Package {{number}}",
+      "itemCount": "{{count}} item(s) · {{units}} unit(s)",
+      "loadedTag": "On the truck",
+      "pendingTag": "To load",
+      "markLoaded": "Mark package {{number}} as loaded",
+      "unmarkLoaded": "Unmark package {{number}}",
+      "noBultos": "This order has no packages recorded.",
+      "dispatch": "Dispatch order",
+      "dispatchConfirmTitle": "Dispatch order?",
+      "dispatchConfirmBody": "All {{count}} packages are on the truck. The order will move to Dispatched and leave your list.",
+      "dispatchConfirm": "Dispatch",
+      "pendingTitle": "Packages still to load",
+      "pendingBody": "Mark every package as loaded before dispatching. Missing: {{bultos}}.",
+      "noBultosTitle": "No packages recorded",
+      "noBultosBody": "An order without packages can't be dispatched. Check it on the web.",
+      "pausedTitle": "Order paused",
+      "pausedBody": "A paused order can't be dispatched."
+    }
+  },
   "audit": {
     "screen": {
       "subtitle": "Packed orders ready for review",
@@ -487,7 +556,24 @@
       "reviewRejected": "Rejected",
       "pendingReview": "Pending",
       "picked": "Picked",
-      "required": "Req."
+      "required": "Req.",
+      "select": "Select package {{number}}",
+      "itemsChecked": "{{checked}}/{{total}} correct",
+      "checkItemsHint": "Check the items that are correct. It can only be approved with all checked; when rejecting, unchecked items are flagged as the problem.",
+      "checkItem": "Mark {{name}} as correct"
+    },
+    "group": {
+      "bultoCount": "{{count}} package(s)",
+      "unitsEach": "×{{qty}} each",
+      "approvedCount": "{{count}} approved",
+      "rejectedCount": "{{count}} rejected",
+      "pendingCount": "{{count}} pending",
+      "selectedCount": "{{count}} selected",
+      "selectAll": "Select all packages of {{name}}"
+    },
+    "bulk": {
+      "approve": "Approve ({{count}})",
+      "reject": "Reject ({{count}})"
     },
     "approve": {
       "btn": "Approve",
@@ -504,7 +590,8 @@
       "placeholder": "E.g. Missing 5 units of SKU X in package 2...",
       "required": "Observation is required.",
       "confirm": "Reject order",
-      "bultoLine": "Package {{number}}: review contents."
+      "bultoLine": "Package {{number}}: review contents.",
+      "bultoLineItems": "Package {{number}}: review {{items}}."
     },
     "paused": {
       "title": "Paused orders",
@@ -654,5 +741,10 @@
     "offlineWithPending": "Offline — there are changes pending to send",
     "pending": "Sending changes…",
     "catalogReady": "Catalog ready to work offline"
+  },
+  "errorScreen": {
+    "title": "Something went wrong",
+    "body": "The screen closed because of an unexpected error. You can retry without signing out.",
+    "retry": "Retry"
   }
 }

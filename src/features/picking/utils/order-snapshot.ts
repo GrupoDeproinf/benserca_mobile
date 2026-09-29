@@ -41,6 +41,22 @@ export function makeLineId(sku: string, index: number): string {
   return `${sku}#${index}`;
 }
 
+/**
+ * Lo metido en bultos para CADA renglón, en una sola pasada. Para recorrer todos
+ * los renglones usar esto y no `getAssignedQtyForLine` dentro de un bucle: eso
+ * es O(renglones × ítems), y con pedidos de 250 renglones se pagaba en cada
+ * toque del stepper.
+ */
+export function getAssignedQtyByLine(bultos: Bulto[]): Map<string, number> {
+  const byLine = new Map<string, number>();
+  for (const bulto of bultos) {
+    for (const item of bulto.items) {
+      byLine.set(item.lineId, (byLine.get(item.lineId) ?? 0) + item.qty);
+    }
+  }
+  return byLine;
+}
+
 /** Cuánto se ha metido en bultos para un RENGLÓN concreto. */
 export function getAssignedQtyForLine(order: Order, lineId: string): number {
   return order.bultos.reduce((sum, bulto) => {
@@ -146,9 +162,10 @@ export interface MissingLineQty {
  */
 export function getMissingQuantities(order: Order): MissingLineQty[] {
   const rows: MissingLineQty[] = [];
+  const assignedByLine = getAssignedQtyByLine(order.bultos);
 
   for (const line of order.lines) {
-    const packed = getAssignedQtyForLine(order, line.id);
+    const packed = assignedByLine.get(line.id) ?? 0;
     const missing = line.requiredQty - packed;
     if (missing > 0) {
       rows.push({

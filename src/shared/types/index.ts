@@ -1,5 +1,11 @@
 // ───────── Roles & sesión ─────────
-export type UserRole = 'picker' | 'warehouse_lead' | 'auditor' | 'supervisor_almacen';
+export type UserRole =
+  | 'picker'
+  | 'warehouse_lead'
+  | 'auditor'
+  | 'supervisor_almacen'
+  /** Sube al camión los bultos de los pedidos embalados y los despacha. */
+  | 'pedido_cargador';
 
 export interface SessionUser {
   uid: string;

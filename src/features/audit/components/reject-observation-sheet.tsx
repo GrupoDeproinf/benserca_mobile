@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAndroidKeyboardHeight } from '@/shared/hooks/use-android-keyboard-height';
 
 interface RejectObservationSheetProps {
   visible: boolean;
@@ -29,6 +30,7 @@ export function RejectObservationSheet({
 }: RejectObservationSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useAndroidKeyboardHeight();
   const [text, setText] = useState('');
   const [error, setError] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -67,8 +69,9 @@ export function RejectObservationSheet({
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
-        style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.root, { paddingBottom: keyboardHeight }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios'}
       >
         <Pressable style={styles.backdrop} onPress={handleClose} accessibilityRole="button" />
 

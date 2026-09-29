@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAndroidKeyboardHeight } from '@/shared/hooks/use-android-keyboard-height';
 import type { MissingItemsMode, PauseReason } from '../types';
 import type { MissingLineQty } from '../utils/order-snapshot';
 
@@ -92,6 +93,7 @@ export function PausePickingSheet({
 }: PausePickingSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useAndroidKeyboardHeight();
 
   const [selectOpen, setSelectOpen] = useState(false);
   const [reason, setReason] = useState<PauseReason | null>(null);
@@ -192,7 +194,7 @@ export function PausePickingSheet({
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
-        style={styles.root}
+        style={[styles.root, { paddingBottom: keyboardHeight }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         enabled={Platform.OS === 'ios'}
       >

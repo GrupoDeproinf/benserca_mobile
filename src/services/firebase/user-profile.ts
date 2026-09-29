@@ -18,6 +18,7 @@ const VALID_ROLES: ReadonlySet<UserRole> = new Set([
   'warehouse_lead',
   'auditor',
   'supervisor_almacen',
+  'pedido_cargador',
 ]);
 
 const ROLE_ALIASES: Record<string, UserRole> = {
@@ -30,12 +31,15 @@ const ROLE_ALIASES: Record<string, UserRole> = {
   supervisor: 'supervisor_almacen',
   supervisor_almacen: 'supervisor_almacen',
   almacen: 'supervisor_almacen',
+  pedido_cargador: 'pedido_cargador',
+  cargador: 'pedido_cargador',
 };
 
 const ROLE_PRIORITY: readonly UserRole[] = [
   'warehouse_lead',
   'supervisor_almacen',
   'auditor',
+  'pedido_cargador',
   'picker',
 ];
 

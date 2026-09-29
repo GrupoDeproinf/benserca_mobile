@@ -29,6 +29,10 @@ export default function PickerTabsLayout() {
         screenOptions={{
           headerShown: false,
           animation: 'none',
+          // Las pestañas ocultas no se re-renderizan hasta volver a ellas. Con
+          // `lazy: false` todas quedan montadas y suscritas al store de pedidos:
+          // sin esto cada ítem armado redibujaba también las que no se ven.
+          freezeOnBlur: true,
           lazy: false,
           tabBarActiveTintColor: TAB_BAR_COLORS.active,
           tabBarInactiveTintColor: TAB_BAR_COLORS.inactive,

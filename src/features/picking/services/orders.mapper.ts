@@ -141,7 +141,7 @@ function readUnitsPerBundle(value: any): number | undefined {
  * también un string suelto por si alguna importación vieja lo mandó así.
  */
 // biome-ignore lint/suspicious/noExplicitAny: Firestore data is untyped
-function readImages(value: any): string[] | undefined {
+export function readImages(value: any): string[] | undefined {
   const raw = Array.isArray(value) ? value : value != null ? [value] : [];
   const urls = raw.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
   return urls.length > 0 ? urls : undefined;
@@ -238,8 +238,10 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
 
   return {
     id,
-    orderNumber: data.order_number ?? id,
-    client: data.client_name ?? '',
+    // Firestore puede traer `order_number` como número (importaciones); la UI
+    // lo trata como texto (búsqueda con `toLowerCase`), así que se normaliza.
+    orderNumber: String(data.order_number ?? id),
+    client: String(data.client_name ?? ''),
     status,
 
     definedBultos: data.bundles_defined ?? 0,
@@ -265,6 +267,7 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
     auditedByName: data.audit?.audited_by_name ?? null,
     rejectedBundles: readBundleNumbers(data.audit?.rejected_bundles),
     approvedBundles: readBundleNumbers(data.audit?.approved_bundles),
+    loadedBundles: readBundleNumbers(data.loading?.loaded_bundles),
 
     isPaused,
     pauseInfo: isPaused ? derivePauseInfo(timeline) : null,

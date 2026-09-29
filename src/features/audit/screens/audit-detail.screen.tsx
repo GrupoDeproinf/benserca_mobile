@@ -4,6 +4,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ClipboardList,
+  Eye,
   GitCompare,
   MessageSquareWarning,
   Package,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import { OrderActionButton } from '@/features/picking/components/order-action-button';
@@ -27,8 +28,10 @@ import {
   OrderDetailSection,
 } from '@/features/picking/components/order-detail-section';
 import { OrderDetailBodyFade } from '@/features/picking/components/order-detail-transition';
+import { SkuPreviewSheet } from '@/features/picking/components/sku-preview-sheet';
 import { useFirestoreOrder } from '@/features/picking/hooks/use-firestore-order';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
+import type { Bulto, OrderLine } from '@/features/picking/types';
 import {
   pauseBannerBodyKey,
   wasCorrectedAfterRejection,
@@ -39,15 +42,19 @@ import { ConfirmSheet } from '@/shared/components/ui/confirm-sheet';
 import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import { Text } from '@/shared/components/ui/text';
 import { AuditBultoAccordion, type BultoAuditStatus } from '../components/audit-bulto-accordion';
+import { AuditBultoGroup } from '../components/audit-bulto-group';
 import { AuditComparisonCard } from '../components/audit-comparison-card';
 import { RejectObservationSheet } from '../components/reject-observation-sheet';
 import { buildAuditComparison, hasComparisonIssues } from '../utils/audit-comparison';
+import { buildAuditBultoEntries } from '../utils/bulto-groups';
 
 interface AuditDetailScreenProps {
   orderId: string;
 }
 
 const SCREEN_BG = '#F2F2F7';
+const NO_LINES: OrderLine[] = [];
+const NO_BULTOS: Bulto[] = [];
 
 function formatPackedAt(iso: string | null): string {
   if (!iso) return '—';
@@ -74,17 +81,47 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [rejectSheetVisible, setRejectSheetVisible] = useState(false);
   const [bultoReviews, setBultoReviews] = useState<Record<string, BultoAuditStatus>>({});
+  /** Bultos de un solo artículo tildados para aprobar/rechazar en bloque. */
+  const [selectedBultoIds, setSelectedBultoIds] = useState<ReadonlySet<string>>(() => new Set());
+  /** Bulto mixto → ítems que el chequeador marcó como correctos. */
+  const [checkedItems, setCheckedItems] = useState<Record<string, string[]>>({});
+  const [previewLine, setPreviewLine] = useState<OrderLine | null>(null);
 
   const pickerName = useMemo(
     () => resolvePickerName(pickers, order?.assignedPickerId),
     [order?.assignedPickerId, pickers],
   );
 
-  const originalLines = order?.snapshotOriginal ?? order?.lines ?? [];
+  const originalLines = order?.snapshotOriginal ?? order?.lines ?? NO_LINES;
+  const bultos = order?.bultos ?? NO_BULTOS;
+  // Las dependencias deben ser exactamente lo que lee el memo: con
+  // `order?.x` en la lista y `order.x` en el cuerpo, React Compiler no podía
+  // preservarlo y dejaba TODA la pantalla sin optimizar.
+  const snapshotOriginal = order?.snapshotOriginal;
   const comparisonRows = useMemo(() => {
-    if (!order?.snapshotOriginal?.length) return [];
-    return buildAuditComparison(order.snapshotOriginal, order.bultos);
-  }, [order?.snapshotOriginal, order?.bultos]);
+    if (!snapshotOriginal?.length) return [];
+    return buildAuditComparison(snapshotOriginal, bultos);
+  }, [snapshotOriginal, bultos]);
+
+  /** Renglones armados sin equivalente en el pedido no tienen foto que mostrar. */
+  const handlePreviewLineId = useCallback(
+    (lineId: string) => {
+      const line = originalLines.find((l) => l.id === lineId);
+      if (line) setPreviewLine(line);
+    },
+    [originalLines],
+  );
+
+  const bultoEntries = useMemo(() => buildAuditBultoEntries(bultos), [bultos]);
+  const mixedBultoIds = useMemo(
+    () =>
+      new Set(
+        bultoEntries.flatMap((entry) =>
+          entry.kind === 'bulto' && entry.mixed ? [entry.bulto.id] : [],
+        ),
+      ),
+    [bultoEntries],
+  );
 
   const allReviewed = order ? order.bultos.every((b) => bultoReviews[b.id]) : false;
   const allApproved = order ? order.bultos.every((b) => bultoReviews[b.id] === 'approved') : false;
@@ -93,13 +130,87 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
     if (!order) return '';
     const rejected = order.bultos.filter((b) => bultoReviews[b.id] === 'rejected');
     if (rejected.length === 0) return '';
-    return rejected.map((b) => t('audit.reject.bultoLine', { number: b.number })).join('\n');
-  }, [order, bultoReviews, t]);
+    return rejected
+      .map((b) => {
+        // En un mixto, lo que el chequeador no tildó es lo que está mal.
+        const checked = checkedItems[b.id] ?? [];
+        const wrong = mixedBultoIds.has(b.id)
+          ? b.items.filter((item) => !checked.includes(item.id))
+          : [];
+        if (wrong.length === 0) return t('audit.reject.bultoLine', { number: b.number });
+        const items = wrong.map((item) => `${item.name} (${item.sku}) ×${item.qty}`).join('; ');
+        return t('audit.reject.bultoLineItems', { number: b.number, items });
+      })
+      .join('\n');
+  }, [order, bultoReviews, checkedItems, mixedBultoIds, t]);
 
   const setBultoReview = useCallback((bultoId: string, status: BultoAuditStatus) => {
     Haptics.selectionAsync();
     setBultoReviews((prev) => ({ ...prev, [bultoId]: status }));
+    // Decidirlo a mano lo saca de la selección en bloque.
+    setSelectedBultoIds((prev) => {
+      if (!prev.has(bultoId)) return prev;
+      const next = new Set(prev);
+      next.delete(bultoId);
+      return next;
+    });
   }, []);
+
+  const approveBulto = useCallback(
+    (bultoId: string) => setBultoReview(bultoId, 'approved'),
+    [setBultoReview],
+  );
+  const rejectBulto = useCallback(
+    (bultoId: string) => setBultoReview(bultoId, 'rejected'),
+    [setBultoReview],
+  );
+
+  const toggleSelectBulto = useCallback((bultoId: string) => {
+    setSelectedBultoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(bultoId)) next.delete(bultoId);
+      else next.add(bultoId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectMany = useCallback((bultoIds: string[]) => {
+    setSelectedBultoIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = bultoIds.every((id) => prev.has(id));
+      for (const id of bultoIds) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const setItemChecked = useCallback((bultoId: string, itemId: string, checked: boolean) => {
+    setCheckedItems((prev) => {
+      const current = prev[bultoId] ?? [];
+      const next = checked
+        ? [...current.filter((id) => id !== itemId), itemId]
+        : current.filter((id) => id !== itemId);
+      return { ...prev, [bultoId]: next };
+    });
+    // Un aprobado exige todo tildado: destildar algo lo devuelve a pendiente.
+    if (!checked) {
+      setBultoReviews((prev) =>
+        prev[bultoId] === 'approved' ? { ...prev, [bultoId]: null } : prev,
+      );
+    }
+  }, []);
+
+  const applyToSelected = (status: Exclude<BultoAuditStatus, null>) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setBultoReviews((prev) => {
+      const next = { ...prev };
+      for (const id of selectedBultoIds) next[id] = status;
+      return next;
+    });
+    setSelectedBultoIds(new Set());
+  };
 
   /**
    * Re-revisión: el pedido vuelve a la cola tras un rechazo previo. Los bultos
@@ -125,19 +236,33 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
     if (!order || seededOrderRef.current === auditSignature) return;
     seededOrderRef.current = auditSignature;
 
+    setSelectedBultoIds(new Set());
+
     if (!isReReview) {
       setBultoReviews({});
+      setCheckedItems({});
       return;
     }
 
     // Solo se premarca lo que se aprobó antes. Un bulto que el picker haya
     // abierto durante la corrección no está en esa lista y queda pendiente.
     const seeded: Record<string, BultoAuditStatus> = {};
+    const seededChecks: Record<string, string[]> = {};
     for (const bulto of order.bultos) {
-      if (order.approvedBundles.includes(bulto.number)) seeded[bulto.id] = 'approved';
+      if (order.approvedBundles.includes(bulto.number)) {
+        seeded[bulto.id] = 'approved';
+        seededChecks[bulto.id] = bulto.items.map((item) => item.id);
+      }
     }
     setBultoReviews(seeded);
+    setCheckedItems(seededChecks);
   }, [order, isReReview, auditSignature]);
+
+  const approvedBundles = order?.approvedBundles;
+  const isBultoExpandedByDefault = useCallback(
+    (bulto: Bulto) => isReReview && !(approvedBundles ?? []).includes(bulto.number),
+    [isReReview, approvedBundles],
+  );
 
   if (!user) {
     return (
@@ -200,10 +325,14 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
    * siempre inhabilitado), sino la única acción que aplica, y recién cuando no
    * queda ningún bulto pendiente.
    */
-  const showAuditDock = canReviewAudit && allReviewed;
+  const selectedCount = canReviewAudit ? selectedBultoIds.size : 0;
+  const showBulkDock = selectedCount > 0;
+  const showAuditDock = canReviewAudit && allReviewed && !showBulkDock;
   const showResumeDock = !canReviewAudit && order.isPaused;
   const dualActionsHeight =
-    showAuditDock || showResumeDock ? estimateOrderActionsHeight(1, insets.bottom) : 0;
+    showBulkDock || showAuditDock || showResumeDock
+      ? estimateOrderActionsHeight(1, insets.bottom)
+      : 0;
 
   const headerMeta = [
     { label: t('audit.detail.picker'), value: pickerName },
@@ -304,7 +433,21 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
                     </ExpandableText>
                     <Text style={styles.lineSku}>{line.sku}</Text>
                   </View>
-                  <Text style={styles.lineQty}>×{line.requiredQty}</Text>
+                  <View style={styles.lineActions}>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setPreviewLine(line);
+                      }}
+                      hitSlop={12}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('picking.skuPreview.open')}
+                      style={({ pressed }) => [styles.eyeBtn, pressed && { opacity: 0.5 }]}
+                    >
+                      <Eye size={18} color="#8E8E93" strokeWidth={2.2} />
+                    </Pressable>
+                    <Text style={styles.lineQty}>×{line.requiredQty}</Text>
+                  </View>
                 </View>
               ))}
             </OrderDetailCard>
@@ -336,7 +479,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
                   <Text style={styles.comparisonOkText}>{t('audit.detail.comparisonOk')}</Text>
                 </View>
               )}
-              <AuditComparisonCard rows={comparisonRows} />
+              <AuditComparisonCard rows={comparisonRows} onPreviewRow={handlePreviewLineId} />
             </OrderDetailSection>
           ) : null}
 
@@ -351,26 +494,72 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
                 <Text style={styles.emptyBultos}>{t('audit.bulto.empty')}</Text>
               </OrderDetailCard>
             ) : (
-              order.bultos.map((bulto) => (
-                <AuditBultoAccordion
-                  // La firma entra en la key para que, si la auditoría previa
-                  // llega después del primer render, el acordeón se remonte y
-                  // recalcule si abre abierto o colapsado.
-                  key={`${bulto.id}:${auditSignature}`}
-                  bulto={bulto}
-                  reviewStatus={bultoReviews[bulto.id] ?? null}
-                  readOnly={alreadyProcessed}
-                  defaultExpanded={isReReview && !order.approvedBundles.includes(bulto.number)}
-                  onApprove={() => setBultoReview(bulto.id, 'approved')}
-                  onReject={() => setBultoReview(bulto.id, 'rejected')}
-                />
-              ))
+              // La firma entra en las keys para que, si la auditoría previa llega
+              // después del primer render, se remonten y recalculen si abren
+              // abiertos o colapsados.
+              bultoEntries.map((entry) =>
+                entry.kind === 'group' ? (
+                  <AuditBultoGroup
+                    key={`${entry.key}:${auditSignature}`}
+                    sku={entry.sku}
+                    name={entry.name}
+                    bultos={entry.bultos}
+                    reviews={bultoReviews}
+                    selectedIds={selectedBultoIds}
+                    readOnly={alreadyProcessed}
+                    selectable={canReviewAudit}
+                    defaultExpanded={entry.bultos.some(isBultoExpandedByDefault)}
+                    isBultoExpandedByDefault={isBultoExpandedByDefault}
+                    onApprove={approveBulto}
+                    onReject={rejectBulto}
+                    onToggleSelect={toggleSelectBulto}
+                    onToggleSelectMany={toggleSelectMany}
+                    onPreviewItem={handlePreviewLineId}
+                  />
+                ) : (
+                  <AuditBultoAccordion
+                    key={`${entry.key}:${auditSignature}`}
+                    bulto={entry.bulto}
+                    reviewStatus={bultoReviews[entry.bulto.id] ?? null}
+                    readOnly={alreadyProcessed}
+                    defaultExpanded={isBultoExpandedByDefault(entry.bulto)}
+                    onApprove={approveBulto}
+                    onReject={rejectBulto}
+                    onPreviewItem={handlePreviewLineId}
+                    selectable={canReviewAudit && !entry.mixed}
+                    selected={selectedBultoIds.has(entry.bulto.id)}
+                    onToggleSelect={toggleSelectBulto}
+                    itemCheckable={canReviewAudit && entry.mixed}
+                    checkedItemIds={checkedItems[entry.bulto.id]}
+                    onToggleItem={setItemChecked}
+                  />
+                ),
+              )
             )}
           </OrderDetailSection>
         </ScrollView>
       </OrderDetailBodyFade>
 
-      {showAuditDock ? (
+      {showBulkDock ? (
+        <View style={[styles.dualDock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.dualBtn}>
+            <OrderActionButton
+              label={t('audit.bulk.reject', { count: selectedCount })}
+              onPress={() => applyToSelected('rejected')}
+              variant="secondary"
+              icon={XCircle}
+            />
+          </View>
+          <View style={styles.dualBtn}>
+            <OrderActionButton
+              label={t('audit.bulk.approve', { count: selectedCount })}
+              onPress={() => applyToSelected('approved')}
+              variant="primary"
+              icon={CheckCircle2}
+            />
+          </View>
+        </View>
+      ) : showAuditDock ? (
         <View style={[styles.dualDock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.dualBtn}>
             {allApproved ? (
@@ -423,6 +612,8 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
         onConfirm={handleReject}
         initialText={rejectPrefill}
       />
+
+      <SkuPreviewSheet line={previewLine} onClose={() => setPreviewLine(null)} />
     </View>
   );
 }
@@ -492,6 +683,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#111827',
+  },
+  lineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  eyeBtn: {
+    padding: 2,
   },
   comparisonAlert: {
     flexDirection: 'row',

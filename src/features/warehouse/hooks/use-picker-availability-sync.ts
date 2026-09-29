@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import { useOrdersStore } from '@/features/picking/store/orders.store';
 import type { OrderStatus } from '@/features/picking/types';
@@ -28,20 +28,24 @@ const ACTIVE_STATUSES: OrderStatus[] = [
  */
 export function usePickerAvailabilitySync() {
   const user = useCurrentUser();
-  const orders = useOrdersStore((s) => s.orders);
+  const uid = user?.uid;
   const hydratedFromServer = useOrdersStore((s) => s.hydratedFromServer);
 
-  const hasActiveOrder = useMemo(() => {
-    if (!user) return false;
-    return orders.some(
-      (o) =>
-        (o.assignedPickerId === user.uid || o.teamPickerUids.includes(user.uid)) &&
-        // Un pedido pausado libera al picker (firestorePausePicking ya pone
-        // `is_available: true`), así que no cuenta como ocupación.
-        !o.isPaused &&
-        ACTIVE_STATUSES.includes(o.status),
-    );
-  }, [orders, user]);
+  // El selector devuelve un booleano, no la lista: este hook vive en
+  // (app)/_layout, y suscribirlo a `orders` re-renderizaba el layout raíz de
+  // la app con cada cambio de cualquier pedido (cada ítem que se arma).
+  const hasActiveOrder = useOrdersStore((s) =>
+    uid
+      ? s.orders.some(
+          (o) =>
+            (o.assignedPickerId === uid || o.teamPickerUids.includes(uid)) &&
+            // Un pedido pausado libera al picker (firestorePausePicking ya pone
+            // `is_available: true`), así que no cuenta como ocupación.
+            !o.isPaused &&
+            ACTIVE_STATUSES.includes(o.status),
+        )
+      : false,
+  );
 
   /** Evita repetir la escritura mientras el estado siga siendo el mismo. */
   const releasedRef = useRef(false);

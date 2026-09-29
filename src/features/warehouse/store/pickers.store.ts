@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { shareByKey } from '@/shared/lib/structural-sharing';
 import { MOCK_PICKERS } from '../data/mock-pickers';
 import type { PickerEstado, PickerStatus } from '../types';
 
@@ -40,7 +41,11 @@ export const usePickersStore = create<PickersState>((set, get) => ({
         }
         return firestorePicker;
       });
-      return { pickers: merged };
+      // `u_pickers` cambia con cada acción de cualquier picker (`last_activity_at`):
+      // sin compartir referencias, cada una redibujaba las pantallas del jefe,
+      // del supervisor y del chequeador aunque lo que muestran no cambiara.
+      const pickers = shareByKey(s.pickers, merged, (p) => p.uid);
+      return pickers === s.pickers ? s : { pickers };
     });
   },
 

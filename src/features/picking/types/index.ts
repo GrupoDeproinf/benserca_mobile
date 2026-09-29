@@ -257,6 +257,11 @@ export interface Order {
    * estar aprobado, sigue visible aunque lo cierre.
    */
   approvedBundles: number[];
+  /**
+   * Números de bulto que el cargador ya subió al camión
+   * (`loading.loaded_bundles`). Con todos marcados puede despachar el pedido.
+   */
+  loadedBundles: number[];
 
   /** Pausa activa del picking. No cambia `status`; es un flag ortogonal. */
   isPaused: boolean;

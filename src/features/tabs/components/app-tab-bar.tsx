@@ -34,6 +34,9 @@ const styles = StyleSheet.create({
     backgroundColor: TAB_BAR_COLORS.background,
     paddingHorizontal: 12,
   },
+  pillCompact: {
+    paddingHorizontal: 4,
+  },
   itemPressable: {
     flex: 1,
     alignItems: 'center',
@@ -47,11 +50,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
+  itemCompact: {
+    gap: 4,
+    paddingHorizontal: 2,
+  },
   label: {
     fontSize: TAB_BAR.labelSize,
     letterSpacing: 0.1,
   },
+  labelCompact: {
+    fontSize: 12,
+  },
 });
+
+/** A partir de 4 tabs, el contenido no cabe con el espaciado por defecto. */
+const COMPACT_THRESHOLD = 4;
 
 interface AppTabBarProps extends BottomTabBarProps {
   tabIcons: Record<string, RoleTabIconConfig>;
@@ -72,6 +85,7 @@ export function AppTabBar({
     .filter(({ route }) => tabIcons[route.name])
     .sort((a, b) => tabOrder.indexOf(a.route.name) - tabOrder.indexOf(b.route.name));
 
+  const compact = visibleRoutes.length >= COMPACT_THRESHOLD;
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
 
   return (
@@ -85,7 +99,7 @@ export function AppTabBar({
           },
         ]}
       >
-        <View style={styles.pill}>
+        <View style={[styles.pill, compact && styles.pillCompact]}>
           {visibleRoutes.map(({ route, index }) => {
             const icons = tabIcons[route.name]!;
             const isFocused = state.index === index;
@@ -118,21 +132,24 @@ export function AppTabBar({
                   { opacity: pressed ? 0.7 : 1 },
                 ]}
               >
-                <View style={styles.item}>
+                <View style={[styles.item, compact && styles.itemCompact]}>
                   <Ionicons
                     name={isFocused ? icons.filled : icons.outline}
-                    size={TAB_BAR.iconSize}
+                    size={compact ? TAB_BAR.iconSize - 2 : TAB_BAR.iconSize}
                     color={color}
                   />
                   <Text
                     style={[
                       styles.label,
+                      compact && styles.labelCompact,
                       {
                         color,
                         fontWeight: isFocused ? '700' : '500',
                       },
                     ]}
                     numberOfLines={1}
+                    adjustsFontSizeToFit={compact}
+                    minimumFontScale={0.85}
                   >
                     {label}
                   </Text>

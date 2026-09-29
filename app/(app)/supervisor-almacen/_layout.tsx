@@ -2,7 +2,15 @@ import { Stack } from 'expo-router';
 
 export default function SupervisorAlmacenStackLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#F2F2F7' } }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: '#F2F2F7' },
+        // Las pantallas tapadas por otra (la lista bajo el detalle del pedido)
+        // no se re-renderizan mientras no estén visibles.
+        freezeOnBlur: true,
+      }}
+    >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
         name="status/[status]"

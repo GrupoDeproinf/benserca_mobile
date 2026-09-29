@@ -10,6 +10,7 @@ export const ROLE_ROUTE_SEGMENT: Record<UserRole, string> = {
   warehouse_lead: 'lead',
   auditor: 'auditor',
   supervisor_almacen: 'supervisor-almacen',
+  pedido_cargador: 'cargador',
 };
 
 export const ROLE_HOME_ROUTES = {
@@ -17,6 +18,7 @@ export const ROLE_HOME_ROUTES = {
   warehouse_lead: '/(app)/lead/(tabs)/orders',
   auditor: '/(app)/auditor/(tabs)/queue',
   supervisor_almacen: '/(app)/supervisor-almacen/(tabs)/dashboard',
+  pedido_cargador: '/(app)/cargador/(tabs)/orders',
 } as const satisfies Record<UserRole, `/(app)/${string}`>;
 
 export type RoleHomeRoute = (typeof ROLE_HOME_ROUTES)[UserRole];

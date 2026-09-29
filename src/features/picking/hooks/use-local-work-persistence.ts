@@ -35,7 +35,14 @@ export function useLocalWorkPersistence() {
       void clearOtherUsersLocalWork(uid);
     });
 
+    // `subscribe` avisa de CUALQUIER cambio del store, también de los que no
+    // tocan los pedidos (p. ej. `hydratedFromServer`). Comparar la referencia
+    // del arreglo evita reprogramar el guardado — y con él serializar los
+    // pedidos — por cambios que no hay que respaldar.
+    let lastOrders = useOrdersStore.getState().orders;
     const unsubscribe = useOrdersStore.subscribe((state) => {
+      if (state.orders === lastOrders) return;
+      lastOrders = state.orders;
       saveLocalWorkDebounced(uid, state.orders);
     });
 

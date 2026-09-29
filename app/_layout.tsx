@@ -3,9 +3,10 @@ import '../global.css';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useProtectedRoute } from '@/features/auth/hooks/use-protected-route';
 import { useFirebaseAuthSync } from '@/features/auth/hooks/use-firebase-auth-sync';
+import { useProtectedRoute } from '@/features/auth/hooks/use-protected-route';
 import { AppProviders } from '@/providers/app-providers';
+import { AppErrorBoundary } from '@/shared/components/app-error-boundary';
 import { SplashGate } from '@/shared/components/splash-gate';
 import { useResolvedColorScheme } from '@/theme';
 
@@ -30,9 +31,11 @@ export default function RootLayout() {
   return (
     <AppProviders>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <SplashGate>
-        <ProtectedRouter />
-      </SplashGate>
+      <AppErrorBoundary>
+        <SplashGate>
+          <ProtectedRouter />
+        </SplashGate>
+      </AppErrorBoundary>
     </AppProviders>
   );
 }

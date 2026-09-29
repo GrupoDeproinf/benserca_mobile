@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useRoleGuard } from '@/features/auth/hooks/use-role-guard';
 import { GlobalNotificationToast } from '@/features/notifications/components/global-notification-toast';
 import { useFirestoreNotificationsListener } from '@/features/notifications/hooks/use-firestore-notifications-listener';
-import { useArticulosCatalogPreload } from '@/features/picking/hooks/use-articulos-catalog-preload';
+import { useArticulosCatalogCleanup } from '@/features/picking/hooks/use-articulos-catalog-cleanup';
 import { useLocalWorkPersistence } from '@/features/picking/hooks/use-local-work-persistence';
 import { useSessionOrdersListener } from '@/features/picking/hooks/use-session-orders-listener';
 import { SyncStatusBanner } from '@/features/sync/components/sync-status-banner';
@@ -15,7 +15,7 @@ export default function AppLayout() {
   useFirestoreNotificationsListener();
   useLocalWorkPersistence();
   usePickerAvailabilitySync();
-  useArticulosCatalogPreload();
+  useArticulosCatalogCleanup();
 
   return (
     <View style={{ flex: 1 }}>
@@ -24,6 +24,7 @@ export default function AppLayout() {
         <Stack.Screen name="lead" />
         <Stack.Screen name="auditor" />
         <Stack.Screen name="supervisor-almacen" />
+        <Stack.Screen name="cargador" />
       </Stack>
       <GlobalNotificationToast />
       <SyncStatusBanner />

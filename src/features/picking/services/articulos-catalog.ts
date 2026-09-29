@@ -2,6 +2,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firestore } from '@/services/firebase';
 import { type Articulo, docToArticulo } from './articulos.mapper';
 
+/**
+ * NO ESTÁ CONECTADO. Catálogo de artículos en disco para buscar y sustituir
+ * SKUs sin conexión; su único consumidor era `SubstituteItemSheet`, eliminada
+ * en el commit 5b88a5f. Lo único que corre hoy es `clearArticulosCatalog`,
+ * desde `useArticulosCatalogCleanup`, para liberar lo que dejaron en el
+ * teléfono las versiones anteriores.
+ *
+ * Se conserva porque es la pieza a reponer si vuelve la sustitución offline:
+ * para reactivarlo hay que volver a llamar a `loadCatalogFromDisk` +
+ * `syncArticulosCatalog` al entrar. Antes de hacerlo, tener en cuenta que
+ * comparte el tope de tamaño de AsyncStorage con el respaldo del picking en
+ * curso (ver `orders-local-work`).
+ */
+
 const META_KEY = 'articulos.catalog.meta.v1';
 const CHUNK_KEY = (index: number) => `articulos.catalog.chunk.${index}.v1`;
 

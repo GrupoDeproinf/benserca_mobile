@@ -17,10 +17,11 @@ export interface RoleTabsConfig {
 /** Tabs del jefe de almacén (warehouse_lead). */
 const WAREHOUSE_MANAGER_TABS: RoleTabsConfig = {
   initialRoute: 'orders',
-  order: ['orders', 'pickers', 'profile'],
+  order: ['orders', 'pickers', 'audit', 'profile'],
   icons: {
     orders: { outline: 'file-tray-stacked-outline', filled: 'file-tray-stacked' },
     pickers: { outline: 'people-outline', filled: 'people' },
+    audit: { outline: 'clipboard-outline', filled: 'clipboard' },
     profile: { outline: 'person-outline', filled: 'person' },
   },
 };
@@ -49,6 +50,15 @@ export const ROLE_TABS_CONFIG: Record<UserRole, RoleTabsConfig> = {
     order: ['dashboard', 'profile'],
     icons: {
       dashboard: { outline: 'grid-outline', filled: 'grid' },
+      profile: { outline: 'person-outline', filled: 'person' },
+    },
+  },
+  // Cargador: pedidos embalados por subir al camión + perfil.
+  pedido_cargador: {
+    initialRoute: 'orders',
+    order: ['orders', 'profile'],
+    icons: {
+      orders: { outline: 'archive-outline', filled: 'archive' },
       profile: { outline: 'person-outline', filled: 'person' },
     },
   },

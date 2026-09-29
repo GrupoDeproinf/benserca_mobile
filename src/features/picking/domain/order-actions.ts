@@ -87,6 +87,16 @@ export function applyMarkDispatched(_order: Order): Partial<Order> {
   return { status: 'dispatched' };
 }
 
+/** El cargador marca (o desmarca) un bulto como subido al camión. */
+export function applySetBundleLoaded(
+  order: Order,
+  bundleNumber: number,
+  loaded: boolean,
+): Partial<Order> {
+  const without = order.loadedBundles.filter((n) => n !== bundleNumber);
+  return { loadedBundles: loaded ? [...without, bundleNumber] : without };
+}
+
 export function applyReopenForRevision(order: Order, pickerId: string): Partial<Order> {
   usePickersStore.getState().setPickerStatus(pickerId, 'en_proceso', order.id);
   return { status: 'in_progress' };
@@ -371,6 +381,56 @@ export function applyDeleteBulto(order: Order, bultoId: string): Partial<Order> 
           approvedBundles: shiftBundleNumbers(order.approvedBundles, eliminado.number),
         }
       : {}),
+  };
+}
+
+/**
+ * Borrado en lote (selección múltiple del picker). Se borra de a uno sobre el
+ * pedido ya actualizado: cada borrado renumera los bultos y corre los números
+ * de la auditoría, y los ids no cambian, así que el orden da igual.
+ */
+export function applyDeleteBultos(order: Order, bultoIds: string[]): Partial<Order> {
+  let working = order;
+  let patch: Partial<Order> = {};
+  for (const bultoId of bultoIds) {
+    const step = applyDeleteBulto(working, bultoId);
+    patch = { ...patch, ...step };
+    working = { ...working, ...step };
+  }
+  return patch;
+}
+
+/**
+ * Cambia el número de uno o varios bultos (selección del picker). El número es
+ * la posición en la lista, así que cambiarlo es mover: los seleccionados se
+ * sacan y se insertan juntos, en su orden actual, para que el primero quede con
+ * `targetNumber`; el resto se corre. `targetNumber` se acota al rango válido.
+ *
+ * Las listas de la auditoría se guardan por número, así que se traducen por id
+ * para que "aprobado el 3" siga señalando al mismo bulto físico.
+ */
+export function applyMoveBultos(
+  order: Order,
+  bultoIds: string[],
+  targetNumber: number,
+): Partial<Order> {
+  const moving = order.bultos.filter((b) => bultoIds.includes(b.id));
+  if (moving.length === 0) return {};
+  const rest = order.bultos.filter((b) => !bultoIds.includes(b.id));
+  const insertAt = Math.min(Math.max(Math.trunc(targetNumber) - 1, 0), rest.length);
+  const bultos = renumberBultos([...rest.slice(0, insertAt), ...moving, ...rest.slice(insertAt)]);
+
+  const idByOldNumber = new Map(order.bultos.map((b) => [b.number, b.id]));
+  const newNumberById = new Map(bultos.map((b) => [b.id, b.number]));
+  const remap = (numbers: number[]) =>
+    numbers
+      .map((n) => newNumberById.get(idByOldNumber.get(n) ?? '') ?? n)
+      .sort((a, b) => a - b);
+
+  return {
+    ...syncPickingMetrics(order, bultos),
+    rejectedBundles: remap(order.rejectedBundles),
+    approvedBundles: remap(order.approvedBundles),
   };
 }
 

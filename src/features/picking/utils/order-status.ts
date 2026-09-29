@@ -92,3 +92,31 @@ export function nextActionsFor(order: Order, role: UserRole): OrderDomainAction[
       return [];
   }
 }
+
+/**
+ * Opción de un filtro de lista de pedidos: un estatus, `paused` (que NO es un
+ * estatus en base de datos, ver `PAUSED_STATUS_I18N_KEY`), `corrected` (pedido
+ * que el picker ya rehizo tras un rechazo) o `all`.
+ *
+ * Vive aquí, y no en cada pantalla, porque picker, jefe de almacén y chequeador
+ * filtran sobre los mismos pedidos y antes cada uno resolvía la etiqueta a su
+ * manera: el que no estuviera en `ORDER_STATUS_I18N_KEY` salía sin traducir.
+ */
+export type OrderListFilter = OrderStatus | 'paused' | 'corrected' | 'all';
+
+export function orderListFilterLabelKey(filter: OrderListFilter): string {
+  if (filter === 'all') return 'common.all';
+  if (filter === 'paused') return PAUSED_STATUS_I18N_KEY;
+  if (filter === 'corrected') return 'orderStatus.corrected';
+  return ORDER_STATUS_I18N_KEY[filter];
+}
+
+/** ¿El pedido entra en el filtro elegido? `all` no descarta nada. */
+export function matchesOrderListFilter(order: Order, filter: OrderListFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'paused') return order.isPaused;
+  if (filter === 'corrected') return wasCorrectedAfterRejection(order);
+  // Un pedido en pausa conserva su estatus, así que sigue saliendo al filtrar
+  // por él: el badge de "En pausa" es de UI, no un estatus aparte.
+  return order.status === filter;
+}

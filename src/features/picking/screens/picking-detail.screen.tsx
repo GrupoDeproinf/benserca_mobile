@@ -5,7 +5,7 @@ import {
   AlertTriangle,
   Box,
   ClipboardList,
-  Eye,
+  ListChecks,
   type LucideIcon,
   Package,
   PackageOpen,
@@ -13,19 +13,21 @@ import {
   PauseCircle,
   Play,
   RotateCcw,
+  Square,
+  SquareCheck,
   Trash2,
 } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCurrentUser } from '@/features/auth/store/auth.store';
 import { ConfirmSheet, type ConfirmSheetTone } from '@/shared/components/ui/confirm-sheet';
-import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import { Text } from '@/shared/components/ui/text';
 import { Toast, useToast } from '@/shared/components/ui/toast';
 import { type AddItemEntry, AddItemSheet } from '../components/add-item-sheet';
 import { BultoCard } from '../components/bulto-card';
+import { FinishMissingSheet } from '../components/finish-missing-sheet';
 import {
   estimateOrderActionsHeight,
   type OrderDetailAction,
@@ -34,15 +36,16 @@ import {
 import { OrderDetailAlertBanner, OrderDetailHeader } from '../components/order-detail-header';
 import { OrderDetailCard, OrderDetailSection } from '../components/order-detail-section';
 import { OrderDetailBodyFade } from '../components/order-detail-transition';
+import { OrderLineRow } from '../components/order-line-row';
 import { type MarkedMissingLine, PausePickingSheet } from '../components/pause-picking-sheet';
 import { QuickBundleCard } from '../components/quick-bundle-card';
 import { SkuPreviewSheet } from '../components/sku-preview-sheet';
 import { useFirestoreOrder } from '../hooks/use-firestore-order';
 import { useOrdersStore } from '../store/orders.store';
 import type { MissingItemsMode, OrderLine, PauseReason } from '../types';
-import { getMaxQtyForBultoItem } from '../utils/bulto-capacity';
+import { createBultoItemMaxQty, getMaxQtyForBultoItem } from '../utils/bulto-capacity';
 import {
-  getAssignedQtyForLine,
+  getAssignedQtyByLine,
   getDuplicateSkus,
   getMissingQuantities,
   getOrphanBultoItems,
@@ -74,7 +77,24 @@ type ConfirmState = {
   dismissible?: boolean;
 };
 
-const EMPTY_PICKER_ORDERS: never[] = [];
+/**
+ * A partir de estos tamaños las secciones arrancan plegadas.
+ *
+ * El detalle dibuja TODOS los renglones y TODOS los ítems de todos los bultos
+ * de una vez, sin virtualizar. Medido en una tablet con un pedido de 250
+ * artículos: abrirlo costaba +241 MB de heap nativo (PSS 192 → 548 MB) y el
+ * 50% de los frames con jank. Plegado, esas vistas no se montan y el picker
+ * despliega solo lo que necesita mirar.
+ */
+const MANY_LINES = 25;
+const MANY_BULTOS = 10;
+/**
+ * `getQuickBundleCandidates` devuelve una tarjeta por RENGLÓN, así que un
+ * pedido de 250 renglones con `units_per_bundle` dibujaba 250 tarjetas de una
+ * vez. Pasado este número la sección arranca plegada: el picker arma de a
+ * pocos, no necesita las 250 a la vista.
+ */
+const MANY_QUICK_BUNDLES = 12;
 
 export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetailScreenProps) {
   const { t } = useTranslation();
@@ -90,18 +110,21 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   // que se cierre sesión.
   useFirestoreOrder(orderId || null);
 
-  const allOrders = useOrdersStore((s) => s.orders);
-  const order = useMemo(() => allOrders.find((o) => o.id === orderId), [allOrders, orderId]);
-  const pickerOrders = useMemo(() => {
-    if (!user) return EMPTY_PICKER_ORDERS;
-    return allOrders.filter(
-      (o) => o.assignedPickerId === user.uid || o.teamPickerUids.includes(user.uid),
+  // Se selecciona SOLO este pedido (y la posición en cola ya calculada), no la
+  // lista entera: así la pantalla no se redibuja cuando cambia otro pedido.
+  // Los `useMemo` que había aquí tenían dependencias que no coincidían con lo
+  // que leían (`user?.uid` vs `user`), y por eso React Compiler descartaba
+  // optimizar la pantalla completa: cada toque recreaba todo.
+  const userUid = user?.uid;
+  const order = useOrdersStore((s) => s.orders.find((o) => o.id === orderId));
+  const effectiveQueuePosition = useOrdersStore((s) => {
+    const current = s.orders.find((o) => o.id === orderId);
+    if (!current || !userUid) return null;
+    const pickerOrders = s.orders.filter(
+      (o) => o.assignedPickerId === userUid || o.teamPickerUids.includes(userUid),
     );
-  }, [allOrders, user?.uid]);
-  const effectiveQueuePosition = useMemo(() => {
-    if (!order) return null;
-    return getEffectiveQueuePosition(order, pickerOrders);
-  }, [order, pickerOrders]);
+    return getEffectiveQueuePosition(current, pickerOrders);
+  });
   const startPicking = useOrdersStore((s) => s.startPicking);
   const finishPicking = useOrdersStore((s) => s.finishPicking);
   const markWrapped = useOrdersStore((s) => s.markWrapped);
@@ -110,6 +133,8 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const closeBulto = useOrdersStore((s) => s.closeBulto);
   const reopenBulto = useOrdersStore((s) => s.reopenBulto);
   const deleteBulto = useOrdersStore((s) => s.deleteBulto);
+  const deleteBultos = useOrdersStore((s) => s.deleteBultos);
+  const moveBultos = useOrdersStore((s) => s.moveBultos);
   const addBultoItem = useOrdersStore((s) => s.addBultoItem);
   const createQuickBundle = useOrdersStore((s) => s.createQuickBundle);
   const removeBultoItem = useOrdersStore((s) => s.removeBultoItem);
@@ -117,6 +142,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const pausePicking = useOrdersStore((s) => s.pausePicking);
   const reportMissingItems = useOrdersStore((s) => s.reportMissingItems);
   const resumePicking = useOrdersStore((s) => s.resumePicking);
+  const refreshArticleData = useOrdersStore((s) => s.refreshArticleData);
 
   const [addSheetBultoId, setAddSheetBultoId] = useState<string | null>(null);
   /**
@@ -128,12 +154,106 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const [previewLine, setPreviewLine] = useState<OrderLine | null>(null);
   const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
   const [confirmSheet, setConfirmSheet] = useState<ConfirmState | null>(null);
+  /** Cantidades sin asignar al tocar "Finalizar"; `null` oculta la hoja. */
+  const [finishMissingItems, setFinishMissingItems] = useState<string[] | null>(null);
+  const [refreshingArticleData, setRefreshingArticleData] = useState(false);
+  /** Modo selección de bultos para borrar varios (o todos) de una vez. */
+  const [bultoSelectionMode, setBultoSelectionMode] = useState(false);
+  const [selectedBultoIds, setSelectedBultoIds] = useState<string[]>([]);
   const {
     message: capacityToast,
     nudgeToken: capacityToastNudge,
     show: showCapacityToast,
   } = useToast();
+  const {
+    message: articleDataToast,
+    nudgeToken: articleDataToastNudge,
+    show: showArticleDataToast,
+  } = useToast();
+  const {
+    message: renumberToast,
+    nudgeToken: renumberToastNudge,
+    show: showRenumberToast,
+  } = useToast();
   const maxReachedTooltip = t('picking.addItem.capacityExceededTooltip');
+
+  /*
+   * Handlers que llegan a CADA fila (renglones e ítems de bulto). Van antes del
+   * `return` temprano y usan `orderId` + el pedido más nuevo del store en vez
+   * de `order`, que cambia con cada toque: así React Compiler los memoriza
+   * aparte y las filas que no cambiaron conservan sus props y no se redibujan.
+   * Declarados más abajo quedaban agrupados con el resto de la pantalla y se
+   * recreaban en cada render.
+   */
+  const handlePreviewLine = (line: OrderLine) => {
+    Haptics.selectionAsync();
+    setPreviewLine(line);
+  };
+
+  const handlePreviewItem = (lineId: string) => {
+    const line = useOrdersStore
+      .getState()
+      .getOrderById(orderId)
+      ?.lines.find((l) => l.id === lineId);
+    if (line) setPreviewLine(line);
+  };
+
+  const handleReportMissing = (line: OrderLine) => {
+    Haptics.selectionAsync();
+    setMissingLine(line);
+    setPauseSheetVisible(true);
+  };
+
+  const handleCloseBulto = (bultoId: string) => {
+    const result = closeBulto(orderId, bultoId);
+    if (!result.ok) {
+      setConfirmSheet({
+        title: t('picking.bulto.cannotCloseEmptyTitle'),
+        message: t('picking.bulto.cannotCloseEmptyBody'),
+        mode: 'info',
+        confirmLabel: t('common.understood'),
+        icon: PackageOpen,
+      });
+    }
+  };
+
+  const handleReopenBulto = (bultoId: string) => reopenBulto(orderId, bultoId);
+
+  const showEmptyBultoModal = (bultoId: string, bultoNumber: number) => {
+    setConfirmSheet({
+      title: t('picking.bulto.emptyModalTitle', { number: bultoNumber }),
+      message: t('picking.bulto.emptyModalBody'),
+      mode: 'confirm',
+      tone: 'warning',
+      confirmLabel: t('picking.bulto.deleteBulto'),
+      cancelLabel: t('picking.bulto.addItem'),
+      icon: Trash2,
+      dismissible: false,
+      onConfirm: () => deleteBulto(orderId, bultoId),
+      onCancel: () => setAddSheetBultoId(bultoId),
+    });
+  };
+
+  const handleRemoveItem = (bultoId: string, itemId: string) => {
+    const result = removeBultoItem(orderId, bultoId, itemId);
+    if (result.bultoEmpty) {
+      showEmptyBultoModal(result.bultoId, result.bultoNumber);
+    }
+  };
+
+  const handleUpdateItemQty = (bultoId: string, itemId: string, qty: number) => {
+    if (qty < 1) {
+      handleRemoveItem(bultoId, itemId);
+      return;
+    }
+    const current = useOrdersStore.getState().getOrderById(orderId);
+    if (!current) return;
+    const maxQty = getMaxQtyForBultoItem(current, itemId);
+    if (qty > maxQty) showCapacityToast(maxReachedTooltip);
+    updateBultoItem(orderId, bultoId, itemId, Math.min(qty, maxQty));
+  };
+
+  const handleCapacityExceeded = () => showCapacityToast(maxReachedTooltip);
 
   if (!order) {
     return (
@@ -147,6 +267,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
 
   const isEditable =
     !readOnly && (order.status === 'in_progress' || order.status === 'rejected_review');
+  /** Trae foto/descripción más nuevas del catálogo; no tiene sentido en un pedido ya cerrado. */
+  const canRefreshArticleData =
+    !readOnly && order.status !== 'dispatched' && order.status !== 'annulled';
   const showBultos =
     order.status === 'in_progress' ||
     order.status === 'to_pack' ||
@@ -177,6 +300,82 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
    * o ya empaquetado no hay nada que armar.
    */
   const quickBundleCandidates = isEditable ? getQuickBundleCandidates(order) : [];
+
+  /**
+   * Selección múltiple de bultos. Solo se ofrece sobre los bultos visibles: en
+   * una corrección de rechazo los aprobados están ocultos y así quedan fuera
+   * del "seleccionar todos". Los ids que ya no existen (borrados, o el pedido
+   * cambió de estatus) se descartan al leer en vez de sincronizar estado.
+   */
+  const canSelectBultos = isEditable && visibleBultos.length > 0;
+  const inBultoSelection = bultoSelectionMode && canSelectBultos;
+  const selectedVisibleIds = inBultoSelection
+    ? visibleBultos.filter((b) => selectedBultoIds.includes(b.id)).map((b) => b.id)
+    : [];
+  const allBultosSelected = selectedVisibleIds.length === visibleBultos.length;
+
+  /**
+   * Cambiar el número = cambiar el orden. En una corrección de rechazo con
+   * bultos aprobados ocultos no se ofrece: moverse entre números ocultos
+   * cambiaría el número de bultos que el chequeador ya dio por buenos.
+   */
+  const canRenumberBultos = hiddenApprovedBultos === 0 && order.bultos.length > 1;
+
+  const exitBultoSelection = () => {
+    setBultoSelectionMode(false);
+    setSelectedBultoIds([]);
+  };
+
+  /** Mantener presionado un bulto: entra al modo selección con ese bulto marcado. */
+  const startBultoSelectionWith = (bultoId: string) => {
+    setSelectedBultoIds([bultoId]);
+    setBultoSelectionMode(true);
+  };
+
+  /**
+   * Número editado en un bulto seleccionado. Sigue seleccionado después de
+   * moverlo para poder corregir el número si hizo falta.
+   */
+  const handleRenumberBulto = (bultoId: string, targetNumber: number) => {
+    const from = order.bultos.find((b) => b.id === bultoId)?.number;
+    if (from === undefined) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    moveBultos(order.id, [bultoId], targetNumber);
+    showRenumberToast(t('picking.bulto.renumberDone', { from, to: targetNumber }));
+  };
+
+  const toggleBultoSelected = (bultoId: string) => {
+    setSelectedBultoIds((ids) =>
+      ids.includes(bultoId) ? ids.filter((id) => id !== bultoId) : [...ids, bultoId],
+    );
+  };
+
+  const toggleSelectAllBultos = () => {
+    Haptics.selectionAsync();
+    setSelectedBultoIds(allBultosSelected ? [] : visibleBultos.map((b) => b.id));
+  };
+
+  const handleDeleteSelectedBultos = () => {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    const withItems = visibleBultos.filter((b) => ids.includes(b.id) && b.items.length > 0);
+    setConfirmSheet({
+      title: t('picking.bulto.deleteSelectedTitle', { count: ids.length }),
+      message:
+        withItems.length > 0
+          ? t('picking.bulto.deleteSelectedBodyWithItems')
+          : t('picking.bulto.deleteSelectedBody'),
+      mode: 'confirm',
+      tone: 'warning',
+      confirmLabel: t('picking.bulto.deleteSelectedConfirm', { count: ids.length }),
+      icon: Trash2,
+      onConfirm: () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        deleteBultos(order.id, ids);
+        exitBultoSelection();
+      },
+    });
+  };
 
   /**
    * Faltantes sin resolver, indexados por renglón. La identidad es el índice en
@@ -231,6 +430,11 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const closedBultos = order.bultos.filter(
     (b) => b.status === 'closed' && b.items.length > 0,
   ).length;
+
+  /** Índices de una sola pasada para las filas (ver `getAssignedQtyByLine`). */
+  const assignedByLine = getAssignedQtyByLine(order.bultos);
+  const getItemMaxQty = createBultoItemMaxQty(order);
+  const canReportMissing = isEditable && !order.isPaused;
 
   const performOpenBulto = () => {
     const result = openBulto(order.id);
@@ -315,15 +519,20 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     });
   };
 
-  const doFinishPicking = () => {
+  const doFinishPicking = (missingNote?: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    const result = finishPicking(order.id, user.uid);
+    const result = finishPicking(order.id, user.uid, missingNote);
     if (!result.ok && result.error === 'empty_open_bulto_exists') {
       const emptyOpen = order.bultos.find((b) => b.status === 'open' && b.items.length === 0);
       showEmptyBultoBlock(emptyOpen?.number);
     } else if (!result.ok && result.error === 'no_bultos') {
       showNoBultosBlock();
     }
+  };
+
+  const handleConfirmFinishMissing = (note: string) => {
+    setFinishMissingItems(null);
+    doFinishPicking(note.length > 0 ? note : undefined);
   };
 
   const handleFinishPicking = () => {
@@ -372,16 +581,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
       const items = missing.map((m) =>
         t('picking.finish.missingLine', { qty: m.missing, name: m.name }),
       );
-      setConfirmSheet({
-        title: t('picking.finish.missingTitle'),
-        message: t('picking.finish.missingBody'),
-        messageItems: items,
-        mode: 'confirm',
-        tone: 'warning',
-        confirmLabel: t('picking.finish.missingConfirm'),
-        icon: PackageOpen,
-        onConfirm: doFinishPicking,
-      });
+      setFinishMissingItems(items);
       return;
     }
 
@@ -439,50 +639,58 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
     setMissingLine(null);
   };
 
-  const handleReportMissing = (line: OrderLine) => {
-    Haptics.selectionAsync();
-    setMissingLine(line);
-    setPauseSheetVisible(true);
-  };
-
   const handleResumePicking = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     resumePicking(order.id);
   };
 
-  const handleCloseBulto = (bultoId: string) => {
-    const result = closeBulto(order.id, bultoId);
+  const handleRefreshArticleData = async () => {
+    if (refreshingArticleData) return;
+    Haptics.selectionAsync();
+    setRefreshingArticleData(true);
+    const result = await refreshArticleData(order.id);
+    setRefreshingArticleData(false);
+
     if (!result.ok) {
-      setConfirmSheet({
-        title: t('picking.bulto.cannotCloseEmptyTitle'),
-        message: t('picking.bulto.cannotCloseEmptyBody'),
-        mode: 'info',
-        confirmLabel: t('common.understood'),
-        icon: PackageOpen,
-      });
+      showArticleDataToast(t('picking.detail.refreshError'));
+      return;
     }
+    showArticleDataToast(
+      result.linesUpdated > 0
+        ? t('picking.detail.refreshSuccess', { count: result.linesUpdated })
+        : t('picking.detail.refreshNoChanges'),
+    );
   };
 
-  const showEmptyBultoModal = (bultoId: string, bultoNumber: number) => {
+  /**
+   * Tacho individual del header del bulto. Un bulto vacío y abierto se borra
+   * de un toque (no hay nada que perder); con ítems o cerrado se confirma
+   * antes, igual que el borrado múltiple.
+   */
+  const handleDeleteSingleBulto = (bultoId: string) => {
+    const bulto = order.bultos.find((b) => b.id === bultoId);
+    if (!bulto) return;
+
+    if (bulto.status === 'open' && bulto.items.length === 0) {
+      deleteBulto(order.id, bultoId);
+      return;
+    }
+
     setConfirmSheet({
-      title: t('picking.bulto.emptyModalTitle', { number: bultoNumber }),
-      message: t('picking.bulto.emptyModalBody'),
+      title: t('picking.bulto.deleteBultoConfirmTitle', { number: bulto.number }),
+      message:
+        bulto.items.length > 0
+          ? t('picking.bulto.deleteBultoConfirmBodyWithItems')
+          : t('picking.bulto.deleteBultoConfirmBody'),
       mode: 'confirm',
       tone: 'warning',
       confirmLabel: t('picking.bulto.deleteBulto'),
-      cancelLabel: t('picking.bulto.addItem'),
       icon: Trash2,
-      dismissible: false,
-      onConfirm: () => deleteBulto(order.id, bultoId),
-      onCancel: () => setAddSheetBultoId(bultoId),
+      onConfirm: () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        deleteBulto(order.id, bultoId);
+      },
     });
-  };
-
-  const handleRemoveItem = (bultoId: string, itemId: string) => {
-    const result = removeBultoItem(order.id, bultoId, itemId);
-    if (result.bultoEmpty) {
-      showEmptyBultoModal(result.bultoId, result.bultoNumber);
-    }
   };
 
   const commitAddItems = (bultoId: string, items: AddItemEntry[]) => {
@@ -598,6 +806,9 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         ]}
         progress={order.progressPercentage / 100}
         progressLabel={t('picking.detail.progressLabel')}
+        onRefresh={canRefreshArticleData ? handleRefreshArticleData : undefined}
+        refreshing={refreshingArticleData}
+        refreshAccessibilityLabel={t('picking.detail.refreshArticles')}
         footer={
           order.hasExtraBultos ? (
             <View style={styles.extraFlag}>
@@ -662,99 +873,26 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
             title={t('picking.detail.linesTitle')}
             icon={ClipboardList}
             collapsible
-            defaultExpanded
+            defaultExpanded={order.lines.length <= MANY_LINES}
             badge={String(order.lines.length)}
             marginTop={16}
           >
             <OrderDetailCard>
-              {order.lines.map((line, idx) => {
-                const assigned = getAssignedQtyForLine(order, line.id);
-                const pending = Math.max(0, line.requiredQty - assigned);
-                // Un renglón ya reportado no se puede volver a reportar ni
-                // corregir desde la app: solo la web lo resuelve.
-                const reported = pendingMissingByLineIndex.get(idx);
-                const isDuplicateSku = duplicateSkuSet.has(line.sku);
-                return (
-                  // Mantener presionado abre la vista previa del artículo: foto
-                  // y código en grande, para cotejar contra la etiqueta física.
-                  <Pressable
-                    key={line.id}
-                    onLongPress={() => {
-                      Haptics.selectionAsync();
-                      setPreviewLine(line);
-                    }}
-                    delayLongPress={250}
-                    style={[
-                      styles.lineRow,
-                      idx < order.lines.length - 1 && styles.lineRowBorder,
-                      isDuplicateSku && styles.lineRowDuplicate,
-                    ]}
-                  >
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <ExpandableText style={styles.lineName} numberOfLines={2}>
-                        {line.name}
-                      </ExpandableText>
-                      <View style={styles.lineSkuRow}>
-                        <Text style={styles.lineSku}>{line.sku}</Text>
-                        {isDuplicateSku ? (
-                          <View style={styles.duplicateSkuTag}>
-                            <Text style={styles.duplicateSkuTagText}>
-                              {t('picking.detail.duplicateSkuTag')}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={styles.lineMeta}>
-                        {t('picking.detail.lineMeta', {
-                          required: line.requiredQty,
-                          assigned,
-                          pending,
-                        })}
-                        {line.talla
-                          ? ` · ${t('picking.detail.tallaMeta', { talla: line.talla })}`
-                          : ''}
-                      </Text>
-                    </View>
-                    <View style={styles.lineActions}>
-                      <Text style={styles.lineQty}>×{line.requiredQty}</Text>
-                      {/* Atajo visible al "mantener presionado". Va en esta
-                          columna y no junto a la meta: el ancho de la izquierda
-                          varía con el largo de la cantidad (×12 vs ×225), y ahí
-                          los ojos quedaban desalineados entre filas. */}
-                      <Pressable
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setPreviewLine(line);
-                        }}
-                        hitSlop={12}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('picking.skuPreview.open')}
-                        style={({ pressed }) => [styles.eyeBtn, pressed && { opacity: 0.5 }]}
-                      >
-                        <Eye size={18} color="#8E8E93" strokeWidth={2.2} />
-                      </Pressable>
-                      {reported ? (
-                        <View style={styles.reportedBadge}>
-                          <AlertTriangle size={12} color="#B45309" strokeWidth={2.4} />
-                          <Text style={styles.reportedBadgeText}>
-                            {t('picking.missing.reportedBadge', { missing: reported.missingQty })}
-                          </Text>
-                        </View>
-                      ) : isEditable && !order.isPaused && pending > 0 ? (
-                        <Pressable
-                          onPress={() => handleReportMissing(line)}
-                          style={styles.reportMissingBtn}
-                        >
-                          <AlertTriangle size={14} color="#B45309" strokeWidth={2.2} />
-                          <Text style={styles.reportMissingText}>
-                            {t('picking.missing.reportBtn')}
-                          </Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
+              {order.lines.map((line, idx) => (
+                <OrderLineRow
+                  key={line.id}
+                  line={line}
+                  isLast={idx === order.lines.length - 1}
+                  assigned={assignedByLine.get(line.id) ?? 0}
+                  // La identidad del faltante es el índice del renglón, no el
+                  // SKU: dos renglones del mismo artículo se reportan por separado.
+                  reported={pendingMissingByLineIndex.get(idx)}
+                  isDuplicateSku={duplicateSkuSet.has(line.sku)}
+                  canReportMissing={canReportMissing}
+                  onPreview={handlePreviewLine}
+                  onReportMissing={handleReportMissing}
+                />
+              ))}
             </OrderDetailCard>
           </OrderDetailSection>
 
@@ -769,16 +907,105 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                 </Text>
               ) : null}
               {quickBundleCandidates.length > 0 ? (
-                <View style={styles.quickBundles}>
-                  <Text style={styles.quickBundlesTitle}>{t('picking.quickBundle.title')}</Text>
-                  {quickBundleCandidates.map((candidate) => (
-                    <QuickBundleCard
-                      key={candidate.lineId}
-                      candidate={candidate}
-                      onCreate={handleQuickBundle}
-                    />
-                  ))}
-                </View>
+                <OrderDetailSection
+                  title={t('picking.quickBundle.title')}
+                  collapsible
+                  defaultExpanded={quickBundleCandidates.length <= MANY_QUICK_BUNDLES}
+                  badge={String(quickBundleCandidates.length)}
+                >
+                  <View style={styles.quickBundles}>
+                    {quickBundleCandidates.map((candidate) => (
+                      <QuickBundleCard
+                        key={candidate.lineId}
+                        candidate={candidate}
+                        onCreate={handleQuickBundle}
+                      />
+                    ))}
+                  </View>
+                </OrderDetailSection>
+              ) : null}
+
+              {canSelectBultos ? (
+                inBultoSelection ? (
+                  <View style={styles.selectionBar}>
+                    <Pressable
+                      onPress={toggleSelectAllBultos}
+                      hitSlop={8}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: allBultosSelected }}
+                      style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                    >
+                      <View style={styles.selectAllBtn} collapsable={false}>
+                        {allBultosSelected ? (
+                          <SquareCheck size={20} color="#111827" strokeWidth={2.2} />
+                        ) : (
+                          <Square size={20} color="#8E8E93" strokeWidth={2.2} />
+                        )}
+                        <Text style={styles.selectAllText}>
+                          {t('picking.bulto.selectAll')} ({selectedVisibleIds.length}/
+                          {visibleBultos.length})
+                        </Text>
+                      </View>
+                    </Pressable>
+                    {canRenumberBultos ? (
+                      <Text style={styles.selectionHint}>{t('picking.bulto.renumberHint')}</Text>
+                    ) : null}
+                    <View style={styles.selectionActions} collapsable={false}>
+                      <Pressable
+                        onPress={exitBultoSelection}
+                        hitSlop={8}
+                        style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                      >
+                        <View style={styles.selectionCancel} collapsable={false}>
+                          <Text style={styles.selectionCancelText}>{t('common.cancel')}</Text>
+                        </View>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleDeleteSelectedBultos}
+                        disabled={selectedVisibleIds.length === 0}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('picking.bulto.deleteSelected', {
+                          count: selectedVisibleIds.length,
+                        })}
+                        style={({ pressed }) => [pressed && { opacity: 0.75 }]}
+                      >
+                        <View
+                          style={[
+                            styles.selectionDelete,
+                            selectedVisibleIds.length === 0 && styles.selectionDeleteDisabled,
+                          ]}
+                          collapsable={false}
+                        >
+                          <Trash2 size={15} color="#FFFFFF" strokeWidth={2.4} />
+                          <Text style={styles.selectionDeleteText}>
+                            {t('picking.bulto.deleteSelected', {
+                              count: selectedVisibleIds.length,
+                            })}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setSelectedBultoIds([]);
+                      setBultoSelectionMode(true);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.selectModePressable,
+                      pressed && { opacity: 0.75 },
+                    ]}
+                  >
+                    <View style={styles.selectModeBtn} collapsable={false}>
+                      <ListChecks size={15} color="#111827" strokeWidth={2.2} />
+                      <Text style={styles.selectModeText}>{t('picking.bulto.select')}</Text>
+                    </View>
+                  </Pressable>
+                )
               ) : null}
 
               {visibleBultos.length === 0 ? (
@@ -790,23 +1017,23 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                   <BultoCard
                     key={bulto.id}
                     bulto={bulto}
+                    defaultExpanded={visibleBultos.length <= MANY_BULTOS}
                     editable={isEditable}
-                    getItemMaxQty={(itemId) => getMaxQtyForBultoItem(order, itemId)}
-                    onClose={(bid) => handleCloseBulto(bid)}
-                    onReopen={(bid) => reopenBulto(order.id, bid)}
+                    getItemMaxQty={getItemMaxQty}
+                    onClose={handleCloseBulto}
+                    onReopen={handleReopenBulto}
                     onAddItem={handleAddItemToBulto}
-                    onCapacityExceeded={() => showCapacityToast(maxReachedTooltip)}
-                    onUpdateItemQty={(bid, iid, qty) => {
-                      if (qty < 1) {
-                        handleRemoveItem(bid, iid);
-                        return;
-                      }
-                      const maxQty = getMaxQtyForBultoItem(order, iid);
-                      if (qty > maxQty) showCapacityToast(maxReachedTooltip);
-                      updateBultoItem(order.id, bid, iid, Math.min(qty, maxQty));
-                    }}
-                    onRemoveItem={(bid, iid) => handleRemoveItem(bid, iid)}
-                    onDelete={(bid) => deleteBulto(order.id, bid)}
+                    onCapacityExceeded={handleCapacityExceeded}
+                    onUpdateItemQty={handleUpdateItemQty}
+                    onRemoveItem={handleRemoveItem}
+                    onDelete={handleDeleteSingleBulto}
+                    selectionMode={inBultoSelection}
+                    selected={selectedVisibleIds.includes(bulto.id)}
+                    onToggleSelect={toggleBultoSelected}
+                    onLongPressSelect={canSelectBultos ? startBultoSelectionWith : undefined}
+                    onRenumber={canRenumberBultos ? handleRenumberBulto : undefined}
+                    maxNumber={order.bultos.length}
+                    onPreviewItem={handlePreviewItem}
                   />
                 ))
               )}
@@ -844,7 +1071,20 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         onConfirm={handleConfirmPause}
       />
 
+      <FinishMissingSheet
+        visible={finishMissingItems !== null}
+        items={finishMissingItems ?? []}
+        onClose={() => setFinishMissingItems(null)}
+        onConfirm={handleConfirmFinishMissing}
+      />
+
       <Toast message={capacityToast} nudgeToken={capacityToastNudge} topInset={insets.top + 64} />
+      <Toast
+        message={articleDataToast}
+        nudgeToken={articleDataToastNudge}
+        topInset={insets.top + 64}
+      />
+      <Toast message={renumberToast} nudgeToken={renumberToastNudge} topInset={insets.top + 64} />
 
       <ConfirmSheet
         visible={confirmSheet !== null}
@@ -881,59 +1121,6 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
   },
   extraFlagText: { fontSize: 12, color: '#B45309', fontWeight: '600' },
-  lineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  lineRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth * 2,
-    borderBottomColor: '#F3F4F6',
-  },
-  // Se resalta cuando el picker marcó ese SKU al pausar por "sku_duplicado"
-  // (ver `duplicateSkuSet`), para reconocerlo de un vistazo en la lista.
-  lineRowDuplicate: { backgroundColor: '#EFF6FF' },
-  lineName: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  lineSkuRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  lineSku: { fontSize: 11, color: '#8E8E93' },
-  duplicateSkuTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: '#DBEAFE',
-  },
-  duplicateSkuTagText: { fontSize: 9, fontWeight: '700', color: '#1D4ED8' },
-  lineMeta: { fontSize: 11, color: '#6B7280', marginTop: 4, lineHeight: 16 },
-  lineActions: { alignItems: 'flex-end', gap: 6 },
-  lineQty: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  reportMissingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: '#FFFBEB',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: '#FDE68A',
-  },
-  reportMissingText: { fontSize: 10, fontWeight: '700', color: '#B45309' },
-  reportedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: '#FEF3C7',
-  },
-  reportedBadgeText: { fontSize: 10, fontWeight: '700', color: '#B45309' },
-  eyeBtn: {
-    alignSelf: 'flex-end',
-    padding: 2,
-  },
   quickBundles: {
     marginBottom: 12,
   },
@@ -957,6 +1144,67 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 10,
   },
+  selectModePressable: {
+    alignSelf: 'flex-end',
+    marginBottom: 12,
+  },
+  selectModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#E9E9EB',
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
+  },
+  selectModeText: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  /**
+   * Columna, no fila: con contador + 2 botones no siempre entra todo en un
+   * mismo renglón, y `marginLeft: 'auto'` combinado con `flexWrap` llegó a
+   * empujar "Eliminar" fuera de la vista en pantallas angostas. Apilado
+   * queda siempre visible sin depender de cuánto ancho sobre.
+   */
+  selectionBar: {
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
+    marginBottom: 12,
+  },
+  selectAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36 },
+  selectAllText: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  selectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  selectionCancel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 36,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+  },
+  selectionCancelText: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
+  selectionDelete: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: '#DC2626',
+  },
+  selectionDeleteDisabled: { backgroundColor: '#FCA5A5' },
+  selectionHint: { fontSize: 12, lineHeight: 16, color: '#6B7280' },
+  selectionDeleteText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   emptyBultosTitle: {
     fontSize: 13,
     color: '#8E8E93',

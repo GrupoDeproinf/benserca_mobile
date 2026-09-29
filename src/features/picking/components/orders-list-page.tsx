@@ -2,13 +2,12 @@ import type { LucideIcon } from 'lucide-react-native';
 import { ClipboardList } from 'lucide-react-native';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, View, type ListRenderItem } from 'react-native';
+import { FlatList, type ListRenderItem, View } from 'react-native';
 import { AppHeroTitleSection } from '@/features/tabs/components/app-hero-title-section';
 import { Text } from '@/shared/components/ui/text';
-import type { PickerOrderFilter } from '../hooks/use-picker-orders';
 import { AppTopBar } from './app-top-bar';
 import { OrdersSearchFilter } from './orders-search-filter';
-import { OrdersStatsGrid, type OrdersStatItem } from './orders-stats-grid';
+import { type OrdersStatItem, OrdersStatsGrid } from './orders-stats-grid';
 
 /** Espacio entre cards en la lista (FlatList ItemSeparator). */
 export const ORDERS_LIST_CARD_GAP = 24;
@@ -21,9 +20,16 @@ interface OrdersListPageProps<T> {
   stats?: OrdersStatItem[];
   showStats?: boolean;
   ordersCount: number;
-  filterValue?: PickerOrderFilter;
-  onFilterChange?: (value: PickerOrderFilter) => void;
+  filterValue?: string;
+  onFilterChange?: (value: string) => void;
+  /** Opciones del dropdown; por defecto las del picker (`PICKER_FILTER_STATUSES`). */
+  filterOptions?: readonly string[];
+  getFilterLabel?: (value: string, t: (key: string) => string) => string;
   showFilter?: boolean;
+  /** Botón de refresh manual junto al filtro. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  refreshLabel?: string;
   onNotificationsPress: () => void;
   onScanPress?: () => void;
   contentPaddingBottom: number;
@@ -45,7 +51,12 @@ export function OrdersListPage<T>({
   ordersCount,
   filterValue = 'all',
   onFilterChange,
+  filterOptions,
+  getFilterLabel,
   showFilter = true,
+  onRefresh,
+  refreshing = false,
+  refreshLabel,
   onNotificationsPress,
   onScanPress,
   contentPaddingBottom,
@@ -63,11 +74,14 @@ export function OrdersListPage<T>({
       search={search}
       onSearchChange={onSearchChange}
       filterValue={filterValue}
-      onFilterChange={
-        onFilterChange ? (value) => onFilterChange(value as PickerOrderFilter) : undefined
-      }
+      onFilterChange={onFilterChange}
+      filterOptions={filterOptions}
+      getFilterLabel={getFilterLabel}
       showFilter={showFilter}
       embedded={embedded}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      refreshLabel={refreshLabel}
     />
   );
 
@@ -135,4 +149,4 @@ export function OrdersListPage<T>({
   );
 }
 
-export type { OrdersStatItem, LucideIcon };
+export type { LucideIcon, OrdersStatItem };

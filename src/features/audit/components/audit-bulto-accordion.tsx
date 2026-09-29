@@ -1,12 +1,16 @@
-import { CheckCircle2, ChevronDown, ChevronUp, XCircle } from 'lucide-react-native';
-import { useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { CheckCircle2, ChevronDown, ChevronUp, Eye, XCircle } from 'lucide-react-native';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { OrderActionButton } from '@/features/picking/components/order-action-button';
 import type { Bulto } from '@/features/picking/types';
 import { ExpandableText } from '@/shared/components/ui/expandable-text';
+import { SelectionCheck } from './selection-check';
 
 export type BultoAuditStatus = 'approved' | 'rejected' | null;
+
+const NO_CHECKED_ITEMS: readonly string[] = [];
 
 interface AuditBultoAccordionProps {
   bulto: Bulto;
@@ -14,17 +18,37 @@ interface AuditBultoAccordionProps {
   readOnly?: boolean;
   /** En una re-revisión, los bultos corregidos llegan abiertos. */
   defaultExpanded?: boolean;
-  onApprove?: () => void;
-  onReject?: () => void;
+  onApprove?: (bultoId: string) => void;
+  onReject?: (bultoId: string) => void;
+  /** Abre la vista previa (foto + código) del renglón dueño del ítem. */
+  onPreviewItem?: (lineId: string) => void;
+  /** Bulto de un solo artículo: se selecciona desde la cabecera para aprobar/rechazar en bloque. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (bultoId: string) => void;
+  /**
+   * Bulto mixto: el chequeador tilda los artículos que están bien. Solo se
+   * aprueba con todos tildados; al rechazar, los no tildados son los malos.
+   */
+  itemCheckable?: boolean;
+  checkedItemIds?: readonly string[];
+  onToggleItem?: (bultoId: string, itemId: string, checked: boolean) => void;
 }
 
-export function AuditBultoAccordion({
+export const AuditBultoAccordion = memo(function AuditBultoAccordion({
   bulto,
   reviewStatus,
   readOnly = false,
   defaultExpanded = false,
   onApprove,
   onReject,
+  onPreviewItem,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  itemCheckable = false,
+  checkedItemIds = NO_CHECKED_ITEMS,
+  onToggleItem,
 }: AuditBultoAccordionProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -32,6 +56,11 @@ export function AuditBultoAccordion({
 
   const isApproved = reviewStatus === 'approved';
   const isRejected = reviewStatus === 'rejected';
+
+  const checkedCount = itemCheckable
+    ? bulto.items.filter((item) => checkedItemIds.includes(item.id)).length
+    : 0;
+  const allItemsChecked = !itemCheckable || checkedCount === bulto.items.length;
 
   const cardBorderStyle = isApproved
     ? styles.cardApproved
@@ -42,11 +71,20 @@ export function AuditBultoAccordion({
         : styles.cardOpen;
 
   return (
-    <View style={[styles.card, cardBorderStyle]}>
+    <View style={[styles.card, cardBorderStyle, selected && styles.cardSelected]}>
       <Pressable
         onPress={() => setExpanded((v) => !v)}
         style={[styles.header, isClosed ? styles.headerClosed : styles.headerOpen]}
       >
+        {selectable && !readOnly ? (
+          <View style={styles.selectSlot}>
+            <SelectionCheck
+              checked={selected}
+              onToggle={() => onToggleSelect?.(bulto.id)}
+              accessibilityLabel={t('audit.bulto.select', { number: bulto.number })}
+            />
+          </View>
+        ) : null}
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>{t('audit.bulto.title', { number: bulto.number })}</Text>
           {reviewStatus ? (
@@ -73,7 +111,9 @@ export function AuditBultoAccordion({
         </View>
         <View style={styles.headerRight}>
           <Text style={styles.itemCount}>
-            {t('audit.bulto.itemCount', { count: bulto.items.length })}
+            {itemCheckable && !readOnly
+              ? t('audit.bulto.itemsChecked', { checked: checkedCount, total: bulto.items.length })
+              : t('audit.bulto.itemCount', { count: bulto.items.length })}
           </Text>
           {expanded ? (
             <ChevronUp size={18} color="#8E8E93" strokeWidth={2.2} />
@@ -85,6 +125,9 @@ export function AuditBultoAccordion({
 
       {expanded ? (
         <View style={styles.body}>
+          {itemCheckable && !readOnly && bulto.items.length > 0 ? (
+            <Text style={styles.checkHint}>{t('audit.bulto.checkItemsHint')}</Text>
+          ) : null}
           {bulto.items.length === 0 ? (
             <Text style={styles.empty}>{t('audit.bulto.empty')}</Text>
           ) : (
@@ -93,12 +136,37 @@ export function AuditBultoAccordion({
                 key={item.id}
                 style={[styles.itemRow, idx < bulto.items.length - 1 && styles.itemRowBorder]}
               >
+                {itemCheckable && !readOnly ? (
+                  <View style={styles.itemCheckSlot}>
+                    <SelectionCheck
+                      checked={checkedItemIds.includes(item.id)}
+                      onToggle={() =>
+                        onToggleItem?.(bulto.id, item.id, !checkedItemIds.includes(item.id))
+                      }
+                      accessibilityLabel={t('audit.bulto.checkItem', { name: item.name })}
+                    />
+                  </View>
+                ) : null}
                 <View style={styles.itemInfo}>
                   <ExpandableText style={styles.itemName} numberOfLines={2}>
                     {item.name}
                   </ExpandableText>
                   <Text style={styles.itemSku}>{item.sku}</Text>
                 </View>
+                {onPreviewItem ? (
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      onPreviewItem(item.lineId);
+                    }}
+                    hitSlop={12}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('picking.skuPreview.open')}
+                    style={({ pressed }) => [styles.eyeBtn, pressed && { opacity: 0.5 }]}
+                  >
+                    <Eye size={18} color="#8E8E93" strokeWidth={2.2} />
+                  </Pressable>
+                ) : null}
                 <Text style={styles.itemQty}>×{item.qty}</Text>
               </View>
             ))
@@ -110,7 +178,7 @@ export function AuditBultoAccordion({
                 <OrderActionButton
                   label={t('audit.bulto.reject')}
                   onPress={() => {
-                    if (!isRejected) onReject?.();
+                    if (!isRejected) onReject?.(bulto.id);
                   }}
                   variant="secondary"
                   size="compact"
@@ -122,12 +190,12 @@ export function AuditBultoAccordion({
                 <OrderActionButton
                   label={t('audit.bulto.approve')}
                   onPress={() => {
-                    if (!isApproved) onApprove?.();
+                    if (!isApproved && allItemsChecked) onApprove?.(bulto.id);
                   }}
                   variant="primary"
                   size="compact"
                   icon={CheckCircle2}
-                  disabled={isApproved}
+                  disabled={isApproved || !allItemsChecked}
                 />
               </View>
             </View>
@@ -136,7 +204,7 @@ export function AuditBultoAccordion({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -162,6 +230,22 @@ const styles = StyleSheet.create({
   },
   cardRejected: {
     borderColor: '#FCA5A5',
+  },
+  cardSelected: {
+    borderColor: '#000000',
+    borderWidth: 2,
+  },
+  selectSlot: {
+    marginRight: 12,
+  },
+  itemCheckSlot: {
+    marginRight: 12,
+  },
+  checkHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    paddingTop: 10,
+    paddingBottom: 2,
   },
   header: {
     flexDirection: 'row',
@@ -271,6 +355,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#111827',
+  },
+  eyeBtn: {
+    padding: 2,
+    marginRight: 8,
   },
   actions: {
     flexDirection: 'row',
