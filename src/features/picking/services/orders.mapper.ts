@@ -278,6 +278,8 @@ export function firestoreDocToOrder(id: string, data: Record<string, any>): Orde
     // flag, lo que manda es el estado real de los items.
     hasMissingItems: missingItems.some((m) => m.resolution === 'pending'),
 
+    duplicateSkusPromo: data.duplicate_skus_promo === true,
+
     // Se normalizan a ISO: en Firestore estos campos pueden venir como
     // Timestamp, y un Timestamp crudo rompe cualquier `new Date(...)` posterior
     // (orden por fecha, filtros, tiempo en cola).

@@ -39,6 +39,7 @@ import { OrderDetailBodyFade } from '../components/order-detail-transition';
 import { OrderLineRow } from '../components/order-line-row';
 import { type MarkedMissingLine, PausePickingSheet } from '../components/pause-picking-sheet';
 import { QuickBundleCard } from '../components/quick-bundle-card';
+import { QuickBundleCountSheet } from '../components/quick-bundle-count-sheet';
 import { SkuPreviewSheet } from '../components/sku-preview-sheet';
 import { useFirestoreOrder } from '../hooks/use-firestore-order';
 import { useOrdersStore } from '../store/orders.store';
@@ -152,6 +153,8 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
   const [missingLine, setMissingLine] = useState<OrderLine | null>(null);
   /** Renglón cuya foto y código se están viendo en grande. */
   const [previewLine, setPreviewLine] = useState<OrderLine | null>(null);
+  /** Renglón de bulto rápido cuya cantidad de bultos se está eligiendo. */
+  const [quickBundleEditLineId, setQuickBundleEditLineId] = useState<string | null>(null);
   const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
   const [confirmSheet, setConfirmSheet] = useState<ConfirmState | null>(null);
   /** Cantidades sin asignar al tocar "Finalizar"; `null` oculta la hoja. */
@@ -409,6 +412,8 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
    * SKUs que Profit repitió en más de un renglón: son los candidatos que se
    * ofrecen en la hoja de pausa para el motivo `sku_duplicado` (ver
    * `getDuplicateSkus`). El picker elige cuáles de ellos son el problema real.
+   * Si el pedido trae `duplicate_skus_promo: true` los repetidos son una
+   * promoción y ese motivo ni se ofrece (ver `allowDuplicateSkuReason`).
    */
   const duplicateSkuCandidates = getDuplicateSkus(order.lines);
   /**
@@ -425,6 +430,15 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
   };
+
+  const handleQuickBundleCount = (lineId: string, count: number) => {
+    setQuickBundleEditLineId(null);
+    createQuickBundle(order.id, lineId, count);
+  };
+
+  /** Se busca en vivo: si la tarjeta desaparece (se armó desde otro lado), la hoja se cierra. */
+  const quickBundleEditCandidate =
+    quickBundleCandidates.find((c) => c.lineId === quickBundleEditLineId) ?? null;
 
   const lastObservation = order.auditObservations[order.auditObservations.length - 1];
   const closedBultos = order.bultos.filter(
@@ -795,6 +809,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         status={order.status}
         auditResult={order.auditResult}
         isPaused={order.isPaused}
+        isPromo={order.duplicateSkusPromo}
         onBack={() => router.back()}
         meta={[
           { label: t('picking.detail.definedBultos'), value: String(order.definedBultos) },
@@ -919,6 +934,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
                         key={candidate.lineId}
                         candidate={candidate}
                         onCreate={handleQuickBundle}
+                        onEditCount={setQuickBundleEditLineId}
                       />
                     ))}
                   </View>
@@ -1061,6 +1077,7 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
         visible={pauseSheetVisible}
         pendingItems={reportableItems}
         duplicateSkus={duplicateSkuCandidates}
+        allowDuplicateSkuReason={!order.duplicateSkusPromo}
         lockedReason={missingLine ? 'falta_articulo' : undefined}
         focusLineId={missingLine?.id}
         alreadyReported={order.hasMissingItems}
@@ -1069,6 +1086,12 @@ export function PickingDetailScreen({ orderId, readOnly = false }: PickingDetail
           setMissingLine(null);
         }}
         onConfirm={handleConfirmPause}
+      />
+
+      <QuickBundleCountSheet
+        candidate={quickBundleEditCandidate}
+        onClose={() => setQuickBundleEditLineId(null)}
+        onConfirm={handleQuickBundleCount}
       />
 
       <FinishMissingSheet

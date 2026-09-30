@@ -7,6 +7,11 @@ interface ExpandableTextProps {
   /** Líneas visibles mientras está colapsado. */
   numberOfLines?: number;
   style?: StyleProp<TextStyle>;
+  /**
+   * Pulsación larga: como el texto captura el toque, un `onLongPress` del padre
+   * no llega si se presiona justo sobre el nombre. Se reenvía por aquí.
+   */
+  onLongPress?: () => void;
 }
 
 /**
@@ -18,7 +23,12 @@ interface ExpandableTextProps {
  * Ojo al colocarlo dentro de una fila pulsable: el toque sobre el texto lo
  * captura este componente y ya no llega al padre.
  */
-export function ExpandableText({ children, numberOfLines = 2, style }: ExpandableTextProps) {
+export function ExpandableText({
+  children,
+  numberOfLines = 2,
+  style,
+  onLongPress,
+}: ExpandableTextProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -26,6 +36,7 @@ export function ExpandableText({ children, numberOfLines = 2, style }: Expandabl
       style={style}
       numberOfLines={expanded ? undefined : numberOfLines}
       onPress={() => setExpanded((v) => !v)}
+      onLongPress={onLongPress}
       suppressHighlighting
     >
       {children}

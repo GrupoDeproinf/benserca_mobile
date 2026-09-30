@@ -6,6 +6,7 @@ type BultoActionVariant = 'filled' | 'outline';
 interface BultoActionButtonProps {
   label: string;
   onPress: () => void;
+  onLongPress?: () => void;
   icon: LucideIcon;
   variant?: BultoActionVariant;
 }
@@ -13,6 +14,7 @@ interface BultoActionButtonProps {
 export function BultoActionButton({
   label,
   onPress,
+  onLongPress,
   icon: Icon,
   variant = 'outline',
 }: BultoActionButtonProps) {
@@ -21,6 +23,8 @@ export function BultoActionButton({
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       android_ripple={{ color: filled ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)' }}
       style={({ pressed }) => [styles.pressable, pressed && { opacity: 0.88 }]}
     >

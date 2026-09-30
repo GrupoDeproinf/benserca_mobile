@@ -280,6 +280,14 @@ export interface Order {
    */
   hasMissingItems: boolean;
 
+  /**
+   * `duplicate_skus_promo` en Firestore. Solo viene en pedidos con SKUs
+   * repetidos: `true` es una promoción (el "20 + 2", los renglones están bien y
+   * no se puede devolver por SKU duplicado); `false` o ausente es un error de
+   * Profit y el picker sí lo devuelve con motivo `sku_duplicado`.
+   */
+  duplicateSkusPromo: boolean;
+
   createdAt: string;
   assignedAt: string | null;
   packedAt: string | null;

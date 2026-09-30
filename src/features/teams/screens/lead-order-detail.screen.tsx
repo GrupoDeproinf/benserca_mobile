@@ -186,6 +186,7 @@ export function LeadOrderDetailScreen({ orderId }: LeadOrderDetailScreenProps) {
         status={order.status}
         auditResult={order.auditResult}
         isPaused={order.isPaused}
+        isPromo={order.duplicateSkusPromo}
         onBack={() => router.back()}
         meta={[
           { label: t('picking.detail.definedBultos'), value: String(order.definedBultos) },

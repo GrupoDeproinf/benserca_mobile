@@ -285,13 +285,27 @@ export function applyOpenBulto(order: Order): Partial<Order> {
  *
  * No toca los bultos abiertos: los rápidos se agregan al final, así que el
  * picker puede tener uno a medias sin que esto lo interrumpa.
+ *
+ * `count` permite armar menos de los que da el cálculo (la app no ve el
+ * inventario: si en almacén no alcanza, el picker lo baja a mano). Se acota a
+ * [1, availableBundles]; sin `count` se arman todos. Lo que no se arme sigue
+ * pendiente y la tarjeta lo vuelve a ofrecer.
  */
-export function applyQuickBundle(order: Order, lineId: string): Partial<Order> | null {
+export function applyQuickBundle(
+  order: Order,
+  lineId: string,
+  count?: number,
+): Partial<Order> | null {
   const candidate = getQuickBundleCandidates(order).find((c) => c.lineId === lineId);
   if (!candidate) return null;
 
+  const bundlesToBuild =
+    count === undefined
+      ? candidate.availableBundles
+      : Math.min(candidate.availableBundles, Math.max(1, Math.floor(count)));
+
   const stamp = Date.now();
-  const nuevos: Bulto[] = Array.from({ length: candidate.availableBundles }, (_, idx) => {
+  const nuevos: Bulto[] = Array.from({ length: bundlesToBuild }, (_, idx) => {
     const number = order.bultos.length + idx + 1;
     return {
       id: `bulto-${order.id}-quick-${stamp}-${idx}`,

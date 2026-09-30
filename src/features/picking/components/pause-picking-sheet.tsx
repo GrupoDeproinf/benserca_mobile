@@ -40,6 +40,12 @@ interface PausePickingSheetProps {
    */
   duplicateSkus?: string[];
   /**
+   * Ofrecer el motivo `sku_duplicado`. Se apaga cuando el pedido trae
+   * `duplicate_skus_promo: true`: los renglones repetidos son una promoción y
+   * el pedido está bien, así que no se puede devolver por eso.
+   */
+  allowDuplicateSkuReason?: boolean;
+  /**
    * Fija el motivo y oculta el selector. Se usa al entrar desde un renglón
    * concreto de la lista de artículos, donde el motivo solo puede ser faltante.
    */
@@ -85,6 +91,7 @@ export function PausePickingSheet({
   visible,
   pendingItems,
   duplicateSkus = [],
+  allowDuplicateSkuReason = true,
   lockedReason,
   focusLineId,
   alreadyReported = false,
@@ -116,6 +123,8 @@ export function PausePickingSheet({
       setSelectedDuplicateSkus(new Set());
     }
   }, [visible, lockedReason, focusLineId]);
+
+  const reasons = allowDuplicateSkuReason ? REASONS : REASONS.filter((r) => r !== 'sku_duplicado');
 
   const reasonLabel = (r: PauseReason) => {
     if (r === 'falta_articulo') return t('picking.pause.reasonMissingItem');
@@ -229,7 +238,7 @@ export function PausePickingSheet({
 
               {selectOpen ? (
                 <View style={styles.selectOptions}>
-                  {REASONS.map((r) => (
+                  {reasons.map((r) => (
                     <Pressable
                       key={r}
                       onPress={() => {

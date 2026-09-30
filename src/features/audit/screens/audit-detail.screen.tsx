@@ -358,6 +358,7 @@ export function AuditDetailScreen({ orderId }: AuditDetailScreenProps) {
         status={order.status}
         auditResult={order.auditResult}
         isPaused={order.isPaused}
+        isPromo={order.duplicateSkusPromo}
         onBack={() => router.back()}
         meta={headerMeta}
         metaInScroll

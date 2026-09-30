@@ -466,6 +466,7 @@ export const MOCK_ORDERS: Order[] = [
     pauseInfo: null,
     missingItems: [],
     hasMissingItems: false,
+    duplicateSkusPromo: false,
     rejectedBundles: [],
     approvedBundles: [],
     loadedBundles: [],

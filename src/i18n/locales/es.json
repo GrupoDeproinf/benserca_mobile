@@ -99,6 +99,7 @@
       "extraBultos": "Bultos adicionales"
     },
     "detail": {
+      "promoBadge": "Promoción",
       "notFound": "Pedido no encontrado.",
       "startPicking": "Iniciar picking",
       "reopenPicking": "Reabrir picking",
@@ -140,7 +141,10 @@
       "cardTitle": "Bulto rápido",
       "unitsPill": "{{units}} uds./bulto",
       "remaining": "{{count}} bulto(s)",
-      "build": "Armar {{count}} bulto(s)"
+      "build": "Armar {{count}} bulto(s)",
+      "editCount": "Cambiar cantidad de bultos",
+      "editTitle": "¿Cuántos bultos armar?",
+      "editSuggested": "Sugerido: {{count}}"
     },
     "queue": {
       "blockTitle": "No puedes iniciar",

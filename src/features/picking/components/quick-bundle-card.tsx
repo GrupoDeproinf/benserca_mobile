@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { Zap } from 'lucide-react-native';
+import { Pencil, Zap } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { ExpandableText } from '@/shared/components/ui/expandable-text';
 import { Text } from '@/shared/components/ui/text';
 import type { QuickBundleCandidate } from '../utils/quick-bundles';
@@ -10,6 +10,8 @@ import { BultoActionButton } from './bulto-action-button';
 interface QuickBundleCardProps {
   candidate: QuickBundleCandidate;
   onCreate: (lineId: string) => void;
+  /** Abre el editor de cantidad (mantener presionada la tarjeta o tocar el lápiz). */
+  onEditCount: (lineId: string) => void;
 }
 
 /**
@@ -26,12 +28,20 @@ interface QuickBundleCardProps {
  *
  * Solo existe si el renglón da para al menos un bulto completo, así que no hay
  * estado deshabilitado: si no aparece, ese artículo se arma a mano.
+ *
+ * El botón arma todos los que da el cálculo. Si en almacén no alcanza, se
+ * mantiene presionada la tarjeta (o se toca el lápiz) para elegir cuántos.
  */
-export function QuickBundleCard({ candidate, onCreate }: QuickBundleCardProps) {
+export function QuickBundleCard({ candidate, onCreate, onEditCount }: QuickBundleCardProps) {
   const { t } = useTranslation();
 
+  const openEditor = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onEditCount(candidate.lineId);
+  };
+
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onLongPress={openEditor} delayLongPress={350}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>{t('picking.quickBundle.cardTitle')}</Text>
@@ -42,15 +52,26 @@ export function QuickBundleCard({ candidate, onCreate }: QuickBundleCardProps) {
             </Text>
           </View>
         </View>
-        <Text style={styles.remaining}>
-          {t('picking.quickBundle.remaining', { count: candidate.availableBundles })}
-        </Text>
+        <Pressable
+          onPress={openEditor}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('picking.quickBundle.editCount')}
+          style={({ pressed }) => pressed && { opacity: 0.6 }}
+        >
+          <View style={styles.remainingRow}>
+            <Text style={styles.remaining}>
+              {t('picking.quickBundle.remaining', { count: candidate.availableBundles })}
+            </Text>
+            <Pencil size={13} color="#8E8E93" strokeWidth={2.2} />
+          </View>
+        </Pressable>
       </View>
 
       <View style={styles.body}>
         <View style={styles.itemRow}>
           <View style={{ flex: 1, marginRight: 8 }}>
-            <ExpandableText style={styles.itemName} numberOfLines={1}>
+            <ExpandableText style={styles.itemName} numberOfLines={1} onLongPress={openEditor}>
               {candidate.name}
             </ExpandableText>
             <Text style={styles.itemSku}>
@@ -72,10 +93,11 @@ export function QuickBundleCard({ candidate, onCreate }: QuickBundleCardProps) {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               onCreate(candidate.lineId);
             }}
+            onLongPress={openEditor}
           />
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -125,6 +147,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#B45309',
+  },
+  remainingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   remaining: {
     fontSize: 12,

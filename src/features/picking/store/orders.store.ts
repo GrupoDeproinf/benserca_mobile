@@ -482,7 +482,8 @@ interface OrdersState {
    * Arma de un toque un bulto ya cerrado con `units_per_bundle` unidades de ese
    * renglón. Devuelve `false` si ya no queda un bulto completo por armar.
    */
-  createQuickBundle: (orderId: string, lineId: string) => boolean;
+  /** `count`: cuántos bultos armar; sin él, todos los que da el cálculo. */
+  createQuickBundle: (orderId: string, lineId: string, count?: number) => boolean;
   closeBulto: (orderId: string, bultoId: string) => CloseBultoResult;
   reopenBulto: (orderId: string, bultoId: string) => void;
   deleteBulto: (orderId: string, bultoId: string) => void;
@@ -916,11 +917,11 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     return { ok: true, isExtra };
   },
 
-  createQuickBundle: (orderId, lineId) => {
+  createQuickBundle: (orderId, lineId, count) => {
     const order = get().getOrderById(orderId);
     if (!order) return false;
 
-    const patch = applyQuickBundle(order, lineId);
+    const patch = applyQuickBundle(order, lineId, count);
     if (!patch) return false;
 
     set((s) => ({ orders: patchOrder(s.orders, orderId, patch) }));

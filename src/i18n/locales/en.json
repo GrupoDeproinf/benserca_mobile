@@ -94,6 +94,7 @@
       "extraBultos": "Extra packages"
     },
     "detail": {
+      "promoBadge": "Promotion",
       "notFound": "Order not found.",
       "startPicking": "Start picking",
       "reopenPicking": "Reopen picking",
@@ -251,7 +252,10 @@
       "cardTitle": "Quick package",
       "unitsPill": "{{units}} units/package",
       "remaining": "{{count}} package(s)",
-      "build": "Build {{count}} package(s)"
+      "build": "Build {{count}} package(s)",
+      "editCount": "Change number of packages",
+      "editTitle": "How many packages?",
+      "editSuggested": "Suggested: {{count}}"
     },
     "queue": {
       "blockTitle": "Cannot start",

@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, Tag } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
@@ -116,6 +116,21 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  badges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  promoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FAE8FF',
+  },
+  promoBadgeText: {
+    color: '#A21CAF',
   },
   card: {
     marginHorizontal: 16,
@@ -243,6 +258,11 @@ interface OrderDetailHeaderProps {
   auditResult?: 'approved' | 'rejected' | null;
   /** Si el pedido está pausado, el badge "En pausa" reemplaza al del estatus. */
   isPaused?: boolean;
+  /**
+   * `duplicate_skus_promo`: los SKUs repetidos del pedido son una promoción.
+   * Muestra la etiqueta "Promoción" junto al estatus.
+   */
+  isPromo?: boolean;
   meta: { label: string; value: string }[];
   /** Progreso 0-1; dibuja el círculo al final de la fila de la meta card. */
   progress?: number;
@@ -266,6 +286,7 @@ export function OrderDetailHeader({
   status,
   auditResult,
   isPaused = false,
+  isPromo = false,
   meta,
   progress: metaProgress,
   progressLabel,
@@ -364,11 +385,23 @@ export function OrderDetailHeader({
                   {client}
                 </Text>
               </View>
-              {badgeStyle ? (
-                <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
-                  <Text style={[styles.badgeText, { color: badgeStyle.text }]}>{statusLabel}</Text>
-                </View>
-              ) : null}
+              <View style={styles.badges}>
+                {isPromo ? (
+                  <View style={[styles.badge, styles.promoBadge]}>
+                    <Tag size={11} color="#A21CAF" strokeWidth={2.6} />
+                    <Text style={[styles.badgeText, styles.promoBadgeText]}>
+                      {t('picking.detail.promoBadge')}
+                    </Text>
+                  </View>
+                ) : null}
+                {badgeStyle ? (
+                  <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
+                    <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
+                      {statusLabel}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               {onRefresh ? (
                 <RefreshIconButton
                   onPress={onRefresh}

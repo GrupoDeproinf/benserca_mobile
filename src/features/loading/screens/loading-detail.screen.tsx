@@ -194,6 +194,7 @@ export function LoadingDetailScreen({ orderId }: LoadingDetailScreenProps) {
         status={order.status}
         auditResult={order.auditResult}
         isPaused={order.isPaused}
+        isPromo={order.duplicateSkusPromo}
         onBack={() => router.back()}
         meta={[
           { label: t('loading.detail.bultos'), value: String(progress.total) },
