@@ -16,8 +16,9 @@ export function usePickerOrders(filter: PickerOrderFilter = 'all'): Order[] {
     if (!user) return [];
     // El pedido debería desasignarse al anular/recuperar; este filtro es una red
     // de seguridad por si esa desasignación falla. Embalado es el último paso del
-    // picker: al marcarlo el pedido sale de su lista (y despachado, que viene
-    // después, tampoco se muestra).
+    // picker: al marcarlo el pedido sale de su lista. Despachado también cubre
+    // `Listo para despachar`, `En guía` y `Rechazado en guía` (ver mapStatus):
+    // la web no quita la asignación, pero el pedido ya no es carga activa.
     const mine = orders.filter(
       (o) =>
         (o.assignedPickerId === user.uid || o.teamPickerUids.includes(user.uid)) &&
